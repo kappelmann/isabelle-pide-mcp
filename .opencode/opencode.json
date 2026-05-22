@@ -1,0 +1,10 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "isabelle": {
+      "type": "local",
+      "command": ["/Users/kevin/Programming/isabelle/isabelle/bin/isabelle", "pide_mcp", "-l", "HOL", "-d", "."],
+      "enabled": true
+    }
+  }
+}

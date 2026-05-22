@@ -1,0 +1,4 @@
+# -*- shell-script -*- :mode=shellscript:
+
+PIDE_MCP_HOME="$COMPONENT"
+ISABELLE_PIDE_MCP_JAR="$PIDE_MCP_HOME/lib/isabelle_pide_mcp.jar"
