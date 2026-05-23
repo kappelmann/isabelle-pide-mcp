@@ -39,3 +39,4 @@ See the example config and skill file in folder `.opencode`
 - instructions field on initialisation
 - update skills file?
 - incremental edits
+- more canonical json parsing or in general working with MCP schema?

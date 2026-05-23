@@ -83,7 +83,7 @@ object Tool_Definitions
       annotations = Some(Map("readOnlyHint" -> true))
     ),
     "find_definition" -> Tool_Def(
-      description = "Resolve the definition site of terms used at a given line via PIDE markup. Returns file path, line number, and source snippet for each resolved entity. Works for library definitions; for project-local entities use list_entities.",
+      description = "Resolve the definition site of terms used at a given line, returning its origin.",
       input_schema = Map("type" -> "object", "properties" -> Map(
         "path" -> Map("type" -> "string", "description" -> "Path to the .thy file containing the usage"),
         "line" -> Map("type" -> "integer", "description" -> "Line number of the usage", "minimum" -> 1),

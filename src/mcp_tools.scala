@@ -30,8 +30,8 @@ class MCP_Tools(val session: PIDE_Session)
       case _ => default
     }
 
-  private def timeout(params: Map[String, Any]): Int =
-    int(params, "timeout_secs").filter(_ > 0).getOrElse(PIDE_Session.default_timeout_secs)
+  private def timeout(raw: Option[Int]): Int =
+    raw.filter(_ > 0).getOrElse(PIDE_Session.default_timeout_secs)
 
   /* theory loading */
 
@@ -88,11 +88,9 @@ class MCP_Tools(val session: PIDE_Session)
     else Right(result)
   }
 
-  private def read_lines(text: String, params: Map[String, Any]): String =
+  private def read_lines(text: String, start: Option[Int], end: Option[Int]): String =
   {
     val all_lines = text.split("\n", -1).zipWithIndex.map { case (l, i) => s"${i+1}: $l" }
-    val start = int(params, "start_line")
-    val end = int(params, "end_line")
     val start_idx = start.filter(_ > 0).map(_ - 1).getOrElse(0)
     val end_idx = end.filter(_ > 0).map(n => Math.min(n, all_lines.length)).getOrElse(all_lines.length)
     all_lines.slice(start_idx, end_idx).mkString("\n")
@@ -103,9 +101,9 @@ class MCP_Tools(val session: PIDE_Session)
     str(params, "path") match {
       case None => Left("Missing path parameter")
       case Some(p) =>
-        file_snapshot(p, timeout(params)).map { case (_, _, doc) =>
+        file_snapshot(p, timeout(int(params, "timeout_secs"))).map { case (_, _, doc) =>
           val text = doc.lines.map(_.text).mkString("\n")
-          Map("content" -> read_lines(text, params))
+          Map("content" -> read_lines(text, int(params, "start_line"), int(params, "end_line")))
         }
     }
   }
@@ -116,7 +114,7 @@ class MCP_Tools(val session: PIDE_Session)
       case None => Left("Missing path parameter")
       case Some(p) =>
         val path = Path.explode(p).expand
-        Right(Map("content" -> read_lines(File.read(path), params)))
+        Right(Map("content" -> read_lines(File.read(path), int(params, "start_line"), int(params, "end_line"))))
     }
   }
 
@@ -155,7 +153,7 @@ class MCP_Tools(val session: PIDE_Session)
             if (start_line.exists(_ > 0) && str(params, "old_content").isEmpty)
               return Left("Missing old_content: must specify expected content at target lines")
             val old_content = str(params, "old_content").getOrElse("")
-            val timeout_secs = timeout(params)
+            val timeout_secs = timeout(int(params, "timeout_secs"))
             val path = Path.explode(path_str).expand
             val current_text = File.read(path)
             replace_lines(current_text, content, start_line.getOrElse(0), end_line.getOrElse(0), old_content).flatMap { new_text =>
@@ -183,7 +181,7 @@ class MCP_Tools(val session: PIDE_Session)
                 if (start_line.exists(_ > 0) && str(params, "old_content").isEmpty)
                   return Left("Missing old_content: must specify expected content at target lines")
                 val old_content = str(params, "old_content").getOrElse("")
-                val timeout_secs = timeout(params)
+                val timeout_secs = timeout(int(params, "timeout_secs"))
                 val path = Path.explode(path_str).expand
                 val current_text = File.read(path)
 
@@ -212,7 +210,7 @@ class MCP_Tools(val session: PIDE_Session)
       case None => Left("Missing path")
       case Some(path_str) =>
         val line_num = int(params, "line")
-        val timeout_secs = timeout(params)
+        val timeout_secs = timeout(int(params, "timeout_secs"))
 
         file_snapshot(path_str, timeout_secs).flatMap { case (snap, _, doc) =>
           if (line_num.isEmpty || line_num.exists(_ <= 0)) {
@@ -500,7 +498,7 @@ class MCP_Tools(val session: PIDE_Session)
 
   private def handle_check_theory(params: Map[String, Any]): Either[String, Map[String, Any]] =
   {
-    val timeout_secs = timeout(params)
+    val timeout_secs = timeout(int(params, "timeout_secs"))
     str(params, "path") match {
       case Some(p) =>
         val path = Path.explode(p).expand
