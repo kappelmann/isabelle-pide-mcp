@@ -18,10 +18,6 @@ object MCPConfig
   val name = "isabelle_pide_mcp"
   val version = "0.1.0"
   val protocolVersion = "2025-11-25"
-
-  /* tool annotation field names */
-  val readOnlyHint = "readOnlyHint"
-  val destructiveHint = "destructiveHint"
 }
 
 class MCPServer(session: PIDESession)
@@ -49,6 +45,12 @@ class MCPServer(session: PIDESession)
   private def rpcResult(id: Option[Any], result: Any): Map[String, Any] =
     Map("jsonrpc" -> "2.0", "id" -> id, "result" -> result)
 
+  /* MCP protocol version negotiation: return the highest version
+     supported by both client and server */
+  private def negotiateProtocolVersion(clientVersion: String): String =
+    if (clientVersion < MCPConfig.protocolVersion) clientVersion
+    else MCPConfig.protocolVersion
+
   def run(): Unit =
   {
     val in = new BufferedReader(new InputStreamReader(System.in))
@@ -64,8 +66,13 @@ class MCPServer(session: PIDESession)
 
         method match {
           case Some("initialize") =>
+            val clientVersion = request.get("params") match {
+              case Some(m: Map[_, _]) => m.asInstanceOf[Map[String, Any]]
+                .get("protocolVersion").map(_.toString).getOrElse(MCPConfig.protocolVersion)
+              case _ => MCPConfig.protocolVersion
+            }
             respond(out, rpcResult(id, Map(
-              "protocolVersion" -> MCPConfig.protocolVersion,
+              "protocolVersion" -> negotiateProtocolVersion(clientVersion),
               "capabilities" -> Map("tools" -> JSON.Object()),
               "serverInfo" -> Map("name" -> MCPConfig.name, "version" -> MCPConfig.version),
               "instructions" -> "TODO description")))
