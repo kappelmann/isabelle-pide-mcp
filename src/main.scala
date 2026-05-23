@@ -1,4 +1,4 @@
-/*  Title:      PIDE_MCP/Main.scala
+/*  Title:      PIDE_MCP/main.scala
     Author:     Kevin Kappelmann
 
 Isabelle tool entry point for the PIDE MCP server.
@@ -41,14 +41,14 @@ Usage: isabelle pide_mcp [OPTIONS]
       val more_args = getopts(args)
       if (more_args.nonEmpty) getopts.usage()
 
-      val pideSession = new PIDESession(logic, session_dirs, options)
+      val pide_session = new PIDE_Session(logic, session_dirs, options)
 
       try {
         System.err.nn.println(s"Starting Isabelle session: $logic ...")
-        pideSession.start()
+        pide_session.start()
         System.err.nn.println("Session started. MCP server listening on stdin/stdout.")
 
-        val server = new MCPServer(pideSession)
+        val server = new MCP_Server(pide_session)
         server.run()
       } catch {
         case ex: Exception =>
@@ -56,7 +56,7 @@ Usage: isabelle pide_mcp [OPTIONS]
           ex.printStackTrace(System.err.nn)
           sys.exit(1)
       } finally {
-        pideSession.stop()
+        pide_session.stop()
       }
     })
 }

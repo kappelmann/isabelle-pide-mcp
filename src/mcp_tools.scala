@@ -1,4 +1,4 @@
-/*  Title:      PIDE_MCP/MCPTools.scala
+/*  Title:      PIDE_MCP/mcp_tools.scala
     Author:     Kevin Kappelmann
 
 Implementation of all MCP tool handlers.
@@ -10,7 +10,7 @@ import isabelle._
 import scala.language.unsafeNulls
 
 
-class MCPTools(val session: PIDESession)
+class MCP_Tools(val session: PIDE_Session)
 {
   /* parameter extraction */
 
@@ -27,24 +27,24 @@ class MCPTools(val session: PIDESession)
   private def timeout(params: Map[String, Any]): Int =
   {
     val t = int(params, "timeout_secs")
-    if (t > 0) t else PIDESession.default_timeout_secs
+    if (t > 0) t else PIDE_Session.default_timeout_secs
   }
 
   /* theory tracking */
 
-  private def ensureTracked(pathStr: String, timeoutSecs: Int = PIDESession.default_timeout_secs): Either[String, Path] =
+  private def ensure_tracked(path_str: String, timeout_secs: Int = PIDE_Session.default_timeout_secs): Either[String, Path] =
   {
-    val path = Path.explode(pathStr).expand
+    val path = Path.explode(path_str).expand
     if (!path.is_file) return Left(s"File not found: $path")
-    session.open_theory(path, timeoutSecs) match {
+    session.open_theory(path, timeout_secs) match {
       case Left(e) => Left(e)
       case Right(_) => Right(path)
     }
   }
 
-  private def fileSnapshot(pathStr: String, timeoutSecs: Int = PIDESession.default_timeout_secs): Either[String, (Document.Snapshot, Document.Node.Name, Line.Document)] =
+  private def file_snapshot(path_str: String, timeout_secs: Int = PIDE_Session.default_timeout_secs): Either[String, (Document.Snapshot, Document.Node.Name, Line.Document)] =
   {
-    ensureTracked(pathStr, timeoutSecs).flatMap { path =>
+    ensure_tracked(path_str, timeout_secs).flatMap { path =>
       val node = session.node_name(path)
       try {
         val snap = session.snapshot(node)
@@ -60,23 +60,23 @@ class MCPTools(val session: PIDESession)
   def invoke(name: String, params: Map[String, Any]): Either[String, Map[String, Any]] =
   {
     name match {
-      case "list_tracked_theories" => handleListTrackedTheories()
-      case "read_theory" => handleReadTheory(params)
-      case "read_ml_file" => handleReadMLFile(params)
-      case "edit_theory" => handleEditTheory(params)
-      case "edit_ml_file" => handleEditMLFile(params)
-      case "get_state" => handleGetState(params)
-      case "list_entities" => handleListEntities(params)
-      case "find_definition" => handleFindDefinition(params)
-      case "scratch" => handleScratch(params)
-      case "check_theory" => handleCheckTheory(params)
+      case "list_tracked_theories" => handle_list_tracked_theories()
+      case "read_theory" => handle_read_theory(params)
+      case "read_ml_file" => handle_read_ml_file(params)
+      case "edit_theory" => handle_edit_theory(params)
+      case "edit_ml_file" => handle_edit_ml_file(params)
+      case "get_state" => handle_get_state(params)
+      case "list_entities" => handle_list_entities(params)
+      case "find_definition" => handle_find_definition(params)
+      case "scratch" => handle_scratch(params)
+      case "check_theory" => handle_check_theory(params)
       case _ => Left(s"Unknown tool: $name")
     }
   }
 
   /* tool implementations */
 
-  private def handleListTrackedTheories(): Either[String, Map[String, Any]] =
+  private def handle_list_tracked_theories(): Either[String, Map[String, Any]] =
   {
     val files = session.loaded_theories.map { name =>
       Map("path" -> name.node, "theory" -> name.theory)
@@ -84,115 +84,115 @@ class MCPTools(val session: PIDESession)
     Right(Map("files" -> files))
   }
 
-  private def readLines(text: String, params: Map[String, Any]): String =
+  private def read_lines(text: String, params: Map[String, Any]): String =
   {
-    val allLines = text.split("\n", -1).zipWithIndex.map { case (l, i) => s"${i+1}: $l" }
+    val all_lines = text.split("\n", -1).zipWithIndex.map { case (l, i) => s"${i+1}: $l" }
     val start = int(params, "start_line")
     val end = int(params, "end_line")
-    val startIdx = if (start > 0) start - 1 else 0
-    val endIdx = if (end > 0) Math.min(end, allLines.length) else allLines.length
-    allLines.slice(startIdx, endIdx).mkString("\n")
+    val start_idx = if (start > 0) start - 1 else 0
+    val end_idx = if (end > 0) Math.min(end, all_lines.length) else all_lines.length
+    all_lines.slice(start_idx, end_idx).mkString("\n")
   }
 
-  private def handleReadTheory(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  private def handle_read_theory(params: Map[String, Any]): Either[String, Map[String, Any]] =
   {
     str(params, "path") match {
       case None => Left("Missing path parameter")
       case Some(p) =>
-        fileSnapshot(p, timeout(params)).map { case (_, _, doc) =>
+        file_snapshot(p, timeout(params)).map { case (_, _, doc) =>
           val text = doc.lines.map(_.text).mkString("\n")
-          Map("content" -> readLines(text, params))
+          Map("content" -> read_lines(text, params))
         }
     }
   }
 
-  private def handleReadMLFile(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  private def handle_read_ml_file(params: Map[String, Any]): Either[String, Map[String, Any]] =
   {
     str(params, "path") match {
       case None => Left("Missing path parameter")
       case Some(p) =>
         val path = Path.explode(p).expand
         if (!path.is_file) Left(s"File not found: $path")
-        else Right(Map("content" -> readLines(File.read(path), params)))
+        else Right(Map("content" -> read_lines(File.read(path), params)))
     }
   }
 
-  private def replaceLines(currentText: String, content: String, startLine: Int, endLine: Int, oldContent: String): Either[String, String] =
+  private def replace_lines(current_text: String, content: String, start_line: Int, end_line: Int, old_content: String): Either[String, String] =
   {
-    if (startLine <= 0) Right(content)
+    if (start_line <= 0) Right(content)
     else {
-      val lines = currentText.split("\n", -1)
-      val end = if (endLine <= 0) startLine else endLine
-      val startIdx = startLine - 1
-      if (startIdx < 0 || startIdx > lines.length) Left(s"Invalid start_line: $startLine")
+      val lines = current_text.split("\n", -1)
+      val end = if (end_line <= 0) start_line else end_line
+      val start_idx = start_line - 1
+      if (start_idx < 0 || start_idx > lines.length) Left(s"Invalid start_line: $start_line")
       else {
-        val actualOld = lines.slice(startIdx, end).mkString("\n")
-        if (actualOld != oldContent)
-          Left(s"old_content mismatch at lines $startLine-$end.\nExpected:\n$oldContent\nActual:\n$actualOld")
+        val actual_old = lines.slice(start_idx, end).mkString("\n")
+        if (actual_old != old_content)
+          Left(s"old_content mismatch at lines $start_line-$end.\nExpected:\n$old_content\nActual:\n$actual_old")
         else {
-          val prefix = lines.take(startIdx)
+          val prefix = lines.take(start_idx)
           val suffix = lines.drop(end)
-          val contentLines = content.split("\n", -1)
-          Right((prefix ++ contentLines ++ suffix).mkString("\n"))
+          val content_lines = content.split("\n", -1)
+          Right((prefix ++ content_lines ++ suffix).mkString("\n"))
         }
       }
     }
   }
 
-  private def handleEditTheory(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  private def handle_edit_theory(params: Map[String, Any]): Either[String, Map[String, Any]] =
   {
     str(params, "path") match {
       case None => Left("Missing path")
-      case Some(pathStr) =>
+      case Some(path_str) =>
         str(params, "content") match {
           case None => Left("Missing content")
           case Some(content) =>
-            val startLine = int(params, "start_line")
-            val endLine = int(params, "end_line")
-            if (startLine > 0 && str(params, "old_content").isEmpty)
+            val start_line = int(params, "start_line")
+            val end_line = int(params, "end_line")
+            if (start_line > 0 && str(params, "old_content").isEmpty)
               return Left("Missing old_content: must specify expected content at target lines")
-            val oldContent = str(params, "old_content").getOrElse("")
-            val timeoutSecs = timeout(params)
-            ensureTracked(pathStr, timeoutSecs).flatMap { path =>
-              val currentText = File.read(path)
+            val old_content = str(params, "old_content").getOrElse("")
+            val timeout_secs = timeout(params)
+            ensure_tracked(path_str, timeout_secs).flatMap { path =>
+              val current_text = File.read(path)
 
-              replaceLines(currentText, content, startLine, endLine, oldContent).flatMap { newText =>
-                File.write(path, newText)
-                session.update_theory(List(session.node_name(path).theory), path.dir.implode, timeoutSecs)
-                Right(Map("status" -> "written", "length" -> newText.length))
+              replace_lines(current_text, content, start_line, end_line, old_content).flatMap { new_text =>
+                File.write(path, new_text)
+                session.update_theory(List(session.node_name(path).theory), path.dir.implode, timeout_secs)
+                Right(Map("status" -> "written", "length" -> new_text.length))
               }
             }
         }
     }
   }
 
-  private def handleEditMLFile(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  private def handle_edit_ml_file(params: Map[String, Any]): Either[String, Map[String, Any]] =
   {
     str(params, "path") match {
       case None => Left("Missing path")
-      case Some(pathStr) =>
+      case Some(path_str) =>
         str(params, "content") match {
           case None => Left("Missing content")
           case Some(content) =>
             str(params, "parent_theory") match {
               case None => Left("Missing parent_theory")
-              case Some(parentStr) =>
-                val startLine = int(params, "start_line")
-                val endLine = int(params, "end_line")
-                if (startLine > 0 && str(params, "old_content").isEmpty)
+              case Some(parent_str) =>
+                val start_line = int(params, "start_line")
+                val end_line = int(params, "end_line")
+                if (start_line > 0 && str(params, "old_content").isEmpty)
                   return Left("Missing old_content: must specify expected content at target lines")
-                val oldContent = str(params, "old_content").getOrElse("")
-                val timeoutSecs = timeout(params)
-                val path = Path.explode(pathStr).expand
+                val old_content = str(params, "old_content").getOrElse("")
+                val timeout_secs = timeout(params)
+                val path = Path.explode(path_str).expand
                 if (!path.is_file) return Left(s"File not found: $path")
-                val currentText = File.read(path)
+                val current_text = File.read(path)
 
-                replaceLines(currentText, content, startLine, endLine, oldContent).flatMap { newText =>
-                  File.write(path, newText)
-                  val parentPath = Path.explode(parentStr).expand
-                  ensureTracked(parentStr, timeoutSecs).flatMap { _ =>
-                    session.update_theory(List(session.node_name(parentPath).theory), parentPath.dir.implode, timeoutSecs)
-                    Right(Map("status" -> "written", "length" -> newText.length))
+                replace_lines(current_text, content, start_line, end_line, old_content).flatMap { new_text =>
+                  File.write(path, new_text)
+                  val parent_path = Path.explode(parent_str).expand
+                  ensure_tracked(parent_str, timeout_secs).flatMap { _ =>
+                    session.update_theory(List(session.node_name(parent_path).theory), parent_path.dir.implode, timeout_secs)
+                    Right(Map("status" -> "written", "length" -> new_text.length))
                   }
                 }
             }
@@ -200,7 +200,7 @@ class MCPTools(val session: PIDESession)
     }
   }
 
-  private def extractMarkupText(results: Command.Results, tags: Set[String]): List[String] =
+  private def extract_markup_text(results: Command.Results, tags: Set[String]): List[String] =
     results.iterator.flatMap { case (_, elem) =>
       elem match {
         case XML.Elem(Markup(tag, _), body) if tags.contains(tag) => Some(XML.content(body))
@@ -208,49 +208,49 @@ class MCPTools(val session: PIDESession)
       }
     }.toList
 
-  private def handleGetState(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  private def handle_get_state(params: Map[String, Any]): Either[String, Map[String, Any]] =
   {
     str(params, "path") match {
       case None => Left("Missing path")
-      case Some(pathStr) =>
-        val lineNum = int(params, "line")
-        val timeoutSecs = timeout(params)
+      case Some(path_str) =>
+        val line_num = int(params, "line")
+        val timeout_secs = timeout(params)
 
-        fileSnapshot(pathStr, timeoutSecs).flatMap { case (snap, _, doc) =>
-          if (lineNum <= 0) {
+        file_snapshot(path_str, timeout_secs).flatMap { case (snap, _, doc) =>
+          if (line_num <= 0) {
             /* file-level diagnostics */
             val diags = session.command_iterator(snap).flatMap { case (cmd, offset) =>
               val status = session.command_status(snap, cmd)
               val results = snap.command_results(cmd)
               val line = doc.position(offset).line + 1
               val errors = if (status.is_failed)
-                extractMarkupText(results, Set(Markup.ERROR, Markup.ERROR_MESSAGE))
+                extract_markup_text(results, Set(Markup.ERROR, Markup.ERROR_MESSAGE))
                   .map(m => Map[String, Any]("severity" -> "error", "line" -> line, "message" -> m.trim))
               else Nil
-              val warnings = extractMarkupText(results, Set(Markup.WARNING, Markup.WARNING_MESSAGE))
+              val warnings = extract_markup_text(results, Set(Markup.WARNING, Markup.WARNING_MESSAGE))
                 .map(m => Map[String, Any]("severity" -> "warning", "line" -> line, "message" -> m.trim))
               errors ++ warnings
             }.toList
             Right(Map("type" -> "file_diagnostics", "diagnostics" -> diags))
           } else {
             /* command-level state */
-            val targetCmd = snap.node.command_iterator()
+            val target_cmd = snap.node.command_iterator()
               .filter { case (cmd, _) => cmd.source.trim.nonEmpty }
               .toList
-              .filter { case (_, offset) => doc.position(offset).line + 1 <= lineNum }
+              .filter { case (_, offset) => doc.position(offset).line + 1 <= line_num }
               .lastOption
 
-            targetCmd match {
+            target_cmd match {
               case Some((cmd, offset)) =>
                 val results = snap.command_results(cmd)
-                val stateText = extractMarkupText(results, Set(Markup.STATE, Markup.STATE_MESSAGE)).mkString("\n").trim
-                val writelnText = extractMarkupText(results, Set(Markup.WRITELN, Markup.WRITELN_MESSAGE)).mkString("\n").trim
-                val infoText = extractMarkupText(results, Set(Markup.INFORMATION, Markup.INFORMATION_MESSAGE)).mkString("\n").trim
-                val errorText = extractMarkupText(results, Set(Markup.ERROR, Markup.ERROR_MESSAGE)).mkString("\n").trim
-                val warningText = extractMarkupText(results, Set(Markup.WARNING, Markup.WARNING_MESSAGE)).mkString("\n").trim
+                val state_text = extract_markup_text(results, Set(Markup.STATE, Markup.STATE_MESSAGE)).mkString("\n").trim
+                val writeln_text = extract_markup_text(results, Set(Markup.WRITELN, Markup.WRITELN_MESSAGE)).mkString("\n").trim
+                val info_text = extract_markup_text(results, Set(Markup.INFORMATION, Markup.INFORMATION_MESSAGE)).mkString("\n").trim
+                val error_text = extract_markup_text(results, Set(Markup.ERROR, Markup.ERROR_MESSAGE)).mkString("\n").trim
+                val warning_text = extract_markup_text(results, Set(Markup.WARNING, Markup.WARNING_MESSAGE)).mkString("\n").trim
 
                 val subgoals = scala.collection.mutable.ListBuffer[String]()
-                val localFacts = scala.collection.mutable.ListBuffer[String]()
+                val local_facts = scala.collection.mutable.ListBuffer[String]()
                 val sendbacks = scala.collection.mutable.ListBuffer[String]()
                 val timings = scala.collection.mutable.ListBuffer[Map[String, String]]()
                 val exports = scala.collection.mutable.ListBuffer[Map[String, String]]()
@@ -261,10 +261,10 @@ class MCPTools(val session: PIDESession)
                       subgoals += XML.content(body).trim
                       traverse(body)
                     case XML.Elem(Markup(Markup.FACT, props), body) =>
-                      props.find(_._1 == Markup.NAME).foreach(p => localFacts += p._2)
+                      props.find(_._1 == Markup.NAME).foreach(p => local_facts += p._2)
                       traverse(body)
                     case XML.Elem(Markup("local_fact", props), body) =>
-                      props.find(_._1 == Markup.NAME).foreach(p => localFacts += p._2)
+                      props.find(_._1 == Markup.NAME).foreach(p => local_facts += p._2)
                       traverse(body)
                     case XML.Elem(Markup(Markup.SENDBACK, _), body) =>
                       sendbacks += XML.content(body).trim
@@ -287,10 +287,10 @@ class MCPTools(val session: PIDESession)
                 results.iterator.foreach { case (_, elem) => traverse(List(elem)) }
 
                 /* extract variables, locales, bindings, class parameters from command source markup */
-                val textRange = cmd.core_range + offset
-                val varKinds = Set(Markup.FREE, Markup.FIXED, Markup.BOUND, Markup.VAR, Markup.SKOLEM, Markup.CONSTANT)
-                val typeKinds = Set(Markup.TYPING, Markup.ML_TYPING)
-                val markup = snap.cumulate(textRange, List.empty[XML.Elem],
+                val text_range = cmd.core_range + offset
+                val var_kinds = Set(Markup.FREE, Markup.FIXED, Markup.BOUND, Markup.VAR, Markup.SKOLEM, Markup.CONSTANT)
+                val type_kinds = Set(Markup.TYPING, Markup.ML_TYPING)
+                val markup = snap.cumulate(text_range, List.empty[XML.Elem],
                   Markup.Elements(Markup.TYPING, Markup.ML_TYPING, Markup.FREE, Markup.FIXED,
                     Markup.BOUND, Markup.VAR, Markup.SKOLEM, Markup.CONSTANT, Markup.ENTITY,
                     Markup.LOCALE, Markup.BINDING, Markup.CLASS_PARAMETER),
@@ -300,52 +300,52 @@ class MCPTools(val session: PIDESession)
                 val vars = scala.collection.mutable.ListBuffer[Map[String, Any]]()
                 val locales = scala.collection.mutable.ListBuffer[String]()
                 val bindings = scala.collection.mutable.ListBuffer[String]()
-                val classParams = scala.collection.mutable.ListBuffer[String]()
+                val class_params = scala.collection.mutable.ListBuffer[String]()
 
                 markup.foreach { case Text.Info(r, elems) =>
-                  val kindElem = elems.find(e => varKinds.contains(e.name))
-                  val typingElem = elems.find(e => typeKinds.contains(e.name))
-                  val localeElem = elems.find(e => e.name == Markup.LOCALE)
-                  val bindingElem = elems.find(e => e.name == Markup.BINDING)
-                  val classParamElem = elems.find(e => e.name == Markup.CLASS_PARAMETER)
-                  val entityLocale = elems.collectFirst {
+                  val kind_elem = elems.find(e => var_kinds.contains(e.name))
+                  val typing_elem = elems.find(e => type_kinds.contains(e.name))
+                  val locale_elem = elems.find(e => e.name == Markup.LOCALE)
+                  val binding_elem = elems.find(e => e.name == Markup.BINDING)
+                  val class_param_elem = elems.find(e => e.name == Markup.CLASS_PARAMETER)
+                  val entity_locale = elems.collectFirst {
                     case XML.Elem(Markup(Markup.ENTITY, props), _)
                       if props.toMap.getOrElse("kind", "") == "locale" =>
                         props.toMap.getOrElse("name", "")
                   }
-                  val entityBinding = elems.collectFirst {
+                  val entity_binding = elems.collectFirst {
                     case XML.Elem(Markup(Markup.ENTITY, props), _)
                       if props.toMap.getOrElse("kind", "") == "binding" =>
                         props.toMap.getOrElse("name", "")
                   }
-                  val entityClassParam = elems.collectFirst {
+                  val entity_class_param = elems.collectFirst {
                     case XML.Elem(Markup(Markup.ENTITY, props), _)
                       if props.toMap.getOrElse("kind", "") == "class_parameter" =>
                         props.toMap.getOrElse("name", "")
                   }
-                  val entityConstant = elems.exists {
+                  val entity_constant = elems.exists {
                     case XML.Elem(Markup(Markup.ENTITY, props), _) =>
                       props.toMap.getOrElse("kind", "") == "constant"
                     case _ => false
                   }
-                  val textOffset = r.start - offset
-                  if (textOffset >= 0 && textOffset + r.length <= cmd.source.length) {
-                    val name = cmd.source.substring(textOffset, textOffset + r.length)
-                    if (localeElem.isDefined || entityLocale.isDefined) locales += entityLocale.getOrElse(name)
-                    if (bindingElem.isDefined || entityBinding.isDefined) bindings += entityBinding.getOrElse(name)
-                    if (classParamElem.isDefined || entityClassParam.isDefined) classParams += entityClassParam.getOrElse(name)
-                    if (kindElem.isDefined || typingElem.isDefined || entityConstant) {
-                      val kind = kindElem.map(_.name).getOrElse(
-                        if (entityConstant) "constant" else "typed"
+                  val text_offset = r.start - offset
+                  if (text_offset >= 0 && text_offset + r.length <= cmd.source.length) {
+                    val name = cmd.source.substring(text_offset, text_offset + r.length)
+                    if (locale_elem.isDefined || entity_locale.isDefined) locales += entity_locale.getOrElse(name)
+                    if (binding_elem.isDefined || entity_binding.isDefined) bindings += entity_binding.getOrElse(name)
+                    if (class_param_elem.isDefined || entity_class_param.isDefined) class_params += entity_class_param.getOrElse(name)
+                    if (kind_elem.isDefined || typing_elem.isDefined || entity_constant) {
+                      val kind = kind_elem.map(_.name).getOrElse(
+                        if (entity_constant) "constant" else "typed"
                       )
-                      val typ = typingElem.map(e => XML.content(e.body)).getOrElse("unknown")
+                      val typ = typing_elem.map(e => XML.content(e.body)).getOrElse("unknown")
                       vars += Map("name" -> name, "kind" -> kind, "type" -> typ)
                     }
                   }
                 }
-                val varsDistinct = vars.distinctBy(v => v("name").toString + v("kind").toString).toList
+                val vars_distinct = vars.distinctBy(v => v("name").toString + v("kind").toString).toList
 
-                val boundFacts = markup.flatMap { case Text.Info(_, elems) =>
+                val bound_facts = markup.flatMap { case Text.Info(_, elems) =>
                   elems.flatMap {
                     case XML.Elem(Markup(Markup.ENTITY, props), _) =>
                       val p = props.toMap
@@ -357,7 +357,7 @@ class MCPTools(val session: PIDESession)
                 }.distinct
 
                 val status = session.command_status(snap, cmd)
-                val statusStr =
+                val status_str =
                   if (status.is_failed) "error"
                   else if (status.is_finished) "ok"
                   else if (status.is_running) "running"
@@ -367,44 +367,44 @@ class MCPTools(val session: PIDESession)
                 val response = scala.collection.mutable.LinkedHashMap[String, Any](
                   "type" -> "command_state",
                   "source" -> cmd.source.trim,
-                  "status" -> statusStr,
-                  "variables" -> varsDistinct
+                  "status" -> status_str,
+                  "variables" -> vars_distinct
                 )
 
-                if (stateText.nonEmpty) response("state") = stateText
+                if (state_text.nonEmpty) response("state") = state_text
                 if (subgoals.nonEmpty) response("subgoals") = subgoals.toList
 
-                val allLocalFacts = (localFacts.toList ++ boundFacts).distinct
-                if (allLocalFacts.nonEmpty) response("local_facts") = allLocalFacts
+                val all_local_facts = (local_facts.toList ++ bound_facts).distinct
+                if (all_local_facts.nonEmpty) response("local_facts") = all_local_facts
 
                 if (sendbacks.nonEmpty) response("sendback") = sendbacks.toList.distinct
                 if (timings.nonEmpty) response("timing") = timings.toList
                 if (exports.nonEmpty) response("exports") = exports.toList
                 if (locales.nonEmpty) response("locale") = locales.toList.distinct
                 if (bindings.nonEmpty) response("binding") = bindings.toList.distinct
-                if (classParams.nonEmpty) response("class_parameter") = classParams.toList.distinct
+                if (class_params.nonEmpty) response("class_parameter") = class_params.toList.distinct
 
-                if (writelnText.nonEmpty) response("writeln") = writelnText
-                if (infoText.nonEmpty) response("information") = infoText
-                if (warningText.nonEmpty) response("warning") = warningText
-                if (errorText.nonEmpty) response("error") = errorText
+                if (writeln_text.nonEmpty) response("writeln") = writeln_text
+                if (info_text.nonEmpty) response("information") = info_text
+                if (warning_text.nonEmpty) response("warning") = warning_text
+                if (error_text.nonEmpty) response("error") = error_text
 
                 Right(response.toMap)
-              case None => Left(s"No command found at line $lineNum")
+              case None => Left(s"No command found at line $line_num")
             }
           }
         }
     }
   }
 
-  private def handleListEntities(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  private def handle_list_entities(params: Map[String, Any]): Either[String, Map[String, Any]] =
   {
     str(params, "path") match {
       case Some(p) =>
-        fileSnapshot(p).flatMap { case (snap, _, doc) =>
+        file_snapshot(p).flatMap { case (snap, _, doc) =>
           val entities = session.command_iterator(snap).flatMap { case (cmd, offset) =>
-            val textRange = cmd.core_range + offset
-            val markup = snap.cumulate(textRange, List.empty[XML.Elem],
+            val text_range = cmd.core_range + offset
+            val markup = snap.cumulate(text_range, List.empty[XML.Elem],
               Markup.Elements(Markup.ENTITY),
               _ => { case (acc, Text.Info(_, m)) => Some(m :: acc) }
             )
@@ -429,26 +429,26 @@ class MCPTools(val session: PIDESession)
     }
   }
 
-  private def handleFindDefinition(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  private def handle_find_definition(params: Map[String, Any]): Either[String, Map[String, Any]] =
   {
     str(params, "path") match {
       case None => Left("Missing path")
-      case Some(pathStr) =>
-        val lineNum = int(params, "line")
-        val termName = str(params, "term_name")
-        if (lineNum <= 0) return Left("Missing or invalid line number")
+      case Some(path_str) =>
+        val line_num = int(params, "line")
+        val term_name = str(params, "term_name")
+        if (line_num <= 0) return Left("Missing or invalid line number")
 
-        fileSnapshot(pathStr).flatMap { case (snap, _, doc) =>
-          val targetCmd = snap.node.command_iterator()
+        file_snapshot(path_str).flatMap { case (snap, _, doc) =>
+          val target_cmd = snap.node.command_iterator()
               .filter { case (cmd, _) => cmd.source.trim.nonEmpty }
               .toList
-              .filter { case (_, offset) => doc.position(offset).line + 1 <= lineNum }
+              .filter { case (_, offset) => doc.position(offset).line + 1 <= line_num }
               .lastOption
 
-          targetCmd match {
+          target_cmd match {
             case Some((cmd, offset)) =>
-              val textRange = cmd.core_range + offset
-              val markup = snap.cumulate(textRange, List.empty[XML.Tree],
+              val text_range = cmd.core_range + offset
+              val markup = snap.cumulate(text_range, List.empty[XML.Tree],
                 Markup.Elements(Markup.ENTITY),
                 _ => { case (acc, Text.Info(_, m)) => Some(m :: acc) }
               )
@@ -459,22 +459,22 @@ class MCPTools(val session: PIDESession)
                     val p = props.toMap
                     if (p.contains("name") && p.contains("def_file") && p.contains("def_line")) {
                       val name = p("name")
-                      if (termName.isEmpty || termName.contains(name)) {
+                      if (term_name.isEmpty || term_name.contains(name)) {
                         try {
-                          val defFile = Path.explode(p("def_file")).expand.implode
-                          val defLine = p("def_line").toInt
-                          val defContent = if (new java.io.File(defFile).exists) {
-                            val lines = File.read(Path.explode(defFile)).split("\n")
-                            val startIdx = Math.max(0, defLine - 1)
-                            val endIdx = Math.min(lines.length, startIdx + 15)
-                            lines.slice(startIdx, endIdx).mkString("\n")
+                          val def_file = Path.explode(p("def_file")).expand.implode
+                          val def_line = p("def_line").toInt
+                          val def_content = if (new java.io.File(def_file).exists) {
+                            val lines = File.read(Path.explode(def_file)).split("\n")
+                            val start_idx = Math.max(0, def_line - 1)
+                            val end_idx = Math.min(lines.length, start_idx + 15)
+                            lines.slice(start_idx, end_idx).mkString("\n")
                           } else "Source file not available on disk."
                           Some(Map[String, Any](
                             "name" -> name,
                             "kind" -> p.getOrElse("kind", "unknown"),
-                            "file" -> defFile,
-                            "line" -> defLine,
-                            "source_snippet" -> defContent
+                            "file" -> def_file,
+                            "line" -> def_line,
+                            "source_snippet" -> def_content
                           ))
                         } catch { case _: Exception => None }
                       } else None
@@ -484,13 +484,13 @@ class MCPTools(val session: PIDESession)
               }.distinctBy(d => d("name").toString + d("file").toString)
               Right(Map("definitions" -> definitions))
 
-            case None => Left(s"No command found at line $lineNum")
+            case None => Left(s"No command found at line $line_num")
           }
         }
     }
   }
 
-  private def handleScratch(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  private def handle_scratch(params: Map[String, Any]): Either[String, Map[String, Any]] =
   {
     str(params, "content") match {
       case None => Left("Missing content")
@@ -498,28 +498,28 @@ class MCPTools(val session: PIDESession)
         str(params, "imports") match {
           case None => Left("Missing imports")
           case Some(imports) =>
-            val timeoutSecs = timeout(params)
-            PIDESession.runQuery(session, content, imports, timeoutSecs) match {
-              case Right((output, theoryName, theoryPath)) =>
-                Right(Map("output" -> output, "theory_name" -> theoryName, "theory_path" -> theoryPath))
+            val timeout_secs = timeout(params)
+            PIDE_Session.run_query(session, content, imports, timeout_secs) match {
+              case Right((output, theory_name, theory_path)) =>
+                Right(Map("output" -> output, "theory_name" -> theory_name, "theory_path" -> theory_path))
               case Left(err) => Left(err)
             }
         }
     }
   }
 
-  private def handleCheckTheory(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  private def handle_check_theory(params: Map[String, Any]): Either[String, Map[String, Any]] =
   {
-    val timeoutSecs = timeout(params)
+    val timeout_secs = timeout(params)
     str(params, "path") match {
       case Some(p) =>
-        ensureTracked(p, timeoutSecs).flatMap { path =>
-          session.update_theory(List(session.node_name(path).theory), path.dir.implode, timeoutSecs)
+        ensure_tracked(p, timeout_secs).flatMap { path =>
+          session.update_theory(List(session.node_name(path).theory), path.dir.implode, timeout_secs)
           Right(Map("status" -> "checked", "path" -> p))
         }
       case None =>
         val all = session.loaded_theories
-        all.foreach(name => session.update_theory(List(name.theory), Path.explode(name.node).dir.implode, timeoutSecs))
+        all.foreach(name => session.update_theory(List(name.theory), Path.explode(name.node).dir.implode, timeout_secs))
         Right(Map("status" -> "checked_all", "count" -> all.length))
     }
   }
