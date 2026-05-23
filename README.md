@@ -22,10 +22,11 @@ Or configure it in your MCP client (e.g., OpenCode, Claude Desktop, Zed, Cursor)
 - args: `["pide_mcp", "-l", "HOL"]` (or whichever session you require)
 
 Options:
-- `-l NAME` — logic session name (required, e.g., HOL, HOL-Analysis, ZF)
+- `-l NAME` — logic session name (e.g., HOL, HOL-Analysis, ZF)
 - `-d DIR` — include session directory
 - `-o OPTION` — override Isabelle system option (via NAME=VAL or NAME)
 - `-v` — verbose output on stderr
 
-### Config
-See the example config and skill file in `.opencode`
+### Configuration
+
+See the example config and skill file in folder `.opencode`
