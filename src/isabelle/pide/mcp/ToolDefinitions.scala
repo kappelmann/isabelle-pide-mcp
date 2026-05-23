@@ -48,7 +48,7 @@ object ToolDefinitions {
       ), "required" -> List("path", "content", "parent_theory"))
     ),
     "get_state" -> ToolDef(
-      description = "Query the PIDE state at a given line: command source, processing status, error/warning messages, and typed variables in scope. Without a line number, returns diagnostics for the whole file.",
+      description = "Query the PIDE state at a given line: command source, processing status, goal state, error/warning messages, variables in scope, etc. Without a line number, returns diagnostics for the whole file.",
       inputSchema = Map("type" -> "object", "properties" -> Map(
         "path" -> Map("type" -> "string", "description" -> "Absolute path to the .thy file"),
         "line" -> Map("type" -> "number", "description" -> "Line number (1-indexed)"),
@@ -70,12 +70,12 @@ object ToolDefinitions {
       ), "required" -> List("path", "line"))
     ),
     "scratch" -> ToolDef(
-      description = "Evaluate Isabelle commands in a scratch theory context. Creates a new theory importing the specified parent. Returns theory_name and theory_path for incremental development: use edit_theory with the returned theory_path to extend the proof/development (insert before the 'end' line).",
+      description = "Evaluate Isabelle source text in a scratch theory context. Creates a new theory importing the specified parent. Returns theory_name and theory_path for incremental development: use edit_theory with the returned theory_path to extend the proof/development. Final changes should eventually be played back to the desired original theory.",
       inputSchema = Map("type" -> "object", "properties" -> Map(
-        "commands" -> Map("type" -> "string", "description" -> "Isabelle commands (e.g. lemmas, definitions, find_theorems, sledgehammer, try, ...)"),
-        "imports" -> Map("type" -> "string", "description" -> "Parent theory (e.g. Main, Complex_Main, HOL-Library.Multiset)"),
+        "content" -> Map("type" -> "string", "description" -> "Isabelle source text (lemmas, definitions, find_theorems, sledgehammer, try, etc.)"),
+        "imports" -> Map("type" -> "string", "description" -> "Parent theories (e.g. Main, Complex_Main, HOL-Library.Multiset)"),
         "timeout_secs" -> Map("type" -> "number", "description" -> "Timeout in seconds for query execution (default: 15)")
-      ), "required" -> List("commands", "imports"))
+      ), "required" -> List("content", "imports"))
     ),
     "check_theory" -> ToolDef(
       description = "Re-check a theory via use_theories. Without a path, re-checks all tracked theories.",

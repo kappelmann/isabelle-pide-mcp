@@ -463,14 +463,14 @@ class MCPTools(val session: PIDESession) {
   }
 
   private def handleScratch(params: Map[String, Any]): Either[String, Map[String, Any]] = {
-    str(params, "commands") match {
-      case None => Left("Missing commands")
-      case Some(commands) =>
+    str(params, "content") match {
+      case None => Left("Missing content")
+      case Some(content) =>
         str(params, "imports") match {
           case None => Left("Missing imports")
           case Some(imports) =>
             val timeoutSecs = timeout(params)
-            PIDESession.runQuery(session, commands, imports, timeoutSecs) match {
+            PIDESession.runQuery(session, content, imports, timeoutSecs) match {
               case Right((output, theoryName, theoryPath)) =>
                 Right(Map("output" -> output, "theory_name" -> theoryName, "theory_path" -> theoryPath))
               case Left(err) => Left(err)
