@@ -1,4 +1,4 @@
-/*  Title:      PIDE_MCP/main.scala
+/*  Title:      PIDE_MCP/pide_mcp.scala
     Author:     Kevin Kappelmann
 
 Isabelle tool entry point for the PIDE MCP server.
@@ -10,7 +10,7 @@ import isabelle._
 import scala.language.unsafeNulls
 
 
-object MCP_Tool_App
+object PIDE_MCP
 {
   val isabelle_tool = Isabelle_Tool("pide_mcp", "Isabelle PIDE MCP server", Scala_Project.here,
     { args =>
@@ -61,4 +61,4 @@ Usage: isabelle pide_mcp [OPTIONS]
     })
 }
 
-class MCP_Tool extends Isabelle_Scala_Tools(MCP_Tool_App.isabelle_tool)
+class PIDE_MCP_Tool extends Isabelle_Scala_Tools(PIDE_MCP.isabelle_tool)

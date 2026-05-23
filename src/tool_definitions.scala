@@ -12,9 +12,12 @@ case class Tool_Def(description: String, input_schema: Map[String, Any],
 object Tool_Definitions
 {
   val all: List[(String, Tool_Def)] = List(
-    "list_tracked_theories" -> Tool_Def(
-      description = "List theories currently loaded in the PIDE session.",
-      input_schema = Map("type" -> "object", "properties" -> Map.empty),
+    "list_loaded_theories" -> Tool_Def(
+      description = "List theories currently loaded in the PIDE session, separated into static (from session build) and dynamic (loaded at runtime) and scratch theories (optional).",
+      input_schema = Map("type" -> "object", "properties" -> Map(
+        "include_scratch" -> Map("type" -> "boolean", "description" -> "Include temporary scratch theories",
+          "default" -> false)
+      )),
       annotations = Some(Map("readOnlyHint" -> true))
     ),
     "read_theory" -> Tool_Def(
@@ -88,18 +91,15 @@ object Tool_Definitions
       ), "required" -> List("path", "line")),
       annotations = Some(Map("readOnlyHint" -> true))
     ),
-    "scratch" -> Tool_Def(
-      description = "Evaluate Isabelle source text in a scratch theory context. Creates a new theory importing the specified parent. Returns theory_name and theory_path for incremental development: use edit_theory with the returned theory_path to extend the proof/development. Final changes should eventually be played back to the desired original theory.",
+    "create_scratch" -> Tool_Def(
+      description = "Create a temporary scratch theory file for exploration. The file is placed in a temporary directory and cleaned up when the session stops. Use read_theory, edit_theory, check_theory, and other tools to interact with it.",
       input_schema = Map("type" -> "object", "properties" -> Map(
-        "content" -> Map("type" -> "string", "description" -> "Isabelle source text (lemmas, definitions, find_theorems, sledgehammer, try, etc.)"),
-        "imports" -> Map("type" -> "string", "description" -> "Parent theories (e.g. Main, Complex_Main, HOL-Library.Multiset)"),
-        "timeout_secs" -> Map("type" -> "integer", "description" -> "Timeout in seconds for query execution",
-          "default" -> PIDE_Session.default_timeout_secs)
-      ), "required" -> List("content", "imports")),
+        "name_suffix" -> Map("type" -> "string", "description" -> "Optional suffix for the theory name (auto-generated if omitted)")
+      )),
       annotations = Some(Map("readOnlyHint" -> false, "destructiveHint" -> false))
     ),
     "check_theory" -> Tool_Def(
-      description = "Re-check a theory via use_theories. Without a path, re-checks all tracked theories.",
+      description = "Re-check a theory via use_theories. Without a path, re-checks all loaded theories.",
       input_schema = Map("type" -> "object", "properties" -> Map(
         "path" -> Map("type" -> "string", "description" -> "Absolute path to the .thy file"),
         "timeout_secs" -> Map("type" -> "integer", "description" -> "Timeout in seconds for PIDE processing",

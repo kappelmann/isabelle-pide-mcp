@@ -17,34 +17,33 @@ class MCP_Tools(val session: PIDE_Session)
   private def str(params: Map[String, Any], key: String): Option[String] =
     params.get(key).map(_.toString)
 
-  private def int(params: Map[String, Any], key: String): Int =
+  private def int(params: Map[String, Any], key: String): Option[Int] =
     params.get(key).flatMap {
       case n: Number => Some(n.intValue())
       case s: String => s.toIntOption
       case _ => None
-    }.getOrElse(0)
+    }
+
+  private def bool(params: Map[String, Any], key: String, default: Boolean = false): Boolean =
+    params.get(key) match {
+      case Some(b: Boolean) => b
+      case _ => default
+    }
 
   private def timeout(params: Map[String, Any]): Int =
-  {
-    val t = int(params, "timeout_secs")
-    if (t > 0) t else PIDE_Session.default_timeout_secs
-  }
+    int(params, "timeout_secs").filter(_ > 0).getOrElse(PIDE_Session.default_timeout_secs)
 
-  /* theory tracking */
+  /* theory loading */
 
-  private def ensure_tracked(path_str: String, timeout_secs: Int = PIDE_Session.default_timeout_secs): Either[String, Path] =
+  private def load_theory_path(path_str: String, timeout_secs: Int = PIDE_Session.default_timeout_secs): Either[String, Path] =
   {
     val path = Path.explode(path_str).expand
-    if (!path.is_file) return Left(s"File not found: $path")
-    session.open_theory(path, timeout_secs) match {
-      case Left(e) => Left(e)
-      case Right(_) => Right(path)
-    }
+    session.load_theory(path, timeout_secs).map(_ => path)
   }
 
   private def file_snapshot(path_str: String, timeout_secs: Int = PIDE_Session.default_timeout_secs): Either[String, (Document.Snapshot, Document.Node.Name, Line.Document)] =
   {
-    ensure_tracked(path_str, timeout_secs).flatMap { path =>
+    load_theory_path(path_str, timeout_secs).flatMap { path =>
       val node = session.node_name(path)
       try {
         val snap = session.snapshot(node)
@@ -60,7 +59,7 @@ class MCP_Tools(val session: PIDE_Session)
   def invoke(name: String, params: Map[String, Any]): Either[String, Map[String, Any]] =
   {
     name match {
-      case "list_tracked_theories" => handle_list_tracked_theories()
+      case "list_loaded_theories" => handle_list_loaded_theories(params)
       case "read_theory" => handle_read_theory(params)
       case "read_ml_file" => handle_read_ml_file(params)
       case "edit_theory" => handle_edit_theory(params)
@@ -68,7 +67,7 @@ class MCP_Tools(val session: PIDE_Session)
       case "get_state" => handle_get_state(params)
       case "list_entities" => handle_list_entities(params)
       case "find_definition" => handle_find_definition(params)
-      case "scratch" => handle_scratch(params)
+      case "create_scratch" => handle_create_scratch(params)
       case "check_theory" => handle_check_theory(params)
       case _ => Left(s"Unknown tool: $name")
     }
@@ -76,12 +75,17 @@ class MCP_Tools(val session: PIDE_Session)
 
   /* tool implementations */
 
-  private def handle_list_tracked_theories(): Either[String, Map[String, Any]] =
+  private def handle_list_loaded_theories(params: Map[String, Any]): Either[String, Map[String, Any]] =
   {
-    val files = session.loaded_theories.map { name =>
-      Map("path" -> name.node, "theory" -> name.theory)
-    }
-    Right(Map("files" -> files))
+    val include_scratch = bool(params, "include_scratch")
+    val (static, dynamic, scratch) = session.loaded_theories
+    def to_entry(name: Document.Node.Name) = Map("path" -> name.node, "theory" -> name.theory)
+    val result = Map(
+      "static" -> static.map(to_entry),
+      "dynamic" -> dynamic.map(to_entry)
+    )
+    if (include_scratch) Right(result + ("scratch" -> scratch.map(to_entry)))
+    else Right(result)
   }
 
   private def read_lines(text: String, params: Map[String, Any]): String =
@@ -89,8 +93,8 @@ class MCP_Tools(val session: PIDE_Session)
     val all_lines = text.split("\n", -1).zipWithIndex.map { case (l, i) => s"${i+1}: $l" }
     val start = int(params, "start_line")
     val end = int(params, "end_line")
-    val start_idx = if (start > 0) start - 1 else 0
-    val end_idx = if (end > 0) Math.min(end, all_lines.length) else all_lines.length
+    val start_idx = start.filter(_ > 0).map(_ - 1).getOrElse(0)
+    val end_idx = end.filter(_ > 0).map(n => Math.min(n, all_lines.length)).getOrElse(all_lines.length)
     all_lines.slice(start_idx, end_idx).mkString("\n")
   }
 
@@ -112,8 +116,7 @@ class MCP_Tools(val session: PIDE_Session)
       case None => Left("Missing path parameter")
       case Some(p) =>
         val path = Path.explode(p).expand
-        if (!path.is_file) Left(s"File not found: $path")
-        else Right(Map("content" -> read_lines(File.read(path), params)))
+        Right(Map("content" -> read_lines(File.read(path), params)))
     }
   }
 
@@ -149,18 +152,16 @@ class MCP_Tools(val session: PIDE_Session)
           case Some(content) =>
             val start_line = int(params, "start_line")
             val end_line = int(params, "end_line")
-            if (start_line > 0 && str(params, "old_content").isEmpty)
+            if (start_line.exists(_ > 0) && str(params, "old_content").isEmpty)
               return Left("Missing old_content: must specify expected content at target lines")
             val old_content = str(params, "old_content").getOrElse("")
             val timeout_secs = timeout(params)
-            ensure_tracked(path_str, timeout_secs).flatMap { path =>
-              val current_text = File.read(path)
-
-              replace_lines(current_text, content, start_line, end_line, old_content).flatMap { new_text =>
-                File.write(path, new_text)
-                session.update_theory(List(session.node_name(path).theory), path.dir.implode, timeout_secs)
-                Right(Map("status" -> "written", "length" -> new_text.length))
-              }
+            val path = Path.explode(path_str).expand
+            val current_text = File.read(path)
+            replace_lines(current_text, content, start_line.getOrElse(0), end_line.getOrElse(0), old_content).flatMap { new_text =>
+              File.write(path, new_text)
+              session.check_theory(session.node_name(path).theory, path.dir.implode, timeout_secs)
+              Right(Map("status" -> "written", "length" -> new_text.length))
             }
         }
     }
@@ -179,21 +180,18 @@ class MCP_Tools(val session: PIDE_Session)
               case Some(parent_str) =>
                 val start_line = int(params, "start_line")
                 val end_line = int(params, "end_line")
-                if (start_line > 0 && str(params, "old_content").isEmpty)
+                if (start_line.exists(_ > 0) && str(params, "old_content").isEmpty)
                   return Left("Missing old_content: must specify expected content at target lines")
                 val old_content = str(params, "old_content").getOrElse("")
                 val timeout_secs = timeout(params)
                 val path = Path.explode(path_str).expand
-                if (!path.is_file) return Left(s"File not found: $path")
                 val current_text = File.read(path)
 
-                replace_lines(current_text, content, start_line, end_line, old_content).flatMap { new_text =>
+                replace_lines(current_text, content, start_line.getOrElse(0), end_line.getOrElse(0), old_content).flatMap { new_text =>
                   File.write(path, new_text)
                   val parent_path = Path.explode(parent_str).expand
-                  ensure_tracked(parent_str, timeout_secs).flatMap { _ =>
-                    session.update_theory(List(session.node_name(parent_path).theory), parent_path.dir.implode, timeout_secs)
-                    Right(Map("status" -> "written", "length" -> new_text.length))
-                  }
+                  session.check_theory(session.node_name(parent_path).theory, parent_path.dir.implode, timeout_secs)
+                  Right(Map("status" -> "written", "length" -> new_text.length))
                 }
             }
         }
@@ -217,7 +215,7 @@ class MCP_Tools(val session: PIDE_Session)
         val timeout_secs = timeout(params)
 
         file_snapshot(path_str, timeout_secs).flatMap { case (snap, _, doc) =>
-          if (line_num <= 0) {
+          if (line_num.isEmpty || line_num.exists(_ <= 0)) {
             /* file-level diagnostics */
             val diags = session.command_iterator(snap).flatMap { case (cmd, offset) =>
               val status = session.command_status(snap, cmd)
@@ -237,7 +235,7 @@ class MCP_Tools(val session: PIDE_Session)
             val target_cmd = snap.node.command_iterator()
               .filter { case (cmd, _) => cmd.source.trim.nonEmpty }
               .toList
-              .filter { case (_, offset) => doc.position(offset).line + 1 <= line_num }
+              .filter { case (_, offset) => doc.position(offset).line + 1 <= line_num.get }
               .lastOption
 
             target_cmd match {
@@ -436,13 +434,13 @@ class MCP_Tools(val session: PIDE_Session)
       case Some(path_str) =>
         val line_num = int(params, "line")
         val term_name = str(params, "term_name")
-        if (line_num <= 0) return Left("Missing or invalid line number")
+        if (line_num.isEmpty || line_num.exists(_ <= 0)) return Left("Missing or invalid line number")
 
         file_snapshot(path_str).flatMap { case (snap, _, doc) =>
           val target_cmd = snap.node.command_iterator()
               .filter { case (cmd, _) => cmd.source.trim.nonEmpty }
               .toList
-              .filter { case (_, offset) => doc.position(offset).line + 1 <= line_num }
+              .filter { case (_, offset) => doc.position(offset).line + 1 <= line_num.get }
               .lastOption
 
           target_cmd match {
@@ -490,21 +488,13 @@ class MCP_Tools(val session: PIDE_Session)
     }
   }
 
-  private def handle_scratch(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  private def handle_create_scratch(params: Map[String, Any]): Either[String, Map[String, Any]] =
   {
-    str(params, "content") match {
-      case None => Left("Missing content")
-      case Some(content) =>
-        str(params, "imports") match {
-          case None => Left("Missing imports")
-          case Some(imports) =>
-            val timeout_secs = timeout(params)
-            PIDE_Session.run_query(session, content, imports, timeout_secs) match {
-              case Right((output, theory_name, theory_path)) =>
-                Right(Map("output" -> output, "theory_name" -> theory_name, "theory_path" -> theory_path))
-              case Left(err) => Left(err)
-            }
-        }
+    val name_suffix = str(params, "name_suffix")
+    session.create_scratch_theory(name_suffix = name_suffix) match {
+      case Right((theory_name, theory_path)) =>
+        Right(Map("theory_name" -> theory_name, "theory_path" -> theory_path))
+      case Left(err) => Left(err)
     }
   }
 
@@ -513,13 +503,13 @@ class MCP_Tools(val session: PIDE_Session)
     val timeout_secs = timeout(params)
     str(params, "path") match {
       case Some(p) =>
-        ensure_tracked(p, timeout_secs).flatMap { path =>
-          session.update_theory(List(session.node_name(path).theory), path.dir.implode, timeout_secs)
-          Right(Map("status" -> "checked", "path" -> p))
-        }
+        val path = Path.explode(p).expand
+        session.check_theory(session.node_name(path).theory, path.dir.implode, timeout_secs)
+        Right(Map("status" -> "checked", "path" -> p))
       case None =>
-        val all = session.loaded_theories
-        all.foreach(name => session.update_theory(List(name.theory), Path.explode(name.node).dir.implode, timeout_secs))
+        val (static, dynamic, _) = session.loaded_theories
+        val all = static ++ dynamic
+        all.foreach(name => session.check_theory(name.theory, Path.explode(name.node).dir.implode, timeout_secs))
         Right(Map("status" -> "checked_all", "count" -> all.length))
     }
   }

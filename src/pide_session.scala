@@ -14,12 +14,14 @@ import scala.concurrent.{Await, Future, TimeoutException}
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
-
 class PIDE_Session(session_name: String, dirs: List[Path] = Nil, val options: Options = Options.init())
 {
+  private val scratch_theory_prefix: String = "PIDE_MCP_Scratch_"
+  private val scratch_tmpdir_prefix: String = "pide_mcp_scratch"
+
   private var _resources: Headless.Resources = _
   private var _session: Headless.Session = _
-  private val scratch_dirs = mutable.Map[String, java.io.File]()  // theory_name -> tmpDir
+  private val scratch_dirs = mutable.Map[String, java.io.File]()
 
   def resources: Headless.Resources = _resources
   def session: Headless.Session = _session
@@ -36,21 +38,28 @@ class PIDE_Session(session_name: String, dirs: List[Path] = Nil, val options: Op
   def stop(): Unit =
   {
     if (_session != null) _session.stop()
-    // Clean up all scratch directories
     scratch_dirs.values.foreach(Isabelle_System.rm_tree)
     scratch_dirs.clear()
   }
 
-  /** Theories currently loaded in the session (excludes scratch/temporary theories). */
-  def loaded_theories: List[Document.Node.Name] =
-    _session.purge_theories(theories = Nil)._2.filterNot(_.theory.contains(PIDE_Session.scratch_theory_prefix))
+  /** Theories loaded in the session: static (from session build), dynamic (loaded at
+    runtime via use_theories, excluding scratch), and scratch (temporary theories). */
+  def loaded_theories: (List[Document.Node.Name], List[Document.Node.Name], List[Document.Node.Name]) =
+  {
+    val static_names = _session.resources.session_base.loaded_theories.keys.toSet
+    val all_nodes = _session.get_state().stable_tip_version
+      .map(_.nodes.topological_order)
+      .getOrElse(Nil)
+    val (scratch, non_scratch) = all_nodes.partition(_.theory.contains(scratch_theory_prefix))
+    val (static, dynamic) = non_scratch.partition(n => static_names.contains(n.theory))
+    (static, dynamic, scratch)
+  }
 
   /* theory operations */
 
-  def open_theory(path: Path, timeout_secs: Int = PIDE_Session.default_timeout_secs): Either[String, Unit] =
+  def load_theory(path: Path, timeout_secs: Int = PIDE_Session.default_timeout_secs): Either[String, Unit] =
   {
     val abs_path = path.expand
-    if (!abs_path.is_file) return Left(s"File not found: $path")
     try {
       val future = Future {
         _session.use_theories(
@@ -66,20 +75,20 @@ class PIDE_Session(session_name: String, dirs: List[Path] = Nil, val options: Op
     }
   }
 
-  def update_theory(
-    theories: List[String],
+  def check_theory(
+    theory: String,
     master_dir: String = "",
     timeout_secs: Int = PIDE_Session.default_timeout_secs
   ): Either[String, Headless.Use_Theories_Result] =
   {
     try {
       val future = Future {
-        _session.use_theories(theories = theories, master_dir = master_dir, progress = new Console_Progress)
+        _session.use_theories(theories = List(theory), master_dir = master_dir, progress = new Console_Progress)
       }
       Right(Await.result(future, timeout_secs.seconds))
     } catch {
-      case _: TimeoutException => Left(s"Timeout after ${timeout_secs}s updating theories: ${theories.mkString(", ")}")
-      case ex: Exception => Left(s"Failed to update theory: ${ex.getMessage}")
+      case _: TimeoutException => Left(s"Timeout after ${timeout_secs}s checking theory: $theory")
+      case ex: Exception => Left(s"Failed to check theory: ${ex.getMessage}")
     }
   }
 
@@ -106,47 +115,11 @@ class PIDE_Session(session_name: String, dirs: List[Path] = Nil, val options: Op
     command: Command
   ): Document_Status.Command_Status =
     snap.state.command_status(snap.version, command)
-}
 
-object PIDE_Session
-{
-  val scratch_theory_prefix = "MCP_Scratch_"
-  val scratch_tmpdir_prefix = "mcp_scratch"
-  val default_timeout_secs = 15
-
-  /* output collection */
-
-  def collect_command_output(snap: Document.Snapshot): String =
+  def create_scratch_theory(name_suffix: Option[String] = None): Either[String, (String, String)] =
   {
-    val buf = new StringBuilder
-    for ((cmd, _) <- snap.node.command_iterator()) {
-      for ((_, elem) <- snap.command_results(cmd).iterator) {
-        val text = elem match {
-          case XML.Elem(Markup(Markup.WRITELN, _), body) => XML.content(body)
-          case XML.Elem(Markup(Markup.WRITELN_MESSAGE, _), body) => XML.content(body)
-          case XML.Elem(Markup(Markup.WARNING, _), body) => "Warning: " + XML.content(body)
-          case XML.Elem(Markup(Markup.WARNING_MESSAGE, _), body) => "Warning: " + XML.content(body)
-          case XML.Elem(Markup(Markup.ERROR, _), body) => "Error: " + XML.content(body)
-          case XML.Elem(Markup(Markup.ERROR_MESSAGE, _), body) => "Error: " + XML.content(body)
-          case _ => ""
-        }
-        if (text.nonEmpty) { buf ++= text; buf += '\n' }
-      }
-    }
-    buf.toString.trim
-  }
-
-  /* scratch theory execution */
-
-  def run_query(
-    pid: PIDE_Session,
-    content: String,
-    imports: String,
-    timeout_secs: Int = PIDE_Session.default_timeout_secs
-  ): Either[String, (String, String, String)] =
-  {
-    val uid = java.util.UUID.randomUUID().toString.replace("-", "").take(12)
-    val theory_name = scratch_theory_prefix + uid
+    val suffix = name_suffix.getOrElse(java.util.UUID.randomUUID().toString.replace("-", "").take(12))
+    val theory_name = scratch_theory_prefix + suffix
     val tmp_dir = Isabelle_System.tmp_dir(scratch_tmpdir_prefix)
     try {
       val tmp_path = Path.explode(tmp_dir.toString)
@@ -155,36 +128,26 @@ object PIDE_Session
 
       val file_content =
         s"""theory $theory_name
-           |imports $imports
+           |imports Pure
            |begin
-           |$content
+           |
+           |
            |end""".stripMargin
 
       Isabelle_System.make_directory(tmp_path)
+      scratch_dirs(theory_name) = tmp_dir
       File.write(thy_path, file_content)
-      val node_name = Document.Node.Name(thy_file, theory = theory_name)
-      pid.update_theory(List(theory_name), tmp_dir.toString, timeout_secs) match {
-        case Right(result) =>
-          val snap = result.snapshot(node_name)
-          val output = collect_command_output(snap)
-          pid.scratch_dirs(theory_name) = tmp_dir
-          if (output.nonEmpty) Right((output, theory_name, thy_file))
-          else Left("No output produced")
-        case Left(e) =>
-          val snap = pid.snapshot(node_name)
-          val output = collect_command_output(snap)
-          if (output.nonEmpty) {
-            pid.scratch_dirs(theory_name) = tmp_dir
-            Right((output, theory_name, thy_file))
-          } else {
-            Isabelle_System.rm_tree(tmp_dir)
-            Left(e)
-          }
-      }
+      Right((theory_name, thy_file))
     } catch {
       case ex: Exception =>
         Isabelle_System.rm_tree(tmp_dir)
-        Left(s"Query error: ${ex.getMessage}")
+        scratch_dirs.remove(theory_name)
+        Left(s"Failed to create scratch theory: ${ex.getMessage}")
     }
   }
+}
+
+object PIDE_Session
+{
+  val default_timeout_secs: Int = 15
 }
