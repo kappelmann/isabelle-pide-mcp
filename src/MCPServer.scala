@@ -17,7 +17,11 @@ object MCPConfig
 {
   val name = "isabelle_pide_mcp"
   val version = "0.1.0"
-  val protocolVersion = "2024-11-05"
+  val protocolVersion = "2025-11-25"
+
+  /* tool annotation field names */
+  val readOnlyHint = "readOnlyHint"
+  val destructiveHint = "destructiveHint"
 }
 
 class MCPServer(session: PIDESession)
@@ -63,11 +67,17 @@ class MCPServer(session: PIDESession)
             respond(out, rpcResult(id, Map(
               "protocolVersion" -> MCPConfig.protocolVersion,
               "capabilities" -> Map("tools" -> JSON.Object()),
-              "serverInfo" -> Map("name" -> MCPConfig.name, "version" -> MCPConfig.version))))
+              "serverInfo" -> Map("name" -> MCPConfig.name, "version" -> MCPConfig.version),
+              "instructions" -> "TODO description")))
 
           case Some("tools/list") =>
             val tools = ToolDefinitions.all.map { case (name, schema) =>
-              Map("name" -> name, "description" -> schema.description, "inputSchema" -> schema.inputSchema)
+              schema.annotations match {
+                case Some(a) => Map("name" -> name, "description" -> schema.description,
+                  "inputSchema" -> schema.inputSchema, "annotations" -> a)
+                case None => Map("name" -> name, "description" -> schema.description,
+                  "inputSchema" -> schema.inputSchema)
+              }
             }
             respond(out, rpcResult(id, Map("tools" -> tools)))
 
