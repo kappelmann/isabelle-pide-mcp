@@ -7,7 +7,7 @@ import scala.concurrent.{Await, Future, TimeoutException}
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class PIDESession(session_name: String, dirs: List[Path] = Nil, options: Options = Options.init()) {
+class PIDESession(session_name: String, dirs: List[Path] = Nil, val options: Options = Options.init()) {
   private var _resources: Headless.Resources = _
   private var _session: Headless.Session = _
   private val scratchDirs = mutable.Map[String, java.io.File]()  // theory_name -> tmpDir
@@ -16,7 +16,8 @@ class PIDESession(session_name: String, dirs: List[Path] = Nil, options: Options
   def session: Headless.Session = _session
 
   def start(): Unit = {
-    _resources = Headless.Resources.make(options, session_name, dirs)
+    val opts = options + "show_states=true"
+    _resources = Headless.Resources.make(opts, session_name, dirs)
     _session = _resources.start_session()
   }
 

@@ -35,8 +35,7 @@ class MCPTools(val session: PIDESession) {
       val node = session.node_name(path)
       try {
         val snap = session.snapshot(node)
-        val text = snap.node.source
-        Right((snap, node, Line.Document(text)))
+        Right((snap, node, Line.Document(snap.node.source)))
       } catch {
         case _: Exception => Left(s"Could not get snapshot for $path")
       }
@@ -223,26 +222,113 @@ class MCPTools(val session: PIDESession) {
                 val infoText = extractMarkupText(results, Set(Markup.INFORMATION, Markup.INFORMATION_MESSAGE)).mkString("\n").trim
                 val errorText = extractMarkupText(results, Set(Markup.ERROR, Markup.ERROR_MESSAGE)).mkString("\n").trim
                 val warningText = extractMarkupText(results, Set(Markup.WARNING, Markup.WARNING_MESSAGE)).mkString("\n").trim
+                // Parse out subgoals, local facts, and other AI-useful info
+                val subgoals = scala.collection.mutable.ListBuffer[String]()
+                val localFacts = scala.collection.mutable.ListBuffer[String]()
+                val sendbacks = scala.collection.mutable.ListBuffer[String]()
+                val timings = scala.collection.mutable.ListBuffer[Map[String, String]]()
+                val exports = scala.collection.mutable.ListBuffer[Map[String, String]]()
+
+                def traverse(trees: List[XML.Tree]): Unit = {
+                  trees.foreach {
+                    case XML.Elem(Markup(Markup.SUBGOAL, _), body) =>
+                      subgoals += XML.content(body).trim
+                      traverse(body)
+                    case XML.Elem(Markup(Markup.FACT, props), body) =>
+                      props.find(_._1 == Markup.NAME).foreach(p => localFacts += p._2)
+                      traverse(body)
+                    case XML.Elem(Markup("local_fact", props), body) =>
+                      props.find(_._1 == Markup.NAME).foreach(p => localFacts += p._2)
+                      traverse(body)
+                    case XML.Elem(Markup(Markup.SENDBACK, _), body) =>
+                      sendbacks += XML.content(body).trim
+                      traverse(body)
+                    case XML.Elem(Markup("timing", props), body) =>
+                      timings += props.toMap
+                      traverse(body)
+                    case XML.Elem(Markup(Markup.EXPORT, props), body) =>
+                      exports += props.toMap
+                      traverse(body)
+                    case XML.Elem(Markup(Markup.THEORY_EXPORTS, props), body) =>
+                      exports += props.toMap
+                      traverse(body)
+                    case XML.Elem(_, body) =>
+                      traverse(body)
+                    case _ =>
+                  }
+                }
                 
-                // Extract variables from command source markup
+                results.iterator.foreach { case (_, elem) => traverse(List(elem)) }
+                
+                // Extract variables, locales, bindings, class parameters from command source markup
                 val textRange = cmd.core_range + offset
-                val varKinds = Set(Markup.FREE, Markup.FIXED, Markup.BOUND, Markup.VAR, Markup.SKOLEM)
+                val varKinds = Set(Markup.FREE, Markup.FIXED, Markup.BOUND, Markup.VAR, Markup.SKOLEM, Markup.CONSTANT)
+                val typeKinds = Set(Markup.TYPING, Markup.ML_TYPING)
                 val markup = snap.cumulate(textRange, List.empty[XML.Elem],
-                  Markup.Elements(Markup.TYPING, Markup.FREE, Markup.FIXED, Markup.BOUND, Markup.VAR, Markup.SKOLEM),
+                  Markup.Elements(Markup.TYPING, Markup.ML_TYPING, Markup.FREE, Markup.FIXED,
+                    Markup.BOUND, Markup.VAR, Markup.SKOLEM, Markup.CONSTANT, Markup.ENTITY,
+                    Markup.LOCALE, Markup.BINDING, Markup.CLASS_PARAMETER),
                   _ => { case (acc, Text.Info(_, m)) => Some(m :: acc) }
                 )
-                val vars = markup.flatMap { case Text.Info(r, elems) =>
-                  val isVar = elems.exists(e => varKinds.contains(e.name))
-                  if (isVar) {
-                    val typing = elems.find(_.name == Markup.TYPING).map(e => XML.content(e.body))
-                    val textOffset = r.start - offset
-                    if (textOffset >= 0 && textOffset + r.length <= cmd.source.length) {
-                      val name = cmd.source.substring(textOffset, textOffset + r.length)
-                      val kind = elems.find(e => varKinds.contains(e.name)).get.name
-                      Some(Map("name" -> name, "kind" -> kind, "type" -> typing.getOrElse("unknown")))
-                    } else None
-                  } else None
-                }.distinctBy(v => v("name").toString + v("kind").toString)
+
+                val vars = scala.collection.mutable.ListBuffer[Map[String, Any]]()
+                val locales = scala.collection.mutable.ListBuffer[String]()
+                val bindings = scala.collection.mutable.ListBuffer[String]()
+                val classParams = scala.collection.mutable.ListBuffer[String]()
+
+                markup.foreach { case Text.Info(r, elems) =>
+                  val kindElem = elems.find(e => varKinds.contains(e.name))
+                  val typingElem = elems.find(e => typeKinds.contains(e.name))
+                  val localeElem = elems.find(e => e.name == Markup.LOCALE)
+                  val bindingElem = elems.find(e => e.name == Markup.BINDING)
+                  val classParamElem = elems.find(e => e.name == Markup.CLASS_PARAMETER)
+                  val entityLocale = elems.collectFirst {
+                    case XML.Elem(Markup(Markup.ENTITY, props), _)
+                      if props.toMap.getOrElse("kind", "") == "locale" =>
+                        props.toMap.getOrElse("name", "")
+                  }
+                  val entityBinding = elems.collectFirst {
+                    case XML.Elem(Markup(Markup.ENTITY, props), _)
+                      if props.toMap.getOrElse("kind", "") == "binding" =>
+                        props.toMap.getOrElse("name", "")
+                  }
+                  val entityClassParam = elems.collectFirst {
+                    case XML.Elem(Markup(Markup.ENTITY, props), _)
+                      if props.toMap.getOrElse("kind", "") == "class_parameter" =>
+                        props.toMap.getOrElse("name", "")
+                  }
+                  val entityConstant = elems.exists {
+                    case XML.Elem(Markup(Markup.ENTITY, props), _) =>
+                      props.toMap.getOrElse("kind", "") == "constant"
+                    case _ => false
+                  }
+                  val textOffset = r.start - offset
+                  if (textOffset >= 0 && textOffset + r.length <= cmd.source.length) {
+                    val name = cmd.source.substring(textOffset, textOffset + r.length)
+                    if (localeElem.isDefined || entityLocale.isDefined) locales += entityLocale.getOrElse(name)
+                    if (bindingElem.isDefined || entityBinding.isDefined) bindings += entityBinding.getOrElse(name)
+                    if (classParamElem.isDefined || entityClassParam.isDefined) classParams += entityClassParam.getOrElse(name)
+                    if (kindElem.isDefined || typingElem.isDefined || entityConstant) {
+                      val kind = kindElem.map(_.name).getOrElse(
+                        if (entityConstant) "constant" else "typed"
+                      )
+                      val typ = typingElem.map(e => XML.content(e.body)).getOrElse("unknown")
+                      vars += Map("name" -> name, "kind" -> kind, "type" -> typ)
+                    }
+                  }
+                }
+                val varsDistinct = vars.distinctBy(v => v("name").toString + v("kind").toString).toList
+
+                val boundFacts = markup.flatMap { case Text.Info(_, elems) =>
+                  elems.flatMap {
+                    case XML.Elem(Markup(Markup.ENTITY, props), _) =>
+                      val p = props.toMap
+                      if (p.getOrElse("kind", "") == "fact" && p.contains("name"))
+                        Some(p("name").toString)
+                      else None
+                    case _ => None
+                  }
+                }.distinct
 
                 val status = session.command_status(snap, cmd)
                 val statusStr =
@@ -256,9 +342,22 @@ class MCPTools(val session: PIDESession) {
                   "type" -> "command_state",
                   "source" -> cmd.source.trim,
                   "status" -> statusStr,
-                  "state" -> stateText,
-                  "variables" -> vars
+                  "variables" -> varsDistinct
                 )
+                
+                if (stateText.nonEmpty) response("state") = stateText
+                if (subgoals.nonEmpty) response("subgoals") = subgoals.toList
+                
+                val allLocalFacts = (localFacts.toList ++ boundFacts).distinct
+                if (allLocalFacts.nonEmpty) response("local_facts") = allLocalFacts
+                
+                if (sendbacks.nonEmpty) response("sendback") = sendbacks.toList.distinct
+                if (timings.nonEmpty) response("timing") = timings.toList
+                if (exports.nonEmpty) response("exports") = exports.toList
+                if (locales.nonEmpty) response("locale") = locales.toList.distinct
+                if (bindings.nonEmpty) response("binding") = bindings.toList.distinct
+                if (classParams.nonEmpty) response("class_parameter") = classParams.toList.distinct
+
                 if (writelnText.nonEmpty) response("writeln") = writelnText
                 if (infoText.nonEmpty) response("information") = infoText
                 if (warningText.nonEmpty) response("warning") = warningText
@@ -283,19 +382,17 @@ class MCPTools(val session: PIDESession) {
               _ => { case (acc, Text.Info(_, m)) => Some(m :: acc) }
             )
             markup.flatMap { case Text.Info(_, elems) =>
-              elems.collect {
+              elems.flatMap {
                 case XML.Elem(Markup(Markup.ENTITY, props), _) =>
-                  val propsMap = props.toMap
-                  (propsMap.contains("def") && propsMap.contains("name"), propsMap)
-              }.collect { case (true, propsMap) =>
-                val name = propsMap("name")
-                val kind = propsMap.getOrElse("kind", "unknown")
-                val line = doc.position(offset).line + 1
-                (name, kind, line)
-              }.filter { case (name, kind, _) =>
-                kind != "theory" && kind != "fixed" && !name.startsWith("local.")
-              }.map { case (name, kind, line) =>
-                Map[String, Any]("name" -> name, "kind" -> kind, "line" -> line)
+                  val p = props.toMap
+                  if (p.contains("def") && p.contains("name")) {
+                    val name = p("name")
+                    val kind = p.getOrElse("kind", "unknown")
+                    if (kind != "theory" && kind != "fixed")
+                      Some(Map[String, Any]("name" -> name, "kind" -> kind, "line" -> (doc.position(offset).line + 1)))
+                    else None
+                  } else None
+                case _ => None
               }
             }
           }.toList.distinctBy(e => e("name").toString)

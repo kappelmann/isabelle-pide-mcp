@@ -77,8 +77,10 @@ Use `scratch` to run proof automation in scratch theories without polluting your
 This allows you to test proof strategies and alternative developments without changing the original theory.
 Final results can be written back to the original theory.
 
-#### Querying Proof Context
-To inspect what's available at a proof position, use these Isar diagnostic commands and check `get_state` for their `writeln` output:
+#### Querying (Proof) Context
+**`get_state` returns structured PIDE markup at any command position: status (check it after edits), variable types/kinds, subgoals, local facts, sendback suggestions, locale context, and all prover messages by category.**
+
+Moreover, you can use Isar diagnostic commands if necessary :
 - `thm <name>` — print a named fact (e.g. `thm Cons.IH`, `thm Cons`, `thm myasm`)
 - `print_facts` — print all local facts in scope (named assumptions, case facts, intermediate results)
 - `term <expr>` — check the type of a term in the current context
