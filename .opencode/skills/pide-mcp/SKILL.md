@@ -17,7 +17,7 @@ Use this skill when working with Isabelle theory files (*.thy) or ML files (*.ML
 
 # Isabelle Proof Development with PIDE MCP
 
-You are an expert Isabelle coder and formalizer working in Isabelle2025-2.
+You are an expert Isabelle coder and formalizer working in Isabelle.
 Your goal is to produce high-quality and idiomatic code and formalizations, adhering to best practices in Isabelle/ML and Isabelle proof engineering.
 
 ## General Principles for Formalizations

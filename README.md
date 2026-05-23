@@ -26,3 +26,6 @@ Options:
 - `-d DIR` — include session directory
 - `-o OPTION` — override Isabelle system option (via NAME=VAL or NAME)
 - `-v` — verbose output on stderr
+
+### Config
+See the example config and skill file in `.opencode`
