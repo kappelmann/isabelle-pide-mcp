@@ -1,9 +1,18 @@
+/*  Title:      PIDE_MCP/MCPTools.scala
+    Author:     Kevin Kappelmann
+
+Implementation of all MCP tool handlers.
+*/
+
 package isabelle.pide.mcp
 
 import isabelle._
 import scala.language.unsafeNulls
 
-class MCPTools(val session: PIDESession) {
+
+class MCPTools(val session: PIDESession)
+{
+  /* parameter extraction */
 
   private def str(params: Map[String, Any], key: String): Option[String] =
     params.get(key).map(_.toString)
@@ -15,13 +24,16 @@ class MCPTools(val session: PIDESession) {
       case _ => None
     }.getOrElse(0)
 
-  private def timeout(params: Map[String, Any]): Int = {
+  private def timeout(params: Map[String, Any]): Int =
+  {
     val t = int(params, "timeout_secs")
     if (t > 0) t else PIDESession.default_timeout_secs
   }
 
-  // Load theory into session if not already present
-  private def ensureTracked(pathStr: String, timeoutSecs: Int = PIDESession.default_timeout_secs): Either[String, Path] = {
+  /* theory tracking */
+
+  private def ensureTracked(pathStr: String, timeoutSecs: Int = PIDESession.default_timeout_secs): Either[String, Path] =
+  {
     val path = Path.explode(pathStr).expand
     if (!path.is_file) return Left(s"File not found: $path")
     session.open_theory(path, timeoutSecs) match {
@@ -30,7 +42,8 @@ class MCPTools(val session: PIDESession) {
     }
   }
 
-  private def fileSnapshot(pathStr: String, timeoutSecs: Int = PIDESession.default_timeout_secs): Either[String, (Document.Snapshot, Document.Node.Name, Line.Document)] = {
+  private def fileSnapshot(pathStr: String, timeoutSecs: Int = PIDESession.default_timeout_secs): Either[String, (Document.Snapshot, Document.Node.Name, Line.Document)] =
+  {
     ensureTracked(pathStr, timeoutSecs).flatMap { path =>
       val node = session.node_name(path)
       try {
@@ -42,7 +55,10 @@ class MCPTools(val session: PIDESession) {
     }
   }
 
-  def invoke(name: String, params: Map[String, Any]): Either[String, Map[String, Any]] = {
+  /* tool dispatch */
+
+  def invoke(name: String, params: Map[String, Any]): Either[String, Map[String, Any]] =
+  {
     name match {
       case "list_tracked_theories" => handleListTrackedTheories()
       case "read_theory" => handleReadTheory(params)
@@ -58,14 +74,18 @@ class MCPTools(val session: PIDESession) {
     }
   }
 
-  private def handleListTrackedTheories(): Either[String, Map[String, Any]] = {
+  /* tool implementations */
+
+  private def handleListTrackedTheories(): Either[String, Map[String, Any]] =
+  {
     val files = session.loaded_theories.map { name =>
       Map("path" -> name.node, "theory" -> name.theory)
     }
     Right(Map("files" -> files))
   }
 
-  private def readLines(text: String, params: Map[String, Any]): String = {
+  private def readLines(text: String, params: Map[String, Any]): String =
+  {
     val allLines = text.split("\n", -1).zipWithIndex.map { case (l, i) => s"${i+1}: $l" }
     val start = int(params, "start_line")
     val end = int(params, "end_line")
@@ -74,7 +94,8 @@ class MCPTools(val session: PIDESession) {
     allLines.slice(startIdx, endIdx).mkString("\n")
   }
 
-  private def handleReadTheory(params: Map[String, Any]): Either[String, Map[String, Any]] = {
+  private def handleReadTheory(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  {
     str(params, "path") match {
       case None => Left("Missing path parameter")
       case Some(p) =>
@@ -85,7 +106,8 @@ class MCPTools(val session: PIDESession) {
     }
   }
 
-  private def handleReadMLFile(params: Map[String, Any]): Either[String, Map[String, Any]] = {
+  private def handleReadMLFile(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  {
     str(params, "path") match {
       case None => Left("Missing path parameter")
       case Some(p) =>
@@ -95,7 +117,8 @@ class MCPTools(val session: PIDESession) {
     }
   }
 
-  private def replaceLines(currentText: String, content: String, startLine: Int, endLine: Int, oldContent: String): Either[String, String] = {
+  private def replaceLines(currentText: String, content: String, startLine: Int, endLine: Int, oldContent: String): Either[String, String] =
+  {
     if (startLine <= 0) Right(content)
     else {
       val lines = currentText.split("\n", -1)
@@ -116,7 +139,8 @@ class MCPTools(val session: PIDESession) {
     }
   }
 
-  private def handleEditTheory(params: Map[String, Any]): Either[String, Map[String, Any]] = {
+  private def handleEditTheory(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  {
     str(params, "path") match {
       case None => Left("Missing path")
       case Some(pathStr) =>
@@ -125,7 +149,6 @@ class MCPTools(val session: PIDESession) {
           case Some(content) =>
             val startLine = int(params, "start_line")
             val endLine = int(params, "end_line")
-            // old_content is mandatory when start_line is specified (i.e., partial edit)
             if (startLine > 0 && str(params, "old_content").isEmpty)
               return Left("Missing old_content: must specify expected content at target lines")
             val oldContent = str(params, "old_content").getOrElse("")
@@ -143,7 +166,8 @@ class MCPTools(val session: PIDESession) {
     }
   }
 
-  private def handleEditMLFile(params: Map[String, Any]): Either[String, Map[String, Any]] = {
+  private def handleEditMLFile(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  {
     str(params, "path") match {
       case None => Left("Missing path")
       case Some(pathStr) =>
@@ -184,7 +208,8 @@ class MCPTools(val session: PIDESession) {
       }
     }.toList
 
-  private def handleGetState(params: Map[String, Any]): Either[String, Map[String, Any]] = {
+  private def handleGetState(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  {
     str(params, "path") match {
       case None => Left("Missing path")
       case Some(pathStr) =>
@@ -193,6 +218,7 @@ class MCPTools(val session: PIDESession) {
 
         fileSnapshot(pathStr, timeoutSecs).flatMap { case (snap, _, doc) =>
           if (lineNum <= 0) {
+            /* file-level diagnostics */
             val diags = session.command_iterator(snap).flatMap { case (cmd, offset) =>
               val status = session.command_status(snap, cmd)
               val results = snap.command_results(cmd)
@@ -207,13 +233,13 @@ class MCPTools(val session: PIDESession) {
             }.toList
             Right(Map("type" -> "file_diagnostics", "diagnostics" -> diags))
           } else {
-            // Find the last non-whitespace command whose start line is <= lineNum.
+            /* command-level state */
             val targetCmd = snap.node.command_iterator()
               .filter { case (cmd, _) => cmd.source.trim.nonEmpty }
               .toList
               .filter { case (_, offset) => doc.position(offset).line + 1 <= lineNum }
               .lastOption
-            
+
             targetCmd match {
               case Some((cmd, offset)) =>
                 val results = snap.command_results(cmd)
@@ -222,7 +248,7 @@ class MCPTools(val session: PIDESession) {
                 val infoText = extractMarkupText(results, Set(Markup.INFORMATION, Markup.INFORMATION_MESSAGE)).mkString("\n").trim
                 val errorText = extractMarkupText(results, Set(Markup.ERROR, Markup.ERROR_MESSAGE)).mkString("\n").trim
                 val warningText = extractMarkupText(results, Set(Markup.WARNING, Markup.WARNING_MESSAGE)).mkString("\n").trim
-                // Parse out subgoals, local facts, and other AI-useful info
+
                 val subgoals = scala.collection.mutable.ListBuffer[String]()
                 val localFacts = scala.collection.mutable.ListBuffer[String]()
                 val sendbacks = scala.collection.mutable.ListBuffer[String]()
@@ -257,10 +283,10 @@ class MCPTools(val session: PIDESession) {
                     case _ =>
                   }
                 }
-                
+
                 results.iterator.foreach { case (_, elem) => traverse(List(elem)) }
-                
-                // Extract variables, locales, bindings, class parameters from command source markup
+
+                /* extract variables, locales, bindings, class parameters from command source markup */
                 val textRange = cmd.core_range + offset
                 val varKinds = Set(Markup.FREE, Markup.FIXED, Markup.BOUND, Markup.VAR, Markup.SKOLEM, Markup.CONSTANT)
                 val typeKinds = Set(Markup.TYPING, Markup.ML_TYPING)
@@ -344,13 +370,13 @@ class MCPTools(val session: PIDESession) {
                   "status" -> statusStr,
                   "variables" -> varsDistinct
                 )
-                
+
                 if (stateText.nonEmpty) response("state") = stateText
                 if (subgoals.nonEmpty) response("subgoals") = subgoals.toList
-                
+
                 val allLocalFacts = (localFacts.toList ++ boundFacts).distinct
                 if (allLocalFacts.nonEmpty) response("local_facts") = allLocalFacts
-                
+
                 if (sendbacks.nonEmpty) response("sendback") = sendbacks.toList.distinct
                 if (timings.nonEmpty) response("timing") = timings.toList
                 if (exports.nonEmpty) response("exports") = exports.toList
@@ -371,7 +397,8 @@ class MCPTools(val session: PIDESession) {
     }
   }
 
-  private def handleListEntities(params: Map[String, Any]): Either[String, Map[String, Any]] = {
+  private def handleListEntities(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  {
     str(params, "path") match {
       case Some(p) =>
         fileSnapshot(p).flatMap { case (snap, _, doc) =>
@@ -402,7 +429,8 @@ class MCPTools(val session: PIDESession) {
     }
   }
 
-  private def handleFindDefinition(params: Map[String, Any]): Either[String, Map[String, Any]] = {
+  private def handleFindDefinition(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  {
     str(params, "path") match {
       case None => Left("Missing path")
       case Some(pathStr) =>
@@ -455,14 +483,15 @@ class MCPTools(val session: PIDESession) {
                 }
               }.distinctBy(d => d("name").toString + d("file").toString)
               Right(Map("definitions" -> definitions))
-              
+
             case None => Left(s"No command found at line $lineNum")
           }
         }
     }
   }
 
-  private def handleScratch(params: Map[String, Any]): Either[String, Map[String, Any]] = {
+  private def handleScratch(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  {
     str(params, "content") match {
       case None => Left("Missing content")
       case Some(content) =>
@@ -479,7 +508,8 @@ class MCPTools(val session: PIDESession) {
     }
   }
 
-  private def handleCheckTheory(params: Map[String, Any]): Either[String, Map[String, Any]] = {
+  private def handleCheckTheory(params: Map[String, Any]): Either[String, Map[String, Any]] =
+  {
     val timeoutSecs = timeout(params)
     str(params, "path") match {
       case Some(p) =>

@@ -1,17 +1,27 @@
+/*  Title:      PIDE_MCP/MCPServer.scala
+    Author:     Kevin Kappelmann
+
+JSON-RPC server loop for the Model Context Protocol.
+*/
+
 package isabelle.pide.mcp
 
 import isabelle._
 import scala.language.unsafeNulls
+
 import java.io.{BufferedReader, InputStreamReader, PrintWriter}
 import java.util.concurrent.{ExecutorService, Executors}
 
-object MCPConfig {
+
+object MCPConfig
+{
   val name = "isabelle_pide_mcp"
   val version = "0.1.0"
   val protocolVersion = "2024-11-05"
 }
 
-class MCPServer(session: PIDESession) {
+class MCPServer(session: PIDESession)
+{
   private val mcpTools = new MCPTools(session)
   private val executor: ExecutorService = Executors.newCachedThreadPool()
 
@@ -35,7 +45,8 @@ class MCPServer(session: PIDESession) {
   private def rpcResult(id: Option[Any], result: Any): Map[String, Any] =
     Map("jsonrpc" -> "2.0", "id" -> id, "result" -> result)
 
-  def run(): Unit = {
+  def run(): Unit =
+  {
     val in = new BufferedReader(new InputStreamReader(System.in))
     val out = new PrintWriter(System.out, true)
     val err = System.err
@@ -85,7 +96,8 @@ class MCPServer(session: PIDESession) {
     id: Option[Any],
     request: Map[String, Any],
     out: PrintWriter
-  ): Unit = {
+  ): Unit =
+  {
     try {
       val params = request.get("params") match {
         case Some(m: Map[_, _]) => m.asInstanceOf[Map[String, Any]]

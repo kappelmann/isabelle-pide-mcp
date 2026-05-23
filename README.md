@@ -30,3 +30,6 @@ Options:
 ### Configuration
 
 See the example config and skill file in folder `.opencode`
+
+# TODOs
+- Get rid of unsafeNull imports?

@@ -1,9 +1,17 @@
+/*  Title:      PIDE_MCP/Main.scala
+    Author:     Kevin Kappelmann
+
+Isabelle tool entry point for the PIDE MCP server.
+*/
+
 package isabelle.pide.mcp
 
 import isabelle._
 import scala.language.unsafeNulls
 
-object MCP_Tool_App {
+
+object MCP_Tool_App
+{
   val isabelle_tool = Isabelle_Tool("pide_mcp", "Isabelle PIDE MCP server", Scala_Project.here,
     { args =>
       var session_dirs: List[Path] = Nil

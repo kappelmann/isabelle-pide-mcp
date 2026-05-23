@@ -1,15 +1,22 @@
+/*  Title:      PIDE_MCP/ToolDefinitions.scala
+    Author:     Kevin Kappelmann
+
+Schema definitions for all MCP tools.
+*/
+
 package isabelle.pide.mcp
 
 case class ToolDef(description: String, inputSchema: Map[String, Any])
 
-object ToolDefinitions {
+object ToolDefinitions
+{
   val all: List[(String, ToolDef)] = List(
     "list_tracked_theories" -> ToolDef(
       description = "List theories currently loaded in the PIDE session.",
       inputSchema = Map("type" -> "object", "properties" -> Map.empty)
     ),
     "read_theory" -> ToolDef(
-      description = "Read an Isabelle theory file. Loads the theory into the PIDE session if not already tracked. Output lines are numbered.",
+      description = "Read an Isabelle theory file. Output lines are numbered.",
       inputSchema = Map("type" -> "object", "properties" -> Map(
         "path" -> Map("type" -> "string", "description" -> "Absolute path to the .thy file"),
         "start_line" -> Map("type" -> "number", "description" -> "Start line (1-indexed)"),
