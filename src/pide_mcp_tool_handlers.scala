@@ -63,22 +63,99 @@ class PIDE_MCP_Tool_Handlers(val session: PIDE_MCP_Session) {
     else error("Unexpected command status: " + status)
   }
 
-  private def command_state_json(
+  private def command_types_json(
     snap: Document.Snapshot,
     cmd: Command,
     offset: Text.Offset
+  ): List[JSON.Object.T] = {
+    val text_range = cmd.core_range + offset
+    val kind_tags = Set(Markup.FREE, Markup.BOUND, Markup.VAR, Markup.SKOLEM, Markup.FIXED, Markup.CONSTANT)
+    val elements = Markup.Elements(kind_tags.toSeq :+ Markup.TYPING :+ Markup.ENTITY: _*)
+    command_markup(snap, cmd, offset, elements).flatMap { case Text.Info(r, elems) =>
+      val kind_elem = elems.find(e => kind_tags.contains(e.name))
+      val typing_elem = elems.find(_.name == Markup.TYPING)
+      val entry = elems.collectFirst { case XML.Elem(Markup.Entity(entry), _) => entry }
+      kind_elem.map { k =>
+        val name = entry.map(_.name).getOrElse {
+          val name_offset = r.start - text_range.start
+          cmd.source.substring(name_offset, name_offset + r.length)
+        }
+        val typ_str = typing_elem.map(e => XML.content(e.body)).getOrElse("?")
+        JSON.Object("name" -> name, "kind" -> k.name, "type" -> typ_str)
+      }
+    }
+  }
+
+  private def command_facts_json(
+    snap: Document.Snapshot,
+    cmd: Command,
+    offset: Text.Offset
+  ): List[String] = {
+    val fact_kinds = Set(Markup.FACT, Markup.DYNAMIC_FACT, Markup.LITERAL_FACT)
+    command_markup(snap, cmd, offset, Markup.Elements(Markup.ENTITY)).flatMap { case Text.Info(_, elems) =>
+      elems.flatMap {
+        case XML.Elem(Markup.Entity(entry), _) if fact_kinds.contains(entry.kind) =>
+          Some(entry.name)
+        case _ => None
+      }
+    }
+  }
+
+  private def command_state_json(
+    snap: Document.Snapshot,
+    cmd: Command,
+    offset: Text.Offset,
+    include_types: Boolean,
+    include_full_markup: Boolean,
+    include_facts: Boolean
   ): JSON.Object.T = {
     val results = snap.command_results(cmd)
-    val markup = command_markup_json(snap, cmd, offset, Markup.Elements.full)
     val source_text = cmd.source.trim
     val source_lines_count = Line.Document(source_text).lines.length
-    JSON.Object(
-      "status" -> command_status_str(snap, cmd),
-      "source" -> PIDE_MCP_Util.numbered_lines(source_text, 1, source_lines_count),
-      "results" -> results.iterator.map { case (id, elem) =>
-        JSON.Object("id" -> id) ++ PIDE_MCP_Util.xml_to_json(elem)
-      }.toList,
-      "markup" -> markup)
+    val status = session.command_status(snap, cmd)
+    val status_str = command_status_str(snap, cmd)
+    val timing_ms = status.timings.sum(Date.now()).ms
+
+    val parts = scala.collection.mutable.ListBuffer[(String, Any)]()
+    parts += "status" -> status_str
+    parts += "timing_ms" -> timing_ms
+    parts += "source" -> PIDE_MCP_Util.numbered_lines(source_text, 1, source_lines_count)
+
+    val goal_texts = scala.collection.mutable.ListBuffer[String]()
+    val error_texts = scala.collection.mutable.ListBuffer[String]()
+    val warning_texts = scala.collection.mutable.ListBuffer[String]()
+    val writeln_texts = scala.collection.mutable.ListBuffer[String]()
+    val info_texts = scala.collection.mutable.ListBuffer[String]()
+
+    results.iterator.foreach { case (_, elem) =>
+      val text = PIDE_MCP_Util.elem_body_plain_text(elem)
+      if (text.nonEmpty) {
+        if (Protocol.is_state(elem) && !status.is_finished) goal_texts += text
+        else if (Protocol.is_error(elem)) error_texts += text
+        else if (Protocol.is_warning_or_legacy(elem)) warning_texts += text
+        else if (Protocol.is_writeln(elem)) writeln_texts += text
+        else if (Protocol.is_information(elem)) info_texts += text
+      }
+    }
+    def add_if_nonempty(buf: scala.collection.mutable.ListBuffer[String], key: String): Unit =
+      if (buf.nonEmpty) parts += key -> buf.toList
+    add_if_nonempty(goal_texts, "goal")
+    add_if_nonempty(error_texts, "error")
+    add_if_nonempty(warning_texts, "warning")
+    add_if_nonempty(writeln_texts, "writeln")
+    add_if_nonempty(info_texts, "information")
+    if (include_types) {
+      val types = command_types_json(snap, cmd, offset)
+      if (types.nonEmpty) parts += "types" -> types
+    }
+    if (include_full_markup) {
+      parts += "markup" -> command_markup_json(snap, cmd, offset, Markup.Elements.full)
+    }
+    if (include_facts) {
+      val facts = command_facts_json(snap, cmd, offset)
+      if (facts.nonEmpty) parts += "facts" -> facts
+    }
+    JSON.Object(parts.toSeq: _*)
   }
 
   def handle(name: String, params: JSON.Object.T): Exn.Result[JSON.T] = {
@@ -140,8 +217,8 @@ class PIDE_MCP_Tool_Handlers(val session: PIDE_MCP_Session) {
   }
 
   private val find_origin_kinds: List[String] =
-    List(Markup.FACT, Markup.CONSTANT, Markup.TYPE_NAME, Markup.METHOD, Markup.ATTRIBUTE,
-      Markup.CLASS, Markup.LOCALE, Markup.CLASS_PARAMETER, Markup.BINDING, Markup.AXIOM)
+    List(Markup.AXIOM, Markup.FACT, Markup.CONSTANT, Markup.TYPE_NAME, Markup.METHOD, Markup.ATTRIBUTE,
+      Markup.CLASS, Markup.LOCALE, Markup.CLASS_PARAMETER, Markup.BINDING)
 
   private def definition_entry(
     snap: Document.Snapshot,
@@ -214,7 +291,12 @@ class PIDE_MCP_Tool_Handlers(val session: PIDE_MCP_Session) {
       val end_line = JSON.int(params, "end_line")
       val (s, e) = Exn.release(PIDE_MCP_Util.resolve_lines(start_line, end_line, doc.lines.length))
       val cmds = PIDE_MCP_Util.commands_in_range(snap, doc, s, e)
-      cmds.map { case (cmd, offset) => command_state_json(snap, cmd, offset) }
+      val include_types = JSON.bool(params, "include_types").getOrElse(false)
+      val include_full_markup = JSON.bool(params, "include_full_markup").getOrElse(false)
+      val include_facts = JSON.bool(params, "include_facts").getOrElse(false)
+      cmds.map { case (cmd, offset) =>
+        command_state_json(snap, cmd, offset, include_types, include_full_markup, include_facts)
+      }
     }
 
   private def handle_list_loaded_theories(params: JSON.Object.T): Exn.Result[JSON.T] =

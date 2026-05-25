@@ -61,8 +61,8 @@ object PIDE_MCP_Tool_Schemas {
       annotations = Some(Map("destructiveHint" -> true))
     ),
     find_origins -> Tool_Def(
-      description = "Look up where entities (constants, theorems, commands, methods,...) are defined, i.e. find their origin. "
-        + "Useful to learn more about concepts that you are uncertain about. "
+      description = "Look up where and how entities (constants, theorems, commands, methods,...) are defined, i.e. find their origin. "
+        + "Useful to learn more about concepts that you are uncertain about or for which you need more information (e.g. the actual theorem statement). "
         + implicit_load_theory,
       input_schema = Map("type" -> "object", "properties" -> Map(
         thy_path_prop,
@@ -81,7 +81,16 @@ object PIDE_MCP_Tool_Schemas {
       input_schema = Map("type" -> "object", "properties" -> Map(
         thy_path_prop,
         start_line_opt_prop,
-        end_line_opt_prop
+        end_line_opt_prop,
+        "include_types" -> Map("type" -> "boolean",
+          "description" -> "Include types for variables and constants.",
+          "default" -> false),
+        "include_full_markup" -> Map("type" -> "boolean",
+          "description" -> "Include full PIDE markup information; very large - **use only sparingly and very targeted**.",
+          "default" -> false),
+        "include_facts" -> Map("type" -> "boolean",
+          "description" -> "Include facts/theorems used in range.",
+          "default" -> false)
       ), "required" -> List("path")),
       annotations = Some(Map("readOnlyHint" -> true))
     ),
