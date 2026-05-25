@@ -17,7 +17,7 @@ Use this skill when working with Isabelle theory files (*.thy) or ML files (*.ML
 
 # Isabelle Proof Development with PIDE MCP
 
-You are an expert Isabelle coder and formalizer working in Isabelle.
+You are an expert Isabelle formalizer working in Isabelle.
 Your goal is to produce high-quality and idiomatic code and formalizations, adhering to best practices in Isabelle/ML and Isabelle proof engineering.
 
 ## General Principles for Formalizations
@@ -34,56 +34,44 @@ Prioritize the following principles in this order:
 ### Workflow Guidelines
 
 #### State Synchronization
-**THESE RULES ARE FUNDAMENTAL!**
 - **All changes are immediately checked** by PIDE after edits
 - **Do not edit files via other means** (shell, other editors) - always use MCP tools to keep PIDE state synchronized
 - **Edits require `old_content` (the expected content at target lines). If the file changed since you last read it (e.g., a human edited it concurrently), the edit is rejected with a mismatch error showing expected vs actual content.**
-- **If you get a mismatch error, re-read the file using the MCP and retry with the correct content.**
-
 #### After Every Edit
-1. **Check for errors/timeouts after edits**
-2. Status values:
-   - `ok` = command terminated successfully
-   - `error` = command failed with errors
-   - `running` = prover still evaluating (indicates timeout)
-   - `unprocessed` = command queued, not yet processed
-   - `pending` = intermediate state (e.g., consolidating)
+1. **Check for errors/unfinished commands after edits**.
 
-#### Timeout Management
-- **Avoid adding large amounts of new material at once, as it makes it hard to identify the source of errors and timeouts.**
-- The default timeout catches most problems early
-- If you are confident that a proof legitimately needs more time, increase the timeout
-- Short timeouts help identify expensive proof steps early
+#### Time Management
+- **Avoid adding large amounts of new material at once, as it makes it hard to identify the source of errors and nontermination.**
+- **Proof methods typically terminate in less than 5 seconds.**
+- **Sledgehammer typically terminates in less than 30 seconds.**
+- If commands take longer, be suspicious! Only if you are very confident that a proof legitimately needs more time wait a bit longer. Short waits typically let you move faster!
 
 #### Proof Search
-Use `scratch` to run proof automation in scratch theories without polluting your main development:
+Use the `create_scratch` tool to run proof automation in scratch theories without polluting your main development:
 - Run `sledgehammer`, `find_theorems`, `try`, etc.
-- **Scratch theories persist for the session** - not deleted until the server stops. You may further change and explore them once created.
-- **Use `scratch` to test large changes before radically changing an existing theory.**
+- **Scratch theories persist for the session** - they are not deleted until the server stops. You may further change and explore them once created.
+- **Use `create_scratch` to test large changes before radically changing an existing theory.**
 
 **Incremental workflow** (for developing complex proofs):
 ```
-1. scratch → returns output, theory_name, theory_path
+1. create_scratch → theory_name, theory_path, content
 
-2. read_theory → see the full scratch theory content
+2. edit → extend the scratch theory (insert new content)
 
-3. edit_theory → extend the scratch theory (insert new content)
+3. get_state → check the new status in the scratch theory
 
-4. get_state → check the new status in the scratch theory
-
-5. happy with the result → write it back to the original theory file
+4. happy with the result → write it back to the original file
 ```
 
-This allows you to test proof strategies and alternative developments without changing the original theory.
-Final results can be written back to the original theory.
+This allows you to test proof strategies and alternative developments without changing the original file.
+Final results can be written back to the original file.
 
 #### Querying (Proof) Context
-**`get_state` returns structured PIDE markup at any command position: status (check it after edits), variable types/kinds, subgoals, local facts, sendback suggestions, locale context, and all prover messages by category.**
+**`get_state` returns structured PIDE markup information at any command position, including status (check it after edits), subgoals, local facts, sendback suggestions, locale context, and all prover messages.**
 
-Moreover, you can use Isar diagnostic commands if necessary :
-- `thm <name>` — print a named fact (e.g. `thm Cons.IH`, `thm Cons`, `thm myasm`)
-- `print_facts` — print all local facts in scope (named assumptions, case facts, intermediate results)
-- `term <expr>` — check the type of a term in the current context
+Moreover, you can use Isar diagnostic commands if necessary, for example:
+- `thm <name>` - print a named fact (e.g. `thm Cons.IH`, `thm Cons`, `thm myasm`)
+- `print_facts` - print all local facts in scope (named assumptions, case facts, intermediate results)
 
 ## Formalization Workflow
 
@@ -108,7 +96,7 @@ Moreover, you can use Isar diagnostic commands if necessary :
 For anything but trivial proofs:
 1. Write the right statement with a `sorry` proof.
 2. Write a proof skeleton with `sorry`s for larger subproofs and comments that describe how to fill the gaps.
-3. Fill the gaps iteratively one-by-one, ensure that there are no errors/timeouts after every edit.
+3. Fill the gaps iteratively one-by-one, ensure that there are no errors/nondeterminations after every edit.
 4. Restructure the proof as necessary.
 
 **Encouraged patterns:**
@@ -125,11 +113,11 @@ For anything but trivial proofs:
   - Correctly classify rules for the classical reasoner (intro, elim, dest).
   - **Add appropriate attributes for fundamental theorems on a new definition** unless you rarely have to work with the concept. In that case, manually pass the rules to the provers.
 - **Prefer methods with good default behavior, such as `simp` and `auto`, over very explicit ones like `metis`, `rule`, etc.**
-- **Only call sledgehammer if simple means fail**.
+- **Only call sledgehammer if other means fail**.
 - **Do not introduce many sledgehammer and expensive automation calls in parallel**. They are resource-hungry!
 - Strike a balance between readability, verboseness, and automation.
 - When automation is brittle, switch to structured Isar proofs and add intermediate steps.
-- In general, automation can easily explode. We must proceed in a way that makes **the failing tactic immediately identifiable**. In case of timeouts, split automation into multiple steps.
+- In general, automation can easily explode. We must proceed in a way that makes **the failing tactic immediately identifiable**. In case of nondetermination, split automation into multiple steps.
 
 ### Managing Contexts with Locales
 - Use locales where appropriate to structure the development and manage assumptions.
@@ -169,7 +157,7 @@ For anything but trivial proofs:
 
 ## Common Pitfalls
 
-### Timeout Issues
+### Nondetermination Issues
 - ❌ **Don't:** Add multiple sledgehammer calls or expensive automation in parallel
   ```isabelle
   lemma foo: "P" sledgehammer
@@ -191,7 +179,7 @@ For anything but trivial proofs:
   ```
 - ✅ **Do:** Use scratch theories for experimentation, then copy successful results back to main theory
   ```
-  1. scratch(...) to test approach
+  1. create_scratch to test approach
   2. Verify it works in scratch theory
   3. Copy successful proof back to main theory with edit_theory
   ```
@@ -206,22 +194,23 @@ For anything but trivial proofs:
 ### Status Checking
 - ❌ **Don't:** Make multiple edits without checking status
   ```
-  edit_theory  (* Add lemma 1 *)
-  edit_theory  (* Add lemma 2 *)
-  edit_theory  (* Add lemma 3 - which one has the error? *)
+  edit  (* Add lemma 1 *)
+  edit  (* Add lemma 2 *)
+  edit  (* Add lemma 3 - which one has the error? *)
   ```
 - ✅ **Do:** Check `get_state` after each significant edit
   ```
-  edit_theory
+  edit
   get_state  (* Verify status: ok *)
-  edit_theory  (* Continue only after verification *)
+  edit  (* Continue only after verification *)
   ```
 
 ## Error Recovery
 
-If you encounter errors or timeouts:
+If you encounter errors or nondetermination:
 1. Check the exact error
 2. Isolate the problem: use `sorry` to skip problematic parts temporarily
-3. Test fixes incrementally: make small changes and check after each
-4. Use `scratch` for experimentation and alternatives
-5. Increase timeout if needed: but prefer refactoring over longer timeouts
+3. Make incremental fixes: make small changes and check after each
+4. Use `create_scratch` for experimentation and alternatives
+5. Increase wait for termination if needed, but prefer refactoring over long waits!
+

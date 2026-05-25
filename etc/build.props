@@ -3,8 +3,9 @@ module = $ISABELLE_PIDE_MCP_JAR
 requirements = env:ISABELLE_SCALA_JAR
 sources = \
   src/pide_mcp.scala \
-  src/mcp_server.scala \
-  src/mcp_tools.scala \
-  src/pide_session.scala \
-  src/tool_definitions.scala
+  src/pide_mcp_server.scala \
+  src/pide_mcp_session.scala \
+  src/pide_mcp_tool_handlers.scala \
+  src/pide_mcp_tool_schemas.scala \
+  src/pide_mcp_util.scala
 services = isabelle.pide.mcp.PIDE_MCP_Tool

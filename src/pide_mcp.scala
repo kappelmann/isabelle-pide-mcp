@@ -1,17 +1,14 @@
 /*  Title:      PIDE_MCP/pide_mcp.scala
     Author:     Kevin Kappelmann
 
-Isabelle tool entry point for the PIDE MCP server.
+Entry point for the PIDE MCP server.
 */
 
 package isabelle.pide.mcp
 
 import isabelle._
-import scala.language.unsafeNulls
 
-
-object PIDE_MCP
-{
+object PIDE_MCP {
   val isabelle_tool = Isabelle_Tool("pide_mcp", "Isabelle PIDE MCP server", Scala_Project.here,
     { args =>
       var session_dirs: List[Path] = Nil
@@ -41,19 +38,19 @@ Usage: isabelle pide_mcp [OPTIONS]
       val more_args = getopts(args)
       if (more_args.nonEmpty) getopts.usage()
 
-      val pide_session = new PIDE_Session(logic, session_dirs, options)
+      val pide_session = new PIDE_MCP_Session(logic, session_dirs, options)
 
       try {
         System.err.nn.println(s"Starting Isabelle session: $logic ...")
         pide_session.start()
         System.err.nn.println("Session started. MCP server listening on stdin/stdout.")
 
-        val server = new MCP_Server(pide_session)
+        val server = new PIDE_MCP_Server(pide_session)
         server.run()
       } catch {
         case ex: Exception =>
-          System.err.nn.println(s"Error: ${ex.getMessage}")
-          ex.printStackTrace(System.err.nn)
+          Output.error_message(s"${ex.getMessage}")
+        ex.printStackTrace(System.err.nn)
           sys.exit(1)
       } finally {
         pide_session.stop()

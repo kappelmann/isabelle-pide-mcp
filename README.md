@@ -32,11 +32,5 @@ Options:
 See the example config and skill file in folder `.opencode`
 
 # TODOs
-- Get rid of unsafeNull imports?
-- Do not just log with System.err
-- double-check appropriateness of timeouts and how they are handled
-- return partial results on error?
-- instructions field on initialisation
-- update skills file?
-- incremental edits
-- more canonical json parsing or in general working with MCP schema?
+- options to warn agent about timeouts? everything is async for now
+- ML go to origin
