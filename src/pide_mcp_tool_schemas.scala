@@ -67,7 +67,10 @@ object PIDE_MCP_Tool_Schemas {
       input_schema = Map("type" -> "object", "properties" -> Map(
         thy_path_prop,
         start_line_prop,
-        end_line_opt_prop
+        end_line_opt_prop,
+        "snippet_lines" -> Map("type" -> "integer",
+          "description" -> "Number of context lines per definition source snippet (use 0 to omit).",
+          "minimum" -> 0, "default" -> 3)
       ), "required" -> List("path", "start_line")),
       annotations = Some(Map("readOnlyHint" -> true))
     ),

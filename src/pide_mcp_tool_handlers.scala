@@ -120,16 +120,16 @@ class PIDE_MCP_Tool_Handlers(val session: PIDE_MCP_Session) {
 
   private def mk_definition_entry(
     name: String, kind: String, file: Option[String] = None, line: Option[Int] = None,
-    source: Option[String] = None, note: Option[String] = None
+    source: Option[String] = None, snippet_lines: Int = 0, note: Option[String] = None
   ): JSON.Object.T = {
     val base = JSON.Object("name" -> name, "kind" -> kind)
     val with_pos = (file, line) match {
       case (Some(f), Some(l)) => base + ("file" -> f) + ("line" -> l)
       case _ => base
     }
-    val with_source = (source, line) match {
-      case (Some(text), Some(l)) =>
-        val snippet_end = l + PIDE_MCP_Tool_Handlers.snippet_preview_lines - 1
+    val with_source = (source, line, snippet_lines) match {
+      case (Some(text), Some(l), n) if n > 0 =>
+        val snippet_end = l + n - 1
         with_pos + ("source_snippet" -> PIDE_MCP_Util.numbered_lines(text, l, snippet_end))
       case _ => with_pos
     }
@@ -139,17 +139,24 @@ class PIDE_MCP_Tool_Handlers(val session: PIDE_MCP_Session) {
     }
   }
 
+  private val find_origin_kinds: List[String] =
+    List(Markup.FACT, Markup.CONSTANT, Markup.TYPE_NAME, Markup.METHOD, Markup.ATTRIBUTE,
+      Markup.CLASS, Markup.LOCALE, Markup.CLASS_PARAMETER, Markup.BINDING, Markup.AXIOM)
+
   private def definition_entry(
     snap: Document.Snapshot,
-    entry: Name_Space.Entry
+    entry: Name_Space.Entry,
+    snippet_lines: Int
   ): Exn.Result[Option[JSON.Object.T]] = Exn.capture {
-    entry.properties match {
+    if (!find_origin_kinds.contains(entry.kind)) None
+    else entry.properties match {
       case Position.Item_Def_File(def_file, def_line, _) =>
         val entry_result = session.session.store.source_file(def_file) match {
           case Some(resolved) =>
             val text = File.read(Path.explode(resolved))
             mk_definition_entry(entry.name, entry.kind,
-              file = Some(resolved), line = Some(def_line), source = Some(text))
+              file = Some(resolved), line = Some(def_line), source = Some(text),
+              snippet_lines = snippet_lines)
           case None =>
             mk_definition_entry(entry.name, entry.kind,
               note = Some("The definition entry's source file " + def_file
@@ -162,7 +169,8 @@ class PIDE_MCP_Tool_Handlers(val session: PIDE_MCP_Session) {
             val pos_path = Path.explode(pos.name).expand
             val text = Exn.release(session.read(session.node_name(Path.explode(pos.name))))
             mk_definition_entry(entry.name, entry.kind,
-              file = Some(pos_path.implode), line = Some(pos.line1), source = Some(text))
+              file = Some(pos_path.implode), line = Some(pos.line1), source = Some(text),
+              snippet_lines = snippet_lines)
           case None =>
             mk_definition_entry(entry.name, entry.kind,
               note = Some("The definition entry has not been loaded yet. " + retry_soon_message))
@@ -180,12 +188,20 @@ class PIDE_MCP_Tool_Handlers(val session: PIDE_MCP_Session) {
       val doc = Line.Document(snap.node.source)
       val start_line = JSON.int(params, "start_line") getOrElse error("Missing or invalid start_line")
       val end_line_opt = JSON.int(params, "end_line")
+      val snippet_lines = JSON.int(params, "snippet_lines").getOrElse(PIDE_MCP_Tool_Handlers.snippet_preview_lines)
       val (s, end_line) = Exn.release(PIDE_MCP_Util.resolve_lines(Some(start_line), end_line_opt, doc.lines.length))
       val cmds = PIDE_MCP_Util.commands_in_range(snap, doc, s, end_line)
       val markup = cmds.flatMap { case (cmd, offset) => command_markup(snap, cmd, offset, Markup.Elements(Markup.ENTITY)) }
-      markup.flatMap { case Text.Info(_, elems) =>
+      val defs = markup.flatMap { case Text.Info(_, elems) =>
         elems.collect { case XML.Elem(Markup.Entity(entry), _) => entry }
-      }.distinctBy(identity).flatMap(entry => Exn.release(definition_entry(snap, entry)))
+      }.distinctBy(identity).flatMap(entry => Exn.release(definition_entry(snap, entry, snippet_lines)))
+      val kind_priority = find_origin_kinds
+      defs.groupBy(e => (e("name"), e.get("file"), e.get("line"))).values.map { group =>
+        group.minBy(e => {
+          val idx = kind_priority.indexOf(e("kind").toString)
+          if (idx >= 0) idx else kind_priority.length
+        })
+      }.toList
     }
 
   private def handle_get_state(params: JSON.Object.T): Exn.Result[JSON.T] =
@@ -231,5 +247,5 @@ class PIDE_MCP_Tool_Handlers(val session: PIDE_MCP_Session) {
 
 object PIDE_MCP_Tool_Handlers {
   val default_imports: List[String] = List("Main")
-  val snippet_preview_lines: Int = 15
+  val snippet_preview_lines: Int = 3
 }
