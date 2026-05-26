@@ -1,8 +1,7 @@
 ---
 name: pide-mcp
 description: Using the Isabelle proof assistant with the PIDE MCP server. Use this skill whenever working with Isabelle theory files (*.thy) or ML files (*.ML) or when you are dealing with Isabelle in the general sense and have access to the PIDE MCP.
-license: MIT
-compatibility: opencode
+compatibility: claude-code
 metadata:
   version: "1.0"
 ---

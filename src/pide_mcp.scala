@@ -14,6 +14,7 @@ object PIDE_MCP {
       var session_dirs: List[Path] = Nil
       var logic = "HOL"
       var options = Options.init()
+      var log_path: Option[Path] = None
       var verbose = false
 
       val getopts = Getopts("""
@@ -21,15 +22,17 @@ Usage: isabelle pide_mcp [OPTIONS]
 
   Options are:
     -d DIR       include session directory
+    -L FILE      logging on FILE (default: console stderr)
     -l NAME      logic session name (default: HOL)
     -o OPTION    override Isabelle system OPTION (via NAME=VAL or NAME)
-    -v           verbose output on stderr
+    -v           verbose
 
   Start an MCP (Model Context Protocol) server over stdin/stdout,
   backed by an embedded Isabelle PIDE session using the specified
   logic image.
 """,
         "d:" -> (arg => session_dirs = session_dirs ::: List(Path.explode(arg))),
+        "L:" -> (arg => log_path = Some(Path.explode(File.standard_path(arg)))),
         "l:" -> (arg => logic = arg),
         "o:" -> (arg => options = options + arg),
         "v" -> (_ => verbose = true)
@@ -38,21 +41,23 @@ Usage: isabelle pide_mcp [OPTIONS]
       val more_args = getopts(args)
       if (more_args.nonEmpty) getopts.usage()
 
-      val pide_session = new PIDE_MCP_Session(logic, session_dirs, options)
+      val log = Logger.make_file(log_path, default = Logger.console)
+      val build_progress = new Console_Progress
+      val pide_session = new PIDE_MCP_Session(logic, log, session_dirs, options)
 
       try {
-        System.err.nn.println(s"Starting Isabelle session: $logic ...")
-        pide_session.start()
-        System.err.nn.println("Session started. MCP server listening on stdin/stdout.")
+        log("Starting Isabelle PIDE session with base session: " + logic + " ...")
+        pide_session.start(build_progress)
+        log("Session started. Now starting MCP server listening on stdin/stdout.")
 
-        val server = new PIDE_MCP_Server(pide_session)
+        val server = new PIDE_MCP_Server(pide_session, log, verbose)
         server.run()
       } catch {
         case ex: Exception =>
-          Output.error_message(s"${ex.getMessage}")
-        ex.printStackTrace(System.err.nn)
+          log.error_message("PIDE MCP error: " + Exn.print(ex))
           sys.exit(1)
       } finally {
+        log("Stopping Isabelle PIDE MCP session...")
         pide_session.stop()
       }
     })

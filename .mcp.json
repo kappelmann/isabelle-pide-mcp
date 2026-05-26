@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "isabelle-pide-mcp": {
+      "command": "isabelle",
+      "args": ["pide_mcp", "-v", "-l", "HOL"]
+    }
+  }
+}

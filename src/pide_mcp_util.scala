@@ -1,50 +1,30 @@
 /*  Title:      PIDE_MCP/pide_mcp_util.scala
     Author:     Kevin Kappelmann
 
-Utility functions for the PIDE MCP server.
+General utils for the PIDE MCP server.
 */
 
 package isabelle.pide.mcp
 
 import isabelle._
-import scala.language.unsafeNulls
 
 object PIDE_MCP_Util {
   val theory_suffix: String = ".thy"
-  val ml_suffix: String = ".ML"
 
   def strip_theory_suffix(path_str: String): String =
     path_str.stripSuffix(theory_suffix)
 
-  def require_thy(path_str: String): Exn.Result[Unit] = Exn.capture {
-    if (!path_str.endsWith(theory_suffix))
-      error(s"Not a theory file: $path_str (must end with $theory_suffix)")
-  }
-
-  def require_thy_or_ml(path_str: String): Exn.Result[Unit] = Exn.capture {
-    if (!path_str.endsWith(theory_suffix) && !path_str.endsWith(ml_suffix))
-      error(s"Unsupported file type: $path_str (only $theory_suffix and $ml_suffix are supported)")
-  }
-
-  def require_valid_lines(
+  private def require_valid_lines(
     start_line: Option[Int],
     end_line: Option[Int],
     total_lines: Int
   ): Exn.Result[Unit] = Exn.capture {
-    start_line match {
-      case Some(n) if n < 1 || n > total_lines =>
-        error(s"start_line $n out of bounds (file has $total_lines lines)")
-      case _ =>
-    }
-    end_line match {
-      case Some(n) if n < 1 || n > total_lines =>
-        error(s"end_line $n out of bounds (file has $total_lines lines)")
-      case _ =>
-    }
-    (start_line, end_line) match {
-      case (Some(s), Some(e)) if e < s => error(s"end_line $e < start_line $s")
-      case _ =>
-    }
+    for (s <- start_line if s < 1 || s > total_lines)
+      error(s"start_line $s out of bounds (file has $total_lines lines)")
+    for (e <- end_line if e < 1 || e > total_lines)
+      error(s"end_line $e out of bounds (file has $total_lines lines)")
+    for (s <- start_line; e <- end_line if e < s)
+      error(s"end_line $e < start_line $s")
   }
 
   def resolve_lines(start_line: Option[Int], end_line: Option[Int], total_lines: Int): Exn.Result[(Int, Int)] =
@@ -53,13 +33,18 @@ object PIDE_MCP_Util {
       (start_line.getOrElse(1), end_line.getOrElse(total_lines))
     }
 
-  def node_defined(snap: Document.Snapshot): Boolean =
-    snap.version.nodes.domain.contains(snap.node_name)
+  def range(doc: Line.Document, start_line: Int, end_line: Int): Text.Range =
+    Text.Range(
+      doc.offset(Line.Position(line = start_line - 1)).getOrElse(0),
+      doc.offset(Line.Position(line = end_line)).getOrElse(Int.MaxValue))
+
+  def numbered_line(line: Int, text: String): String =
+    s"${line}: ${text}"
 
   def numbered_lines(text: String, start: Int): String = {
     val lines = Line.Document(text).lines
     lines.zipWithIndex.map { case (l, i) =>
-      (start + i).toString + ": " + l.text
+      numbered_line(start + i, l.text)
     }.mkString("\n")
   }
 
@@ -70,18 +55,37 @@ object PIDE_MCP_Util {
     numbered_lines(lines.slice(start_idx, end_idx).map(_.text).mkString("\n"), start)
   }
 
-  def commands_in_range(
-    snap: Document.Snapshot,
-    doc: Line.Document,
-    start_line: Int,
-    end_line: Int
-  ): List[(Command, Text.Offset)] = {
-    val start_offset = doc.offset(Line.Position(line = (start_line - 1).max(0))).getOrElse(0)
-    val end_offset = doc.offset(Line.Position(line = end_line)).getOrElse(Int.MaxValue)
-    snap.node.command_iterator(Text.Range(start_offset, end_offset))
-      .filter { case (cmd, _) => cmd.source.trim.nonEmpty }
-      .toList
+  def node_defined(snap: Document.Snapshot, name: Document.Node.Name): Boolean =
+    snap.version.nodes.domain.contains(name)
+
+  def node_defined(snap: Document.Snapshot): Boolean =
+    node_defined(snap, snap.node_name)
+
+  def find_loading_command(snap: Document.Snapshot, blob_name: Document.Node.Name): Option[Command] =
+    snap.version.nodes.iterator.flatMap { case (_, node) =>
+      node.load_commands.find(_.blobs_names.contains(blob_name))
+    }.nextOption()
+
+  def is_blob_loaded(snap: Document.Snapshot, blob_name: Document.Node.Name): Boolean =
+    find_loading_command(snap, blob_name).isDefined
+
+  def restrict_source_range(snap: Document.Snapshot, range: Option[Text.Range]): Text.Range = {
+    val full = Text.Range.length(snap.node.source)
+    range.fold(full)(r => full.try_restrict(r).getOrElse(Text.Range.zero))
   }
+
+  def result_in_range(elem: XML.Tree, offset: Text.Offset, range: Option[Text.Range]): Boolean =
+    range.forall { r =>
+      val props = elem match {
+        case e: XML.Elem => e.markup.properties
+        case _ => Nil
+      }
+      Position.Range.unapply(props) match {
+        case Some(rng) => (rng + offset).overlaps(r)
+        case None =>
+          Position.Offset.unapply(props).forall(s => r.contains(s + offset))
+      }
+    }
 
   def xml_to_json(tree: XML.Tree): JSON.Object.T = tree match {
     case XML.Elem(Markup(name, props), body) =>
@@ -93,4 +97,6 @@ object PIDE_MCP_Util {
 
   def elem_body_plain_text(elem: XML.Elem): String =
     Pretty.string_of(elem.body, pure = true)
+
+  def canonical_path(path: Path): Path = path.expand.canonical
 }

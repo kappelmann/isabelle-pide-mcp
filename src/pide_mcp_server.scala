@@ -1,4 +1,4 @@
-/*  Title:      PIDE_MCP/mcp_server.scala
+/*  Title:      PIDE_MCP/pide_mcp_server.scala
     Author:     Kevin Kappelmann
 
 JSON-RPC server loop for the Model Context Protocol.
@@ -11,17 +11,28 @@ import scala.language.unsafeNulls
 import java.io.{BufferedReader, InputStreamReader, PrintWriter}
 
 
-object PIDE_MCP_Config {
+object Config {
   val name = "isabelle_pide_mcp"
   val version = "0.1.0"
   val protocol_version = "2025-11-25"
 }
 
-class PIDE_MCP_Server(session: PIDE_MCP_Session) {
+object RPC_Error {
+  /* JSON-RPC 2.0 reserved error codes (https://www.jsonrpc.org/specification#error_object) */
+  val PARSE_ERROR: Int = -32700
+  val METHOD_NOT_FOUND: Int = -32601
+  val INVALID_PARAMS: Int = -32602
+  val INTERNAL_ERROR: Int = -32603
+  /* implementation-defined server errors: range -32000 to -32099 */
+  val SERVER_ERROR: Int = -32000
+}
+
+class PIDE_MCP_Server(session: PIDE_MCP_Session, log: Logger, verbose: Boolean = false) {
   private val handlers = new PIDE_MCP_Tool_Handlers(session)
 
   private def respond(out: PrintWriter, body: JSON.Object.T): Unit =
     out.synchronized {
+      if (verbose) log(JSON.Format(body))
       out.println(JSON.Format(body))
       out.flush()
     }
@@ -34,16 +45,16 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session) {
       "error" -> JSON.Object("code" -> code, "message" -> msg))
 
   private def negotiate_protocol_version(client_version: String): String =
-    if (client_version < PIDE_MCP_Config.protocol_version) client_version
-    else PIDE_MCP_Config.protocol_version
+    if (client_version < Config.protocol_version) client_version
+    else Config.protocol_version
 
   def run(): Unit = {
     val in = new BufferedReader(new InputStreamReader(System.in))
     val out = new PrintWriter(System.out, true)
 
-    var line: String = null
-    while ({ line = in.readLine(); line != null }) {
+    Iterator.continually(in.readLine()).takeWhile(_ != null).foreach { line =>
       try {
+        if (verbose) log("<<< " + line)
         val request = JSON.Object.parse(line)
         val method = JSON.string(request, "method")
         val id = request.get("id")
@@ -52,13 +63,13 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session) {
           case Some("initialize") =>
             val client_version = request.get("params") match {
               case Some(JSON.Object(params)) =>
-                JSON.string(params, "protocolVersion").getOrElse(PIDE_MCP_Config.protocol_version)
-              case _ => PIDE_MCP_Config.protocol_version
+                JSON.string(params, "protocolVersion").getOrElse(Config.protocol_version)
+              case _ => Config.protocol_version
             }
             respond(out, rpc_result(id, JSON.Object(
               "protocolVersion" -> negotiate_protocol_version(client_version),
               "capabilities" -> JSON.Object("tools" -> JSON.Object()),
-              "serverInfo" -> JSON.Object("name" -> PIDE_MCP_Config.name, "version" -> PIDE_MCP_Config.version),
+              "serverInfo" -> JSON.Object("name" -> Config.name, "version" -> Config.version),
               "instructions" -> ("Interactive proof development with Isabelle PIDE MCP.\n\n" +
                 "The server automatically and asynchronously checks all commands after edits. Use `get_state` frequently to verify nothing is stuck or failed.\n" +
                 "Use `create_scratch` to test proof strategies, automation, and searches before editing your main theory.\n" +
@@ -83,13 +94,12 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session) {
 
           case Some(m) if m.startsWith("notifications/") => ()
 
-          case _ => respond(out, rpc_error(id, -32601, s"Method not found: $method"))
+          case _ => respond(out, rpc_error(id, RPC_Error.METHOD_NOT_FOUND, s"Method not found: $method"))
         }
       } catch {
-        case ex: Exception =>
-          Output.error_message(s"${ex.getMessage}")
-        ex.printStackTrace(System.err.nn)
-        respond(out, rpc_error(None, -32700, s"Parse error: ${ex.getMessage}"))
+        case ex: Throwable =>
+          log.error_message("Server loop error: " + Exn.print(ex))
+          respond(out, rpc_error(None, RPC_Error.PARSE_ERROR, s"Server loop error: ${Exn.message(ex)}"))
       }
     }
   }
@@ -122,15 +132,16 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session) {
                   "text" -> content_text
                 ))
               )))
-            case Exn.Exn(e) => respond(out, rpc_error(id, -32000, Exn.message(e)))
+            case Exn.Exn(e) =>
+              log.error_message("Tool call error: " + Exn.message(e))
+              respond(out, rpc_error(id, RPC_Error.SERVER_ERROR, Exn.message(e)))
           }
-        case None => respond(out, rpc_error(id, -32602, "Missing params or tool name"))
+        case None => respond(out, rpc_error(id, RPC_Error.INVALID_PARAMS, "Missing params or tool name"))
       }
     } catch {
-      case ex: Exception =>
-        Output.error_message(s"Internal error in tool call: ${ex.getMessage}")
-        ex.printStackTrace(System.err.nn)
-        respond(out, rpc_error(id, -32603, s"Internal error: ${ex.getMessage}"))
+      case ex: Throwable =>
+        log.error_message("Internal error in tool call: " + Exn.print(ex))
+        respond(out, rpc_error(id, RPC_Error.INTERNAL_ERROR, s"Internal error: ${Exn.message(ex)}"))
     }
   }
 }

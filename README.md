@@ -1,6 +1,6 @@
 ## Isabelle PIDE MCP Server
 
-A Model Context Protocol (MCP) server that provides interactive tools for working with Isabelle theories via a headless PIDE session.
+A Model Context Protocol (MCP) server that provides interactive tools for working with Isabelle theories and ML files via a headless PIDE session.
 
 ### Installation
 
@@ -11,26 +11,18 @@ isabelle components -u /path/to/pide_mcp
 
 ### Running
 
-To start the MCP server manually (e.g., for testing over stdin/stdout):
+You can register the server to your MCP client (e.g., OpenCode, Claude Code, Codex,...) or start the server manually:
 
 ```bash
 isabelle pide_mcp -l HOL
 ```
 
-Or configure it in your MCP client (e.g., OpenCode, Claude Desktop, Zed, Cursor) by providing:
-- command: `/path/to/isabelle`
-- args: `["pide_mcp", "-l", "HOL"]` (or whichever session you require)
+As usual, all options can be seen using `isabelle pide_mcp -?` (they follow the typical Isabelle conventions, e.g. `-d`, `-v`, `-L`).
 
-Options:
-- `-l NAME` — logic session name (e.g., HOL, HOL-Analysis, ZF)
-- `-d DIR` — include session directory
-- `-o OPTION` — override Isabelle system option (via NAME=VAL or NAME)
-- `-v` — verbose output on stderr
+### Coding Agents Configuration
 
-### Configuration
-
-See the example config and skill file in folder `.opencode`
+- For OpenCode, copy/adapt folder `.opencode` and start OpenCode in the same base directory.
+- For Claude Code, copy/adapt `.claude` and `.mcp.json` and start Claude Code in the same base directory. 
 
 # TODOs
 - options to warn agent about timeouts? everything is async for now
-- Find entities for ML files?
