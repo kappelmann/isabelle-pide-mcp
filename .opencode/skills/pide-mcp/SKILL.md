@@ -35,7 +35,7 @@ Prioritize the following principles in this order:
 
 #### State Synchronization
 - **All changes are immediately checked** by PIDE after edits
-- **Do not edit files via other means** (shell, other editors) - always use MCP tools to keep PIDE state synchronized
+- **Do not edit files via other means** (shell, other editors) - always use MCP tools to keep PIDE state synchronized. Reading via other tools (e.g. grep) for unloaded theories for exploration (e.g. grepping the AFP) is OK.
 - **Edits require `old_content` (the expected content at target lines). If the file changed since you last read it (e.g., a human edited it concurrently), the edit is rejected with a mismatch error showing expected vs actual content.**
 #### After Every Edit
 1. **Check for errors/unfinished commands after edits**.
@@ -67,11 +67,12 @@ This allows you to test proof strategies and alternative developments without ch
 Final results can be written back to the original file.
 
 #### Querying (Proof) Context
-**`get_state` returns structured PIDE markup information at any command position, including status (check it after edits), subgoals, local facts, sendback suggestions, locale context, and all prover messages.**
-
-Moreover, you can use Isar diagnostic commands if necessary, for example:
-- `thm <name>` - print a named fact (e.g. `thm Cons.IH`, `thm Cons`, `thm myasm`)
+- **`get_state` returns structured information at any command position, including status (check it after edits), subgoals, all prover messages (errors, warnings, writelns, .etc), type information for terms,...** 
+- **`find_entities` lets you explore defined entities (theorems, definitions, methods, etc.)**.
+Moreover, you can use Isar commands if necessary, for example:
 - `print_facts` - print all local facts in scope (named assumptions, case facts, intermediate results)
+- `find_theorems`
+- `find_consts`
 
 ## Formalization Workflow
 
@@ -146,7 +147,7 @@ For anything but trivial proofs:
 - If theories become too large, you may split into helper theories.
 
 ### Documentation
-- Use `text ‹ … ›` for prose explanations.
+- Use `text ‹ … ›` for prose explanations and add sections.
 - Add short explanations before major definitions/theorems:
   - why the definition is chosen,
   - intended use,

@@ -33,4 +33,4 @@ See the example config and skill file in folder `.opencode`
 
 # TODOs
 - options to warn agent about timeouts? everything is async for now
-- ML go to origin
+- Find entities for ML files?

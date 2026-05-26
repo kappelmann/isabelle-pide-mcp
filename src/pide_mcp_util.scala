@@ -56,14 +56,18 @@ object PIDE_MCP_Util {
   def node_defined(snap: Document.Snapshot): Boolean =
     snap.version.nodes.domain.contains(snap.node_name)
 
-  def numbered_lines(text: String, start: Int, end: Int): String = {
+  def numbered_lines(text: String, start: Int): String = {
+    val lines = Line.Document(text).lines
+    lines.zipWithIndex.map { case (l, i) =>
+      (start + i).toString + ": " + l.text
+    }.mkString("\n")
+  }
+
+  def numbered_lines_range(text: String, start: Int, end: Int): String = {
     val lines = Line.Document(text).lines
     val start_idx = start - 1
     val end_idx = end.min(lines.length)
-    lines.slice(start_idx, end_idx).zipWithIndex.map { case (l, i) =>
-      val n = start_idx + i + 1
-      n.toString + ": " + l.text
-    }.mkString("\n")
+    numbered_lines(lines.slice(start_idx, end_idx).map(_.text).mkString("\n"), start)
   }
 
   def commands_in_range(

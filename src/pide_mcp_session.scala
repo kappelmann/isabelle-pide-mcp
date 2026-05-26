@@ -146,20 +146,25 @@ class PIDE_MCP_Session(session_name: String, dirs: List[Path] = Nil, val options
       (prefix ++ Library.split_lines(content) ++ suffix).mkString("\n")
     }
 
-  private def edit_file(
-    path: Path,
-    content: String,
+  private def submit_incremental_edit(
+    name: Document.Node.Name,
+    disk_text: String,
+    new_text: String,
     start_line: Option[Int],
     end_line: Option[Int],
-    old_content: String
-  ): Exn.Result[(String, Boolean)] =
-    Exn.capture {
-      val disk_text = File.read(path)
-      val new_text = Exn.release(compute_file_edit(disk_text, content, start_line, end_line, old_content))
-      val changed = new_text != disk_text
-      if (changed) File.write(path, new_text)
-      (new_text, changed)
-    }
+    old_content: String,
+    content: String
+  ): Unit = {
+    val lines_count = Library.split_lines(disk_text).length
+    val (s, e) = Exn.release(PIDE_MCP_Util.resolve_lines(start_line, end_line, lines_count))
+    val doc = Line.Document(disk_text)
+    val start_offset = doc.offset(Line.Position(line = s - 1)).getOrElse(0)
+    val text_edits = Text.Edit.replace(start_offset, old_content, content)
+    val new_header = resources.check_thy(name, Scan.char_reader(new_text))
+    _session.update(Document.Blobs.empty, List(
+      name -> (Document.Node.Edits(text_edits): Document.Node.Edit[Text.Edit, Text.Perspective]),
+      name -> (Document.Node.Perspective(true, Text.Perspective.empty, Document.Node.Overlays.empty): Document.Node.Edit[Text.Edit, Text.Perspective])))
+  }
 
   def edit_load_file(
     path: Path,
@@ -170,9 +175,12 @@ class PIDE_MCP_Session(session_name: String, dirs: List[Path] = Nil, val options
   ): Exn.Result[(String, Boolean)] = {
     val name = node_name(path)
     Exn.capture {
-      val (new_text, changed) = Exn.release(edit_file(path, content, start_line, end_line, old_content))
+      val disk_text = File.read(path)
+      val new_text = Exn.release(compute_file_edit(disk_text, content, start_line, end_line, old_content))
+      val changed = new_text != disk_text
       if (changed) {
-        if (name.is_theory) Exn.release(load_theory(name))
+        File.write(path, new_text)
+        if (name.is_theory) submit_incremental_edit(name, disk_text, new_text, start_line, end_line, old_content, content)
         else Exn.release(load_file(name))
       }
       (new_text, changed)

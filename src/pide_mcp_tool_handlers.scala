@@ -105,21 +105,23 @@ class PIDE_MCP_Tool_Handlers(val session: PIDE_MCP_Session) {
     snap: Document.Snapshot,
     cmd: Command,
     offset: Text.Offset,
+    doc: Line.Document,
     include_types: Boolean,
-    include_full_markup: Boolean,
-    include_facts: Boolean
+    include_facts: Boolean,
+    include_infos: Boolean,
+    include_full_markup: Boolean
   ): JSON.Object.T = {
     val results = snap.command_results(cmd)
     val source_text = cmd.source.trim
-    val source_lines_count = Line.Document(source_text).lines.length
     val status = session.command_status(snap, cmd)
     val status_str = command_status_str(snap, cmd)
     val timing_ms = status.timings.sum(Date.now()).ms
+    val real_line = doc.position(offset).line + 1
 
     val parts = scala.collection.mutable.ListBuffer[(String, Any)]()
     parts += "status" -> status_str
     parts += "timing_ms" -> timing_ms
-    parts += "source" -> PIDE_MCP_Util.numbered_lines(source_text, 1, source_lines_count)
+    parts += "source" -> PIDE_MCP_Util.numbered_lines(source_text, real_line)
 
     val goal_texts = scala.collection.mutable.ListBuffer[String]()
     val error_texts = scala.collection.mutable.ListBuffer[String]()
@@ -142,18 +144,20 @@ class PIDE_MCP_Tool_Handlers(val session: PIDE_MCP_Session) {
     add_if_nonempty(goal_texts, "goal")
     add_if_nonempty(error_texts, "error")
     add_if_nonempty(warning_texts, "warning")
-    add_if_nonempty(writeln_texts, "writeln")
-    add_if_nonempty(info_texts, "information")
     if (include_types) {
       val types = command_types_json(snap, cmd, offset)
       if (types.nonEmpty) parts += "types" -> types
     }
-    if (include_full_markup) {
-      parts += "markup" -> command_markup_json(snap, cmd, offset, Markup.Elements.full)
-    }
     if (include_facts) {
       val facts = command_facts_json(snap, cmd, offset)
       if (facts.nonEmpty) parts += "facts" -> facts
+    }
+    if (include_infos) {
+      add_if_nonempty(writeln_texts, "writeln")
+      add_if_nonempty(info_texts, "information")
+    }
+    if (include_full_markup) {
+      parts += "markup" -> command_markup_json(snap, cmd, offset, Markup.Elements.full)
     }
     JSON.Object(parts.toSeq: _*)
   }
@@ -162,7 +166,7 @@ class PIDE_MCP_Tool_Handlers(val session: PIDE_MCP_Session) {
     name match {
       case PIDE_MCP_Tool_Schemas.create_scratch => handle_create_scratch(params)
       case PIDE_MCP_Tool_Schemas.edit => handle_edit(params)
-      case PIDE_MCP_Tool_Schemas.find_origins => handle_find_origins(params)
+      case PIDE_MCP_Tool_Schemas.find_entities => handle_find_entities(params)
       case PIDE_MCP_Tool_Schemas.get_state => handle_get_state(params)
       case PIDE_MCP_Tool_Schemas.list_loaded_theories => handle_list_loaded_theories(params)
       case PIDE_MCP_Tool_Schemas.read => handle_read(params)
@@ -191,8 +195,8 @@ class PIDE_MCP_Tool_Handlers(val session: PIDE_MCP_Session) {
       val status = if (changed) "written" else "unchanged"
       val description = if (changed) "File content changed"
         else "Edit did not modify the file content (old_content matches current content)"
-      val file_lines = PIDE_MCP_Util.numbered_lines(new_text, 1, Line.Document(new_text).lines.length)
-      Map("status" -> status, "description" -> description, "file_content" -> file_lines)
+      val file_content = PIDE_MCP_Util.numbered_lines_range(new_text, 1, Line.Document(new_text).lines.length)
+      Map("status" -> status, "description" -> description, "file_content" -> file_content)
     }
 
   private def mk_definition_entry(
@@ -207,7 +211,7 @@ class PIDE_MCP_Tool_Handlers(val session: PIDE_MCP_Session) {
     val with_source = (source, line, snippet_lines) match {
       case (Some(text), Some(l), n) if n > 0 =>
         val snippet_end = l + n - 1
-        with_pos + ("source_snippet" -> PIDE_MCP_Util.numbered_lines(text, l, snippet_end))
+        with_pos + ("source_snippet" -> PIDE_MCP_Util.numbered_lines_range(text, l, snippet_end))
       case _ => with_pos
     }
     note match {
@@ -223,41 +227,46 @@ class PIDE_MCP_Tool_Handlers(val session: PIDE_MCP_Session) {
   private def definition_entry(
     snap: Document.Snapshot,
     entry: Name_Space.Entry,
-    snippet_lines: Int
+    snippet_lines: Int,
+    origin_theories: Option[List[String]]
   ): Exn.Result[Option[JSON.Object.T]] = Exn.capture {
+    val origin_set = origin_theories.map(paths => paths.map(p => Path.explode(p).expand.implode).toSet)
+    def matches_origin(file: String): Boolean = origin_set.isEmpty || origin_set.get.contains(file)
     if (!find_origin_kinds.contains(entry.kind)) None
     else entry.properties match {
       case Position.Item_Def_File(def_file, def_line, _) =>
-        val entry_result = session.session.store.source_file(def_file) match {
+        session.session.store.source_file(def_file) match {
           case Some(resolved) =>
-            val text = File.read(Path.explode(resolved))
-            mk_definition_entry(entry.name, entry.kind,
-              file = Some(resolved), line = Some(def_line), source = Some(text),
-              snippet_lines = snippet_lines)
-          case None =>
-            mk_definition_entry(entry.name, entry.kind,
+            if (!matches_origin(resolved)) None
+            else {
+              val text = File.read(Path.explode(resolved))
+              Some(mk_definition_entry(entry.name, entry.kind,
+                file = Some(resolved), line = Some(def_line), source = Some(text),
+                snippet_lines = snippet_lines))
+            }
+          case None => Some(mk_definition_entry(entry.name, entry.kind,
               note = Some("The definition entry's source file " + def_file
-                + " could not be resolved yet. " + retry_soon_message))
+                + " could not be resolved yet. " + retry_soon_message)))
         }
-        Some(entry_result)
       case Position.Item_Def_Id(def_id, def_range) =>
-        val entry_result = snap.find_command_position(def_id, def_range.start) match {
+        snap.find_command_position(def_id, def_range.start) match {
           case Some(pos) =>
             val pos_path = Path.explode(pos.name).expand
-            val text = Exn.release(session.read(session.node_name(Path.explode(pos.name))))
-            mk_definition_entry(entry.name, entry.kind,
-              file = Some(pos_path.implode), line = Some(pos.line1), source = Some(text),
-              snippet_lines = snippet_lines)
-          case None =>
-            mk_definition_entry(entry.name, entry.kind,
-              note = Some("The definition entry has not been loaded yet. " + retry_soon_message))
+            if (!matches_origin(pos_path.implode)) None
+            else {
+              val text = Exn.release(session.read(session.node_name(Path.explode(pos.name))))
+              Some(mk_definition_entry(entry.name, entry.kind,
+                file = Some(pos_path.implode), line = Some(pos.line1), source = Some(text),
+                snippet_lines = snippet_lines))
+            }
+          case None => Some(mk_definition_entry(entry.name, entry.kind,
+              note = Some("The definition entry has not been loaded yet. " + retry_soon_message)))
         }
-        Some(entry_result)
       case _ => None
     }
   }
 
-  private def handle_find_origins(params: JSON.Object.T): Exn.Result[JSON.T] =
+  private def handle_find_entities(params: JSON.Object.T): Exn.Result[JSON.T] =
     Exn.capture {
       val path_str = Exn.release(path_param(params))
       val snap = Exn.release(load_snapshot(path_str))
@@ -266,12 +275,13 @@ class PIDE_MCP_Tool_Handlers(val session: PIDE_MCP_Session) {
       val start_line = JSON.int(params, "start_line") getOrElse error("Missing or invalid start_line")
       val end_line_opt = JSON.int(params, "end_line")
       val snippet_lines = JSON.int(params, "snippet_lines").getOrElse(PIDE_MCP_Tool_Handlers.snippet_preview_lines)
+      val origin_theories = JSON.strings(params, "origin_theories")
       val (s, end_line) = Exn.release(PIDE_MCP_Util.resolve_lines(Some(start_line), end_line_opt, doc.lines.length))
       val cmds = PIDE_MCP_Util.commands_in_range(snap, doc, s, end_line)
       val markup = cmds.flatMap { case (cmd, offset) => command_markup(snap, cmd, offset, Markup.Elements(Markup.ENTITY)) }
       val defs = markup.flatMap { case Text.Info(_, elems) =>
         elems.collect { case XML.Elem(Markup.Entity(entry), _) => entry }
-      }.distinctBy(identity).flatMap(entry => Exn.release(definition_entry(snap, entry, snippet_lines)))
+      }.distinctBy(identity).flatMap(entry => Exn.release(definition_entry(snap, entry, snippet_lines, origin_theories)))
       val kind_priority = find_origin_kinds
       defs.groupBy(e => (e("name"), e.get("file"), e.get("line"))).values.map { group =>
         group.minBy(e => {
@@ -292,11 +302,44 @@ class PIDE_MCP_Tool_Handlers(val session: PIDE_MCP_Session) {
       val (s, e) = Exn.release(PIDE_MCP_Util.resolve_lines(start_line, end_line, doc.lines.length))
       val cmds = PIDE_MCP_Util.commands_in_range(snap, doc, s, e)
       val include_types = JSON.bool(params, "include_types").getOrElse(false)
-      val include_full_markup = JSON.bool(params, "include_full_markup").getOrElse(false)
       val include_facts = JSON.bool(params, "include_facts").getOrElse(false)
-      cmds.map { case (cmd, offset) =>
-        command_state_json(snap, cmd, offset, include_types, include_full_markup, include_facts)
+      val include_infos = JSON.bool(params, "include_infos").getOrElse(false)
+      val include_full_markup = JSON.bool(params, "include_full_markup").getOrElse(false)
+
+      var errors = 0
+      var warnings = 0
+      var total_timing_ms = 0L
+      var commands_finished = 0
+      var commands_failed = 0
+      var commands_running = 0
+      var commands_unprocessed = 0
+      var commands_canceled = 0
+
+      cmds.foreach { case (cmd, _) =>
+        val status = session.command_status(snap, cmd)
+        total_timing_ms += status.timings.sum(Date.now()).ms
+        if (status.is_finished) commands_finished += 1
+        else if (status.is_failed) commands_failed += 1
+        else if (status.is_running) commands_running += 1
+        else if (status.is_canceled) commands_canceled += 1
+        else if (status.is_unprocessed) commands_unprocessed += 1
+        snap.command_results(cmd).iterator.foreach { case (_, elem) =>
+          val text = PIDE_MCP_Util.elem_body_plain_text(elem)
+          if (text.nonEmpty) {
+            if (Protocol.is_error(elem)) errors += 1
+            else if (Protocol.is_warning_or_legacy(elem)) warnings += 1
+          }
+        }
       }
+
+      val command_states = cmds.map { case (cmd, offset) =>
+        command_state_json(snap, cmd, offset, doc, include_types, include_facts, include_infos, include_full_markup)
+      }
+      JSON.Object("errors" -> errors, "warnings" -> warnings,
+        "commands_finished" -> commands_finished, "commands_failed" -> commands_failed,
+        "commands_running" -> commands_running, "commands_unprocessed" -> commands_unprocessed,
+        "commands_canceled" -> commands_canceled, "total_timing_ms" -> total_timing_ms,
+        "commands" -> command_states)
     }
 
   private def handle_list_loaded_theories(params: JSON.Object.T): Exn.Result[JSON.T] =
@@ -322,7 +365,7 @@ class PIDE_MCP_Tool_Handlers(val session: PIDE_MCP_Session) {
       val start_line = JSON.int(params, "start_line")
       val end_line = JSON.int(params, "end_line")
       val (s, e) = Exn.release(PIDE_MCP_Util.resolve_lines(start_line, end_line, lines_count))
-      PIDE_MCP_Util.numbered_lines(text, s, e)
+      PIDE_MCP_Util.numbered_lines_range(text, s, e)
     }
 
 }

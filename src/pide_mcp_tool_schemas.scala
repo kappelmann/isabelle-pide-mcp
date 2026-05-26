@@ -12,7 +12,7 @@ case class Tool_Def(description: String, input_schema: Map[String, Any],
 object PIDE_MCP_Tool_Schemas {
   val create_scratch: String = "create_scratch"
   val edit: String = "edit"
-  val find_origins: String = "find_origins"
+  val find_entities: String = "find_entities"
   val get_state: String = "get_state"
   val list_loaded_theories: String = "list_loaded_theories"
   val read: String = "read"
@@ -60,9 +60,9 @@ object PIDE_MCP_Tool_Schemas {
       ), "required" -> List("path", "content", "old_content")),
       annotations = Some(Map("destructiveHint" -> true))
     ),
-    find_origins -> Tool_Def(
-      description = "Look up where and how entities (constants, theorems, commands, methods,...) are defined, i.e. find their origin. "
-        + "Useful to learn more about concepts that you are uncertain about or for which you need more information (e.g. the actual theorem statement). "
+    find_entities -> Tool_Def(
+      description = "Look up what entities (constants, theorems, commands, methods,...) are defined where and how, i.e. find their origin with preview snippets. "
+        + "Useful to learn more about concepts that you are uncertain about or for which you need more information (e.g. the actual theorem statement) and to study the content of a theory. To get all entities defined in a theory, select the theory with full range and also pass it in origin_theories."
         + implicit_load_theory,
       input_schema = Map("type" -> "object", "properties" -> Map(
         thy_path_prop,
@@ -70,12 +70,15 @@ object PIDE_MCP_Tool_Schemas {
         end_line_opt_prop,
         "snippet_lines" -> Map("type" -> "integer",
           "description" -> "Number of context lines per definition source snippet (use 0 to omit).",
-          "minimum" -> 0, "default" -> 3)
+          "minimum" -> 0, "default" -> 3),
+        "origin_theories" -> Map("type" -> "array", "items" -> Map("type" -> "string"),
+          "description" -> "List of theory file paths. If provided, only returns entities whose definition originates from one of these theories. Use this if you want to explore the entities defined by a theory.")
       ), "required" -> List("path", "start_line")),
       annotations = Some(Map("readOnlyHint" -> true))
     ),
     get_state -> Tool_Def(
       description = "Inspect the state of a (range in a) theory: goals, variables, errors, warnings, etc. "
+        + "Returns a summary (number of errors, warnings, number of commands running, finished, etc., total timing, ...) and details for all commands selected."
         + "**Use this frequently to check if you are making progress, what is left to be done, and importantly, if certain commands are still processing, potentially even looping.** "
         + implicit_load_theory,
       input_schema = Map("type" -> "object", "properties" -> Map(
@@ -85,12 +88,15 @@ object PIDE_MCP_Tool_Schemas {
         "include_types" -> Map("type" -> "boolean",
           "description" -> "Include types for variables and constants.",
           "default" -> false),
-        "include_full_markup" -> Map("type" -> "boolean",
-          "description" -> "Include full PIDE markup information; very large - **use only sparingly and very targeted**.",
-          "default" -> false),
         "include_facts" -> Map("type" -> "boolean",
           "description" -> "Include facts/theorems used in range.",
-          "default" -> false)
+          "default" -> false),
+        "include_infos" -> Map("type" -> "boolean",
+          "description" -> "Include writeln and information output in the state. This can get large, but often contains useful information. Avoid using it for large ranges if possible.",
+          "default" -> false),
+        "include_full_markup" -> Map("type" -> "boolean",
+          "description" -> "Include full PIDE markup information. This gets very large - **use only sparingly and very targeted to get local details**.",
+          "default" -> false),
       ), "required" -> List("path")),
       annotations = Some(Map("readOnlyHint" -> true))
     ),
