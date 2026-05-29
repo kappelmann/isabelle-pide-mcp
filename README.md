@@ -2,6 +2,9 @@
 
 A Model Context Protocol (MCP) server that provides interactive tools for working with Isabelle theories and ML files via a headless PIDE session.
 
+**Note:** The MCP manages its own PIDE state. If you edit the same files as the MCP, it will only see your changes once they are written to disk.
+The MCP automatically synchronizes with disk on every read and write.
+
 ### Installation
 
 1. Install the component:
