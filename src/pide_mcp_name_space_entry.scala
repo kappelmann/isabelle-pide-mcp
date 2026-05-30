@@ -12,13 +12,14 @@ import isabelle._
 object PIDE_MCP_Name_Space_Entry {
 
   private def mk_definition_json(
-    name: String, kind: String, origin: Option[String] = None,
+    name: String, kind: String, def_label: String, origin: Option[String] = None,
     line: Option[Int] = None, source: Option[String] = None,
     snippet_lines: Int = 0, note: Option[String] = None
   ): JSON.Object.T = {
     val entries: List[(String, JSON.T)] = List(
       Some("name" -> name),
       Some("kind" -> kind),
+      Option.when(def_label.nonEmpty)("def_label" -> def_label),
       origin.map("origin" -> _),
       line.map("line" -> _),
       (source, line) match {
@@ -43,7 +44,7 @@ object PIDE_MCP_Name_Space_Entry {
     if (filter_origins.nonEmpty && !filter_origins.contains(origin)) None
     else {
       val source = if (snippet_lines > 0) Some(Exn.release(session.read(node_name))) else None
-      Some(mk_definition_json(name, entry.kind, origin = Some(origin),
+      Some(mk_definition_json(name, entry.kind, entry.def_label, origin = Some(origin),
         line = Some(line), source = source, snippet_lines = snippet_lines))
     }
   }
@@ -62,7 +63,7 @@ object PIDE_MCP_Name_Space_Entry {
         case Exn.Res(node_name) =>
           Exn.release(source_definition_json(session, entry, name, node_name, line, snippet_lines, filter_origins))
         case Exn.Exn(ex) =>
-          Some(mk_definition_json(name, entry.kind, origin = Some(origin_str),
+          Some(mk_definition_json(name, entry.kind, entry.def_label, origin = Some(origin_str),
             line = Some(line), note = Some("The definition entry's source file " + origin_str
               + " could not be resolved: " + Exn.message(ex))))
       }
@@ -72,7 +73,8 @@ object PIDE_MCP_Name_Space_Entry {
       case Position.Item_Def_Id(def_id, def_range) =>
         snapshot.find_command_position(def_id, def_range.start) match {
           case Some(pos) => resolve_entry(pos.name, pos.line1)
-          case None => Some(mk_definition_json(name, entry.kind, note = Some(def_entry_not_loaded)))
+          case None => Some(mk_definition_json(name, entry.kind, entry.def_label,
+            note = Some(def_entry_not_loaded)))
         }
       case _ => None
     }

@@ -43,8 +43,7 @@ object PIDE_MCP_Util {
 
   def numbered_lines(text: String, start: Int): String = {
     val all_lines = Line.Document(text).lines
-    // A trailing newline in `text` produces an empty trailing line in Line.Document;
-    // drop it so range queries don't emit a phantom next line.
+    // drop potentially empty last line
     val lines = if (all_lines.lastOption.exists(_.text.isEmpty)) all_lines.init else all_lines
     lines.zipWithIndex.map { case (l, i) =>
       numbered_line(start + i, l.text)

@@ -51,32 +51,23 @@ object PIDE_MCP_Commands {
     range.flatMap(full.try_restrict).getOrElse(full)
   }
 
-  /** returns outer range, inner markup, ancestors */
-  private def markups_cumulated(
-    snapshot: Document.Snapshot,
-    range: Text.Range,
-    elements: Markup.Elements
-  ): List[Text.Info[(Text.Info[XML.Elem], List[Text.Info[XML.Elem]])]] =
-    snapshot.cumulate(range, List.empty[Text.Info[XML.Elem]], elements,
-      _ => { case (acc, info) => Some(info :: acc) }
-    ).collect {
-      case Text.Info(r, current :: ancestors) => Text.Info(r, (current, ancestors))
-    }
-
+  /** returning range and containing markups (which contain their own sub-range) */
   private def markups(
     snapshot: Document.Snapshot,
     range: Text.Range,
     elements: Markup.Elements
-  ): List[Text.Info[Text.Info[XML.Elem]]] =
-    markups_cumulated(snapshot, range, elements).map { case Text.Info(r, (current, _)) => Text.Info(r, current) }
+  ): List[Text.Info[List[Text.Info[XML.Elem]]]] =
+    snapshot.cumulate(range, List.empty[Text.Info[XML.Elem]], elements,
+      _ => { case (acc, info) => Some(info :: acc) }
+    )
 
   def markup_json(
     snapshot: Document.Snapshot,
     range: Text.Range,
     elements: Markup.Elements
   ): List[JSON.Object.T] =
-    markups(snapshot, range, elements).map { case Text.Info(_, Text.Info(_, elem)) =>
-      PIDE_MCP_Util.xml_to_json(elem)
+    markups(snapshot, range, elements).flatMap { case Text.Info(_, infos) =>
+      infos.map(info => PIDE_MCP_Util.xml_to_json(info.info))
     }
 
   val Markup_ML: String = "ML"
@@ -96,12 +87,12 @@ object PIDE_MCP_Commands {
         typing_elem <- at_range.collectFirst { case Text.Info(_, e) if e.name == Markup.TYPING => e }
       } yield (kind_elem.name, XML.content(typing_elem.body)))
 
-    markups_cumulated(snapshot, range, elements).flatMap {
-      case Text.Info(r, (current, ancestors)) if current.range == r => // only keep leaf nodes
-        val at_range = current :: ancestors.filter(_.range == r)
+    markups(snapshot, range, elements).flatMap {
+      case Text.Info(r, infos @ (info :: _)) if info.range == r => // only keep leaf nodes
+        val at_range = infos.filter(_.range == r)
         val name_at = PIDE_MCP_Util.display_name(
           at_range.collectFirst { case Text.Info(_, XML.Elem(Markup.Entity(entry), _)) => entry },
-          current.range, snapshot.node.source)
+          r, snapshot.node.source)
         kind_and_type(at_range).map { case (kind, t) =>
           JSON.Object("name" -> name_at, "kind" -> kind, "type" -> t)
         }
@@ -111,15 +102,18 @@ object PIDE_MCP_Commands {
 
   def facts_json(snapshot: Document.Snapshot, range: Text.Range): List[String] = {
     val fact_kinds = Set(Markup.FACT, Markup.DYNAMIC_FACT, Markup.LITERAL_FACT)
-    markups(snapshot, range, Markup.Elements(Markup.ENTITY)).collect {
-      case Text.Info(_, Text.Info(_, XML.Elem(Markup.Entity(entry), _)))
-        if fact_kinds.contains(entry.kind) => entry.name
+    markups(snapshot, range, Markup.Elements(Markup.ENTITY)).flatMap {
+      case Text.Info(_, infos) => infos.collect {
+        case Text.Info(_, XML.Elem(Markup.Entity(entry), _)) if fact_kinds.contains(entry.kind) =>
+          entry.name
+      }.distinct
     }
   }
 
   def bad_json(snapshot: Document.Snapshot, range: Text.Range): List[String] =
-    markups(snapshot, range, Markup.Elements(Markup.BAD))
-      .map { case Text.Info(_, Text.Info(r0, _)) => r0.substring(snapshot.node.source) }
+    markups(snapshot, range, Markup.Elements(Markup.BAD)).flatMap {
+      case Text.Info(_, infos) => infos.map(info => info.range.substring(snapshot.node.source))
+    }
 
   sealed case class State_Options(
     include_types: Boolean = false,
@@ -275,12 +269,14 @@ object PIDE_MCP_Commands {
   ): Exn.Result[Map[String, List[JSON.Object.T]]] = Exn.capture {
     val restricted = PIDE_MCP_Util.restrict_source_range(snapshot, range)
     markups(snapshot, restricted, Markup.Elements(Markup.ENTITY)).flatMap {
-      case Text.Info(_, Text.Info(r0, XML.Elem(Markup.Entity(entry), _)))
-        if definition_kinds.contains(entry.kind) =>
-        val name = PIDE_MCP_Util.display_name(Some(entry), r0, snapshot.node.source)
-        Exn.release(PIDE_MCP_Name_Space_Entry.definition_json(session, snapshot, entry, name,
-          snippet_lines, filter_origins, def_entry_not_loaded))
-      case _ => Nil
+      case Text.Info(_, infos) => infos.flatMap {
+        case Text.Info(r0, XML.Elem(Markup.Entity(entry), _))
+          if definition_kinds.contains(entry.kind) =>
+          val name = PIDE_MCP_Util.display_name(Some(entry), r0, snapshot.node.source)
+          Exn.release(PIDE_MCP_Name_Space_Entry.definition_json(session, snapshot, entry, name,
+            snippet_lines, filter_origins, def_entry_not_loaded))
+        case _ => Nil
+      }
     }.groupBy(e => JSON.string(e, "origin").getOrElse("")).map { case (origin, entries) =>
       origin -> entries.sortBy(e => (JSON.int(e, "line"), JSON.string(e, "name"), JSON.string(e, "kind")))
         .distinctBy(e => (JSON.int(e, "line"), JSON.string(e, "name")))
