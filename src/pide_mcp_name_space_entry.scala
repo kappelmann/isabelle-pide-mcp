@@ -33,34 +33,36 @@ object PIDE_MCP_Name_Space_Entry {
   private def source_definition_json(
     session: PIDE_MCP_Session,
     entry: Name_Space.Entry,
-    name: Document.Node.Name,
+    name: String,
+    node_name: Document.Node.Name,
     line: Int,
     snippet_lines: Int,
     filter_origins: Set[String]
   ): Exn.Result[Option[JSON.Object.T]] = Exn.capture {
-    val origin = session.origin(name)
+    val origin = session.origin(node_name)
     if (filter_origins.nonEmpty && !filter_origins.contains(origin)) None
     else {
-      val source = if (snippet_lines > 0) Some(Exn.release(session.read(name))) else None
-      Some(mk_definition_json(entry.name, entry.kind, origin = Some(origin),
+      val source = if (snippet_lines > 0) Some(Exn.release(session.read(node_name))) else None
+      Some(mk_definition_json(name, entry.kind, origin = Some(origin),
         line = Some(line), source = source, snippet_lines = snippet_lines))
     }
   }
 
   def definition_json(
     session: PIDE_MCP_Session,
-    snap: Document.Snapshot,
+    snapshot: Document.Snapshot,
     entry: Name_Space.Entry,
+    name: String,
     snippet_lines: Int,
     filter_origins: Set[String],
     def_entry_not_loaded: String
   ): Exn.Result[Option[JSON.Object.T]] = Exn.capture {
     def resolve_entry(origin_str: String, line: Int): Option[JSON.Object.T] = {
       session.node_name(origin_str) match {
-        case Exn.Res(name) =>
-          Exn.release(source_definition_json(session, entry, name, line, snippet_lines, filter_origins))
+        case Exn.Res(node_name) =>
+          Exn.release(source_definition_json(session, entry, name, node_name, line, snippet_lines, filter_origins))
         case Exn.Exn(ex) =>
-          Some(mk_definition_json(entry.name, entry.kind, origin = Some(origin_str),
+          Some(mk_definition_json(name, entry.kind, origin = Some(origin_str),
             line = Some(line), note = Some("The definition entry's source file " + origin_str
               + " could not be resolved: " + Exn.message(ex))))
       }
@@ -68,10 +70,9 @@ object PIDE_MCP_Name_Space_Entry {
     entry.properties match {
       case Position.Item_Def_File(def_file, def_line, _) => resolve_entry(def_file, def_line)
       case Position.Item_Def_Id(def_id, def_range) =>
-        snap.find_command_position(def_id, def_range.start) match {
+        snapshot.find_command_position(def_id, def_range.start) match {
           case Some(pos) => resolve_entry(pos.name, pos.line1)
-          case None => Some(mk_definition_json(entry.name, entry.kind,
-            note = Some(def_entry_not_loaded)))
+          case None => Some(mk_definition_json(name, entry.kind, note = Some(def_entry_not_loaded)))
         }
       case _ => None
     }

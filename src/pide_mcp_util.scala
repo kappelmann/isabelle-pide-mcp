@@ -42,7 +42,10 @@ object PIDE_MCP_Util {
     s"${line}: ${text}"
 
   def numbered_lines(text: String, start: Int): String = {
-    val lines = Line.Document(text).lines
+    val all_lines = Line.Document(text).lines
+    // A trailing newline in `text` produces an empty trailing line in Line.Document;
+    // drop it so range queries don't emit a phantom next line.
+    val lines = if (all_lines.lastOption.exists(_.text.isEmpty)) all_lines.init else all_lines
     lines.zipWithIndex.map { case (l, i) =>
       numbered_line(start + i, l.text)
     }.mkString("\n")
@@ -55,22 +58,25 @@ object PIDE_MCP_Util {
     numbered_lines(lines.slice(start_idx, end_idx).map(_.text).mkString("\n"), start)
   }
 
-  def node_defined(snap: Document.Snapshot, name: Document.Node.Name): Boolean =
-    snap.version.nodes.domain.contains(name)
+  def display_name(entry: Option[Name_Space.Entry], range: Text.Range, source: String): String =
+    entry.map(_.name).filter(_.nonEmpty).getOrElse(range.substring(source))
 
-  def node_defined(snap: Document.Snapshot): Boolean =
-    node_defined(snap, snap.node_name)
+  def node_defined(snapshot: Document.Snapshot, node_name: Document.Node.Name): Boolean =
+    snapshot.version.nodes.domain.contains(node_name)
 
-  def find_loading_command(snap: Document.Snapshot, blob_name: Document.Node.Name): Option[Command] =
-    snap.version.nodes.iterator.flatMap { case (_, node) =>
-      node.load_commands.find(_.blobs_names.contains(blob_name))
+  def node_defined(snapshot: Document.Snapshot): Boolean =
+    node_defined(snapshot, snapshot.node_name)
+
+  def find_loading_command(snapshot: Document.Snapshot, file_name: Document.Node.Name): Option[Command] =
+    snapshot.version.nodes.iterator.flatMap { case (_, node) =>
+      node.load_commands.find(_.blobs_names.contains(file_name))
     }.nextOption()
 
-  def is_blob_loaded(snap: Document.Snapshot, blob_name: Document.Node.Name): Boolean =
-    find_loading_command(snap, blob_name).isDefined
+  def is_file_loaded(snapshot: Document.Snapshot, file_name: Document.Node.Name): Boolean =
+    find_loading_command(snapshot, file_name).isDefined
 
-  def restrict_source_range(snap: Document.Snapshot, range: Option[Text.Range]): Text.Range = {
-    val full = Text.Range.length(snap.node.source)
+  def restrict_source_range(snapshot: Document.Snapshot, range: Option[Text.Range]): Text.Range = {
+    val full = Text.Range.length(snapshot.node.source)
     range.fold(full)(r => full.try_restrict(r).getOrElse(Text.Range.zero))
   }
 
