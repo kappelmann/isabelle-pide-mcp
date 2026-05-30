@@ -42,9 +42,7 @@ object PIDE_MCP_Util {
     s"${line}: ${text}"
 
   def numbered_lines(text: String, start: Int): String = {
-    val all_lines = Line.Document(text).lines
-    // drop potentially empty last line
-    val lines = if (all_lines.lastOption.exists(_.text.isEmpty)) all_lines.init else all_lines
+    val lines = Line.Document(text).lines
     lines.zipWithIndex.map { case (l, i) =>
       numbered_line(start + i, l.text)
     }.mkString("\n")

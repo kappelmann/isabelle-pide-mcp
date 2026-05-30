@@ -152,7 +152,7 @@ object PIDE_MCP_Commands {
   ): JSON.Object.T = {
     val cmd_status = status(snapshot, entry.cmd)
     val texts_by_kind = classify_results(entry.results)
-    val source_text = entry.range.substring(snapshot.node.source)
+    val source_text = entry.range.substring(snapshot.node.source).stripLineEnd
     val source_line = doc.position(entry.range.start).line1
     val entries: List[Option[(String, JSON.T)]] = List(
       Some("status" -> status_list(cmd_status)),
