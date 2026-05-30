@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "isabelle-pide-mcp": {
-      "command": "isabelle",
+      "command": "/Users/kevin/Programming/isabelle/isabelle/bin/isabelle",
       "args": ["pide_mcp", "-v", "-l", "HOL"]
     }
   }
