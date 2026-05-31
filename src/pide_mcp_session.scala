@@ -16,7 +16,11 @@ class PIDE_MCP_Session(
   session_name: String,
   val log: Logger,
   dirs: List[Path] = Nil,
-  val options: Options = Options.init()
+  val options: Options = Options.init(),
+  session_ancestor: Option[String] = None,
+  session_requirements: Boolean = false,
+  no_build: Boolean = false,
+  fresh_build: Boolean = false,
 ) {
   private val scratch_theory_prefix: String = "PIDE_MCP_Scratch_"
   private val scratch_tmpdir_prefix: String = "pide_mcp_scratch"
@@ -28,10 +32,14 @@ class PIDE_MCP_Session(
 
   def start(build_progress: Progress = new Progress): Unit = {
     val opts = options + "show_states=true" + "show_results=true"
-
-    Build.build_logic(opts, session_name, build_heap = true, progress = build_progress, dirs = dirs).check
-
-    resources = Headless.Resources.make(opts, session_name, log = log, session_dirs = dirs)
+    val session_background = Sessions.background(opts, session_name, dirs = dirs,
+      session_ancestor = session_ancestor, session_requirements = session_requirements).check_errors
+    if (!no_build) {
+      Build.build(opts, selection = Sessions.Selection.session(session_background.session_name),
+        build_heap = true, dirs = dirs, infos = session_background.infos,
+        fresh_build = fresh_build, progress = build_progress).check
+    }
+    resources = Headless.Resources(opts, session_background, log)
     session = resources.start_session()
   }
 
