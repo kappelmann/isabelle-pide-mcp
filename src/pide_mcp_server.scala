@@ -98,7 +98,7 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session, log: Logger, verbose: Boolean =
         }
       } catch {
         case ex: Throwable =>
-          log.error_message("Server loop error: " + Exn.print(ex))
+          log("Server loop error: " + Exn.print(ex))
           respond(out, rpc_error(None, RPC_Error.PARSE_ERROR, s"Server loop error: ${Exn.message(ex)}"))
       }
     }
@@ -133,14 +133,14 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session, log: Logger, verbose: Boolean =
                 ))
               )))
             case Exn.Exn(e) =>
-              log.error_message("Tool call error: " + Exn.message(e))
+              log("Tool call error: " + Exn.message(e))
               respond(out, rpc_error(id, RPC_Error.SERVER_ERROR, Exn.message(e)))
           }
         case None => respond(out, rpc_error(id, RPC_Error.INVALID_PARAMS, "Missing params or tool name"))
       }
     } catch {
       case ex: Throwable =>
-        log.error_message("Internal error in tool call: " + Exn.print(ex))
+        log("Internal error in tool call: " + Exn.print(ex))
         respond(out, rpc_error(id, RPC_Error.INTERNAL_ERROR, s"Internal error: ${Exn.message(ex)}"))
     }
   }

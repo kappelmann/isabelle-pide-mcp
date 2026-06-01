@@ -73,7 +73,7 @@ Prioritize the following principles in this order:
 - **Run `try0`, `sledgehammer` (in that order!) for proof search and check the output of these tools.**
 - Run `find_theorems`, `find_consts` (in that order!) for concept search and check the output of these tools.
 - Note that `sledgehammer` is searching for useful theorems and can potentially be much faster in finding them than you searching for them individually.
-- **Note: find_theorems uses matching and you have to explicitly use schematic variables.**
+- **Note: find_theorems uses matching and you have to explicitly use schematic variables.** 
   For example `rev (rev ?xs) = ?xs` works as does `rev (rev _) = _`, but not `rev (rev xs) = xs` (xs is a free variable in the last case).
 - Use ML functions to query internal data if you have to. For example, to inspect the simpset in the current context:
   ```isabelle
@@ -100,13 +100,13 @@ Final results can be written back to the original file.
 - **Restrict by `start_line` / `end_line`** when you only care about a specific lemma or error - it is less verbose than scanning the whole file. But don't forget that local changes may have global effects.
 - **`find_entities` lets you explore defined entities (theorems, definitions, methods, ML terms, etc.)**.
 Moreover, you can use Isar commands if necessary, for example:
-- **`print_facts` - print all facts of the current context (named assumptions, case facts, intermediate results, locale assumptions, etc.)**
+- `print_facts` - print all local facts in scope (named assumptions, case facts, intermediate results)
 - `find_theorems`
 - `find_consts`
 
 ### Reuse existing library, facts, and definitions
 - **Before defining a concept or proving likely-to-exist theorems or lemmas from scratch, browse existing developments in the library.**
-- Import other theories from the Isabelle distribution and the AFP (https://isa-afp.org/) as needed with the right session-qualified import.
+- Import other theories from the Isabelle distribution and the AFP (https://isa-afp.org/) as needed with the right session-qualified import. 
 - **Use `list_session_directories` to get all available session directories, which often contain useful library material.**
 - **To get session qualifiers, grep the ROOT files in the session directories.**
 - You may also use web searches and the website `https://search.isabelle.in.tum.de` if you are unsure about the existence of a concept and about to start a big development.
