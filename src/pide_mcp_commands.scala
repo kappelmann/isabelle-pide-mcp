@@ -10,6 +10,7 @@ import isabelle._
 
 
 object PIDE_MCP_Commands {
+
   object Status {
     val unprocessed = "unprocessed"
     val running = "running"
@@ -32,43 +33,38 @@ object PIDE_MCP_Commands {
       Option.when(status.is_finished)(Status.finished),
       Option.when(status.is_canceled)(Status.canceled)).flatten
 
-  /** (Pre)filter for commands overlapping a text range.
-    * For session-built theories, the entire theory (loaded with read_theory) is one command,
-    * so the filter is too coarse (hence a prefilter) - so we additionally check ranges in results/markup.
-    */
-  def commands(
+  private def has_markup(snapshot: Document.Snapshot, range: Text.Range, elements: Markup.Elements)
+      : Boolean =
+    snapshot.select(range, elements, _ => { case _ => Some(()) }).nonEmpty
+
+  private def warned(snapshot: Document.Snapshot, range: Text.Range): Boolean =
+    has_markup(snapshot, range, Markup.Elements(Markup.WARNING, Markup.LEGACY))
+
+  private def failed(snapshot: Document.Snapshot, range: Text.Range): Boolean =
+    has_markup(snapshot, range, Markup.Elements(Markup.FAILED, Markup.ERROR))
+
+  private def status_list_range(
     snapshot: Document.Snapshot,
-    range: Option[Text.Range]
-  ): Iterator[(Command, Text.Offset)] =
+    cmd_status: Document_Status.Command_Status,
+    range: Text.Range
+  ): List[String] =
+    status_list(cmd_status).filter {
+      case Status.warned => warned(snapshot, range)
+      case Status.failed => failed(snapshot, range)
+      case _ => true
+    }
+
+  def commands(snapshot: Document.Snapshot, range: Option[Text.Range]): Iterator[(Command, Text.Offset)] =
     range.fold(snapshot.node.command_iterator())(snapshot.node.command_iterator(_))
 
-  private def restrict_cmd_range(
-    cmd: Command,
-    offset: Text.Offset,
-    range: Option[Text.Range]
-  ): Text.Range = {
-    val full = cmd.range + offset
-    range.flatMap(full.try_restrict).getOrElse(full)
-  }
-
-  /** returning range and containing markups (which contain their own sub-range) */
-  private def markups(
+  /** Like select, but returns all covering markups (full markup stack) at each sub-range. */
+  private def select_covering(
     snapshot: Document.Snapshot,
     range: Text.Range,
     elements: Markup.Elements
   ): List[Text.Info[List[Text.Info[XML.Elem]]]] =
     snapshot.cumulate(range, List.empty[Text.Info[XML.Elem]], elements,
-      _ => { case (acc, info) => Some(info :: acc) }
-    )
-
-  def markup_json(
-    snapshot: Document.Snapshot,
-    range: Text.Range,
-    elements: Markup.Elements
-  ): List[JSON.Object.T] =
-    markups(snapshot, range, elements).flatMap { case Text.Info(_, infos) =>
-      infos.map(info => PIDE_MCP_Util.xml_to_json(info.info))
-    }
+      _ => { case (acc, info) => Some(info :: acc) })
 
   val Markup_ML: String = "ML"
 
@@ -87,7 +83,7 @@ object PIDE_MCP_Commands {
         typing_elem <- at_range.collectFirst { case Text.Info(_, e) if e.name == Markup.TYPING => e }
       } yield (kind_elem.name, XML.content(typing_elem.body)))
 
-    markups(snapshot, range, elements).flatMap {
+    select_covering(snapshot, range, elements).flatMap {
       case Text.Info(r, infos @ (info :: _)) if info.range == r => // only keep leaf nodes
         val at_range = infos.filter(_.range == r)
         val name_at = PIDE_MCP_Util.display_name(
@@ -102,17 +98,26 @@ object PIDE_MCP_Commands {
 
   def facts_json(snapshot: Document.Snapshot, range: Text.Range): List[String] = {
     val fact_kinds = Set(Markup.FACT, Markup.DYNAMIC_FACT, Markup.LITERAL_FACT)
-    markups(snapshot, range, Markup.Elements(Markup.ENTITY)).flatMap {
-      case Text.Info(_, infos) => infos.collect {
-        case Text.Info(_, XML.Elem(Markup.Entity(entry), _)) if fact_kinds.contains(entry.kind) =>
-          entry.name
-      }.distinct
-    }
+    snapshot.select(range, Markup.Elements(Markup.ENTITY), _ => {
+      case Text.Info(_, XML.Elem(Markup.Entity(entry), _)) if fact_kinds.contains(entry.kind) =>
+        Some(entry.name)
+      case _ => None
+    }).map(_.info)
   }
 
   def bad_json(snapshot: Document.Snapshot, range: Text.Range): List[String] =
-    markups(snapshot, range, Markup.Elements(Markup.BAD)).flatMap {
-      case Text.Info(_, infos) => infos.map(info => info.range.substring(snapshot.node.source))
+    snapshot.select(range, Markup.Elements(Markup.BAD), _ => {
+      case Text.Info(r, _) => Some(r.substring(snapshot.node.source))
+    }).map(_.info)
+
+  def markup_json(
+    snapshot: Document.Snapshot,
+    range: Text.Range,
+    elements: Markup.Elements
+  ): List[JSON.Object.T] =
+    select_covering(snapshot, range, elements).flatMap {
+      case Text.Info(r, infos) =>
+        infos.filter(_.range == r).map(i => PIDE_MCP_Util.xml_to_json(i.info))
     }
 
   sealed case class State_Options(
@@ -126,10 +131,31 @@ object PIDE_MCP_Commands {
     snapshot: Document.Snapshot,
     cmd: Command,
     offset: Text.Offset,
-    range: Option[Text.Range] = None
+    range: Text.Range
   ): Iterator[XML.Elem] =
     snapshot.command_results(cmd).iterator.collect { case (_, elem: XML.Elem) => elem }
       .filter { elem => PIDE_MCP_Util.result_in_range(elem, offset, range) }
+
+  private def span_serials(
+    snapshot: Document.Snapshot,
+    range: Text.Range
+  ): Set[Long] = {
+    val elements = Markup.Elements(Markup.WARNING, Markup.LEGACY, Markup.ERROR,
+      Markup.WRITELN, Markup.INFORMATION, Markup.STATE)
+    snapshot.cumulate[Set[Long]](range, Set.empty, elements,
+      _ => { case (serials, Text.Info(_, elem)) =>
+        Markup.Serial.unapply(elem.markup.properties).map(serials + _)
+      }).foldLeft(Set.empty)(_ ++ _.info)
+  }
+
+  private def span_results(
+    snapshot: Document.Snapshot,
+    cmd: Command,
+    range: Text.Range
+  ): Iterator[XML.Elem] = {
+    val serials = span_serials(snapshot, range)
+    snapshot.command_results(cmd).iterator.collect { case (id, elem) if serials.contains(id) => elem }
+  }
 
   private def classify_results(elements: Iterator[XML.Elem]): Map[String, List[String]] =
     elements.flatMap { elem =>
@@ -142,21 +168,22 @@ object PIDE_MCP_Commands {
       else None
     }.toList.groupMap(_._1)(_._2)
 
-  sealed case class State_Entry(cmd: Command, range: Text.Range, results: Iterator[XML.Elem])
+  sealed case class State_Entry(cmd: Command, range: Text.Range, results: List[XML.Elem])
 
-  private def state_entry_json(
+  def state_entry_json(
     snapshot: Document.Snapshot,
     entry: State_Entry,
     doc: Line.Document,
     opts: State_Options
   ): JSON.Object.T = {
     val cmd_status = status(snapshot, entry.cmd)
-    val texts_by_kind = classify_results(entry.results)
+    val timing_ms = cmd_status.timings.sum(Date.now()).ms
+    val texts_by_kind = classify_results(entry.results.iterator)
     val source_text = entry.range.substring(snapshot.node.source).stripLineEnd
     val source_line = doc.position(entry.range.start).line1
     val entries: List[Option[(String, JSON.T)]] = List(
-      Some("status" -> status_list(cmd_status)),
-      Some("timing_ms" -> cmd_status.timings.sum(Date.now()).ms),
+      Some("status" -> status_list_range(snapshot, cmd_status, entry.range)),
+      Some("timing_ms" -> timing_ms),
       Some("source" -> PIDE_MCP_Util.numbered_lines(source_text, source_line)),
       proper_list(bad_json(snapshot, entry.range)).map("bad" -> _),
       texts_by_kind.get("goal").map("goal" -> _),
@@ -170,31 +197,52 @@ object PIDE_MCP_Commands {
     JSON.Object(entries.flatten: _*)
   }
 
-  private def state_entries_theory(
+  def state_entries_json(
+    snapshot: Document.Snapshot,
+    entries: List[State_Entry],
+    doc: Line.Document,
+    opts: State_Options
+  ): List[JSON.Object.T] =
+    entries.map(state_entry_json(snapshot, _, doc, opts))
+
+  def state_entries_theory_dynamic(
     snapshot: Document.Snapshot,
     range: Option[Text.Range]
   ): Iterator[State_Entry] =
     commands(snapshot, range).map { case (cmd, offset) =>
-      State_Entry(cmd, restrict_cmd_range(cmd, offset, range), results(snapshot, cmd, offset, range))
+      val restricted = PIDE_MCP_Util.intersect_range(cmd.range + offset, range)
+      State_Entry(cmd, restricted, results(snapshot, cmd, offset, restricted).toList)
     }
 
-  private def state_entry_file(
+  def state_entries_theory_base_session(
+    snapshot: Document.Snapshot,
+    range: Option[Text.Range]
+  ): Exn.Result[Iterator[State_Entry]] = Exn.capture {
+    val cmd = snapshot.node.get_theory.get
+    snapshot.command_spans(PIDE_MCP_Util.restrict_source_range(snapshot, range)).iterator.map { span =>
+      val restricted = PIDE_MCP_Util.intersect_range(span.range, range)
+      State_Entry(cmd, restricted, span_results(snapshot, cmd, restricted).toList)
+    }
+  }
+
+  def state_entry_file(
     snapshot: Document.Snapshot,
     range: Option[Text.Range]
   ): Option[State_Entry] = {
     val restricted = PIDE_MCP_Util.restrict_source_range(snapshot, range)
     PIDE_MCP_Util.find_loading_command(snapshot, snapshot.node_name).map { cmd =>
-      State_Entry(cmd, restricted, results(snapshot, cmd, 0, Some(restricted)))
+      State_Entry(cmd, restricted, results(snapshot, cmd, 0, restricted).toList)
     }
   }
 
-  private def state_summary_json(snapshot: Document.Snapshot, entries: Iterator[State_Entry]): JSON.Object.T = {
+  def state_summary_json(snapshot: Document.Snapshot, entries: Iterator[State_Entry]): JSON.Object.T = {
     val cmd_counts = scala.collection.mutable.Map[String, Int]().withDefaultValue(0)
     var total_timing_ms = 0L
     entries.foreach { case State_Entry(cmd, range, res) =>
       val st = status(snapshot, cmd)
       total_timing_ms += st.timings.sum(Date.now()).ms
-      for (flag <- status_list(st)) cmd_counts(flag) += 1
+
+      for (flag <- status_list_range(snapshot, st, range)) cmd_counts(flag) += 1
       cmd_counts("bad") += bad_json(snapshot, range).length
       res.foreach { elem =>
         if (Protocol.is_error(elem)) cmd_counts("errors") += 1
@@ -215,49 +263,6 @@ object PIDE_MCP_Commands {
       entry("warnings"))
   }
 
-  def state_summary_theory_json(
-    snapshot: Document.Snapshot,
-    range: Option[Text.Range] = None
-  ): JSON.Object.T =
-    state_summary_json(snapshot, state_entries_theory(snapshot, range))
-
-  def state_summary_file_json(
-    snapshot: Document.Snapshot,
-    range: Option[Text.Range] = None
-  ): JSON.Object.T =
-    state_summary_json(snapshot, state_entry_file(snapshot, range).iterator)
-
-  def state_theory_json(
-    snapshot: Document.Snapshot,
-    cmd: Command,
-    offset: Text.Offset,
-    doc: Line.Document,
-    range: Option[Text.Range] = None,
-    opts: State_Options = State_Options()
-  ): JSON.Object.T = {
-    val entry = State_Entry(cmd, restrict_cmd_range(cmd, offset, range), results(snapshot, cmd, offset, range))
-    state_entry_json(snapshot, entry, doc, opts)
-  }
-
-  def states_theory_json(
-    snapshot: Document.Snapshot,
-    doc: Line.Document,
-    range: Option[Text.Range] = None,
-    opts: State_Options = State_Options(),
-    commands_limit: Int = 500
-  ): List[JSON.Object.T] =
-    commands(snapshot, range).take(commands_limit).map { case (cmd, offset) =>
-      state_theory_json(snapshot, cmd, offset, doc, range, opts)
-    }.toList
-
-  def states_file_json(
-    snapshot: Document.Snapshot,
-    doc: Line.Document,
-    range: Option[Text.Range] = None,
-    opts: State_Options = State_Options()
-  ): List[JSON.Object.T] =
-    state_entry_file(snapshot, range).toList.map(entry => state_entry_json(snapshot, entry, doc, opts))
-
   def definitions_json(
     session: PIDE_MCP_Session,
     snapshot: Document.Snapshot,
@@ -268,16 +273,14 @@ object PIDE_MCP_Commands {
     def_entry_not_loaded: String
   ): Exn.Result[Map[String, List[JSON.Object.T]]] = Exn.capture {
     val restricted = PIDE_MCP_Util.restrict_source_range(snapshot, range)
-    markups(snapshot, restricted, Markup.Elements(Markup.ENTITY)).flatMap {
-      case Text.Info(_, infos) => infos.flatMap {
-        case Text.Info(r0, XML.Elem(Markup.Entity(entry), _))
-          if definition_kinds.contains(entry.kind) =>
-          val name = PIDE_MCP_Util.display_name(Some(entry), r0, snapshot.node.source)
-          Exn.release(PIDE_MCP_Name_Space_Entry.definition_json(session, snapshot, entry, name,
-            snippet_lines, filter_origins, def_entry_not_loaded))
-        case _ => Nil
-      }
-    }.groupBy(e => JSON.string(e, "origin").getOrElse("")).map { case (origin, entries) =>
+    snapshot.select(restricted, Markup.Elements(Markup.ENTITY), _ => {
+      case Text.Info(r, XML.Elem(Markup.Entity(entry), _))
+        if definition_kinds.contains(entry.kind) =>
+        val name = PIDE_MCP_Util.display_name(Some(entry), r, snapshot.node.source)
+        Some(Exn.release(PIDE_MCP_Name_Space_Entry.definition_json(session, snapshot, entry, name,
+          snippet_lines, filter_origins, def_entry_not_loaded)))
+      case _ => None
+    }).flatMap(_.info.toList).groupBy(e => JSON.string(e, "origin").getOrElse("")).map { case (origin, entries) =>
       origin -> entries.sortBy(e => (JSON.int(e, "line"), JSON.string(e, "name"), JSON.string(e, "kind")))
         .distinctBy(e => (JSON.int(e, "line"), JSON.string(e, "name")))
     }

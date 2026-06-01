@@ -18,7 +18,6 @@ object PIDE_MCP {
       var verbose = false
       var session_ancestor: Option[String] = None
       var session_requirements = false
-      var no_build = false
       var fresh_build = false
 
       val getopts = Getopts("""
@@ -31,7 +30,7 @@ Usage: isabelle pide_mcp [OPTIONS]
     -f           fresh build
     -L FILE      logging on FILE (default: console stderr)
     -l NAME      logic session name (default: HOL)
-    -n           no build of session image on startup
+
     -o OPTION    override Isabelle system OPTION (via NAME=VAL or NAME)
     -s           system build mode for session image (system_heaps=true)
     -u           user build mode for session image (system_heaps=false)
@@ -47,7 +46,7 @@ Usage: isabelle pide_mcp [OPTIONS]
         "f" -> (_ => fresh_build = true),
         "L:" -> (arg => log_path = Some(Path.explode(File.standard_path(arg)))),
         "l:" -> (arg => logic = arg),
-        "n" -> (_ => no_build = true),
+
         "o:" -> (arg => options = options + arg),
         "s" -> (_ => options = options + "system_heaps=true"),
         "u" -> (_ => options = options + "system_heaps=false"),
@@ -61,11 +60,11 @@ Usage: isabelle pide_mcp [OPTIONS]
       val build_progress = new Console_Progress
       val pide_session = new PIDE_MCP_Session(logic, log, session_dirs, options,
         session_ancestor = session_ancestor, session_requirements = session_requirements,
-        no_build = no_build, fresh_build = fresh_build)
+        fresh_build = fresh_build)
 
       try {
         log("Starting Isabelle PIDE session...")
-        pide_session.start(build_progress)
+        Exn.release(pide_session.start(build_progress))
         log("Session started. Now starting MCP server listening on stdin/stdout.")
 
         val server = new PIDE_MCP_Server(pide_session, log, verbose)

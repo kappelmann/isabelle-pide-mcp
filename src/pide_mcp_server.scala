@@ -97,7 +97,7 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session, log: Logger, verbose: Boolean =
           case _ => respond(out, rpc_error(id, RPC_Error.METHOD_NOT_FOUND, s"Method not found: $method"))
         }
       } catch {
-        case ex: Throwable =>
+        case ex: Exception =>
           log.error_message("Server loop error: " + Exn.print(ex))
           respond(out, rpc_error(None, RPC_Error.PARSE_ERROR, s"Server loop error: ${Exn.message(ex)}"))
       }
@@ -139,7 +139,7 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session, log: Logger, verbose: Boolean =
         case None => respond(out, rpc_error(id, RPC_Error.INVALID_PARAMS, "Missing params or tool name"))
       }
     } catch {
-      case ex: Throwable =>
+      case ex: Exception =>
         log.error_message("Internal error in tool call: " + Exn.print(ex))
         respond(out, rpc_error(id, RPC_Error.INTERNAL_ERROR, s"Internal error: ${Exn.message(ex)}"))
     }

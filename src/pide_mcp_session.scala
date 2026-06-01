@@ -14,12 +14,11 @@ import java.io.{File => JFile}
 
 class PIDE_MCP_Session(
   session_name: String,
-  val log: Logger,
+  private val log: Logger,
   dirs: List[Path] = Nil,
-  val options: Options = Options.init(),
+  private val options: Options = Options.init(),
   session_ancestor: Option[String] = None,
   session_requirements: Boolean = false,
-  no_build: Boolean = false,
   fresh_build: Boolean = false,
 ) {
   private val scratch_theory_prefix: String = "PIDE_MCP_Scratch_"
@@ -30,15 +29,13 @@ class PIDE_MCP_Session(
   private var session: Headless.Session = _
   private val scratch_dirs = mutable.Map[String, JFile]()
 
-  def start(build_progress: Progress = new Progress): Unit = {
+  def start(build_progress: Progress = new Progress): Exn.Result[Unit] = Exn.capture {
     val opts = options + "show_states=true" + "show_results=true"
     val session_background = Sessions.background(opts, session_name, dirs = dirs,
       session_ancestor = session_ancestor, session_requirements = session_requirements).check_errors
-    if (!no_build) {
-      Build.build(opts, selection = Sessions.Selection.session(session_background.session_name),
-        build_heap = true, dirs = dirs, infos = session_background.infos,
-        fresh_build = fresh_build, progress = build_progress).check
-    }
+    Build.build(opts, selection = Sessions.Selection.session(session_background.session_name),
+      build_heap = true, dirs = dirs, infos = session_background.infos,
+      fresh_build = fresh_build, progress = build_progress).check
     resources = Headless.Resources(opts, session_background, log)
     session = resources.start_session()
   }
@@ -78,7 +75,7 @@ class PIDE_MCP_Session(
     resources.session_base.known_theories.contains(node_name.theory)
 
   def node_snapshot(node_name: Document.Node.Name): Exn.Result[Document.Snapshot] = Exn.capture {
-    if (is_base_session_theory(node_name)) session.read_theory(node_name.theory) // base session
+    if (is_base_session_theory(node_name)) session.read_theory(node_name.theory, unicode_symbols = true) // base session
     else {
       val snapshot = session.get_state().snapshot(node_name)
       if (PIDE_MCP_Util.node_defined(snapshot)) snapshot // dynamic theory
@@ -118,7 +115,7 @@ class PIDE_MCP_Session(
     }
   }
 
-  private def load_file(node_name: Document.Node.Name): Exn.Result[Unit] = do_load(files = List(node_name))
+  def load_file(node_name: Document.Node.Name): Exn.Result[Unit] = do_load(files = List(node_name))
 
   def load(node_name: Document.Node.Name): Exn.Result[Unit] =
     if (node_name.is_theory) load_theory(node_name) else load_file(node_name)
@@ -177,18 +174,16 @@ class PIDE_MCP_Session(
   private def compute_edit(
     lines: List[String],
     new_text: String,
-    start_line: Option[Int],
-    end_line: Option[Int],
+    start_line: Int,
+    end_line: Int,
     old_text: String
-  ): Exn.Result[String] = Exn.capture {
-    val (s, e) = Exn.release(PIDE_MCP_Util.resolve_lines(start_line, end_line, lines.length))
-    val start_idx = s - 1
-    val actual_old = lines.slice(start_idx, e).mkString("\n") + (if (e < lines.length) "\n" else "")
-    val sep = "\""
+  ): String = {
+    val start_idx = start_line - 1
+    val actual_old = lines.slice(start_idx, end_line).mkString("\n") + (if (end_line < lines.length) "\n" else "")
     if (actual_old.stripTrailing != old_text.stripTrailing)
-      error(s"old_text mismatch at lines $s-$e.\nExpected:\n$sep$old_text$sep\nActual:\n$sep$actual_old$sep")
+      error(s"old_text mismatch at lines $start_line-$end_line.\nExpected:\n\"$old_text\"\nActual:\n\"$actual_old\"")
     val prefix = lines.take(start_idx)
-    val suffix = lines.drop(e)
+    val suffix = lines.drop(end_line)
     (prefix ++ Library.split_lines(new_text) ++ suffix).mkString("\n")
   }
 
@@ -203,12 +198,12 @@ class PIDE_MCP_Session(
       error("Cannot edit base session theory " + origin(node_name))
     val current_text = Exn.release(read(node_name))
     val doc = Line.Document(current_text)
-    val computed_text = Exn.release(compute_edit(doc.lines.map(_.text), new_text, start_line, end_line, old_text))
+    val (s, e) = Exn.release(PIDE_MCP_Util.resolve_lines(start_line, end_line, doc.lines.length))
+    val computed_text = compute_edit(doc.lines.map(_.text), new_text, s, e, old_text)
     val write = computed_text != current_text
     if (write) {
       File.write(node_name.path, Symbol.encode(computed_text))
       if (node_name.is_theory) {
-        val (s, e) = Exn.release(PIDE_MCP_Util.resolve_lines(start_line, end_line, doc.lines.length))
         val offset = doc.offset(Line.Position(line = s - 1)).get
         text_edit(node_name, offset, old_text, new_text, computed_text)
       } else Exn.release(load_file(node_name))

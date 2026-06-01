@@ -29,3 +29,4 @@ As usual, all options can be seen using `isabelle pide_mcp -?` (they follow the 
 
 # TODOs
 - options to warn agent about timeouts? everything is async for now
+- timeouts for base sessions are currently returned as 0 (because they are not stored in the base session's markup)

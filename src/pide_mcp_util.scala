@@ -77,18 +77,20 @@ object PIDE_MCP_Util {
     range.fold(full)(r => full.try_restrict(r).getOrElse(Text.Range.zero))
   }
 
-  def result_in_range(elem: XML.Tree, offset: Text.Offset, range: Option[Text.Range]): Boolean =
-    range.forall { r =>
-      val props = elem match {
-        case e: XML.Elem => e.markup.properties
-        case _ => Nil
-      }
-      Position.Range.unapply(props) match {
-        case Some(rng) => (rng + offset).overlaps(r)
-        case None =>
-          Position.Offset.unapply(props).forall(s => r.contains(s + offset))
-      }
+  def intersect_range(full: Text.Range, range: Option[Text.Range]): Text.Range =
+    range.flatMap(full.try_restrict).getOrElse(full)
+
+  def result_in_range(elem: XML.Tree, offset: Text.Offset, range: Text.Range): Boolean = {
+    val props = elem match {
+      case e: XML.Elem => e.markup.properties
+      case _ => Nil
     }
+    Position.Range.unapply(props) match {
+      case Some(r) => (r + offset).overlaps(range)
+      case None =>
+        Position.Offset.unapply(props).forall(s => range.contains(s + offset))
+    }
+  }
 
   def xml_to_json(tree: XML.Tree): JSON.Object.T = tree match {
     case XML.Elem(Markup(name, props), body) =>
