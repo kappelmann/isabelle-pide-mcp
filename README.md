@@ -27,6 +27,10 @@ As usual, all options can be seen using `isabelle pide_mcp -?` (they follow the 
 - For OpenCode, copy/adapt folder `.opencode` and start OpenCode in the same base directory.
 - For Claude Code, copy/adapt `.claude` and `.mcp.json` and start Claude Code in the same base directory. 
 
+### Note
+
+- If you want to the agent to see proof states for base sessions, you have to build them with `-o show_states`
+
 # TODOs
 - options to warn agent about timeouts? everything is async for now
 - timeouts for base sessions are currently returned as 0 (because they are not stored in the base session's markup)
