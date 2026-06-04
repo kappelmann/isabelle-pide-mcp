@@ -63,11 +63,12 @@ class PIDE_MCP_Tool_Handlers(session: PIDE_MCP_Session) {
   private def handle_edit(params: JSON.Object.T): Exn.Result[JSON.T] =
     Exn.capture {
       val node_name = Exn.release(origin_param(params))
+      val mode = Exn.release(session.Edit_Mode.parse(JSON.string(params, "mode").getOrElse(error("Missing mode parameter"))))
       val text = JSON.string(params, "text").getOrElse(error("Missing text parameter"))
       val old_text = JSON.string(params, "old_text").getOrElse(error("Missing old_text parameter"))
       val start_line = JSON.int(params, "start_line")
       val end_line = JSON.int(params, "end_line")
-      val (new_text, written) = Exn.release(session.read_edit(node_name, text, start_line, end_line, old_text))
+      val (new_text, written) = Exn.release(session.read_edit(mode, node_name, text, start_line, end_line, old_text))
       val (status, description) = if (written) ("written", "Changes written")
         else ("unchanged", "Unchanged - did you replace the text by itself?")
       val file_content = PIDE_MCP_Util.numbered_lines(new_text, 1)

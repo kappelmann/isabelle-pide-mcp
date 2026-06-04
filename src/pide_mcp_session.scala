@@ -122,17 +122,14 @@ class PIDE_MCP_Session(
 
   private def text_edit(
     node_name: Document.Node.Name,
-    offset: Int,
-    old_content: String,
-    new_content: String,
+    edits: List[Text.Edit],
     full_text: String
   ): Unit = {
     val node_header = resources.check_thy(node_name, Scan.char_reader(full_text))
     for (imp <- node_header.imports) Exn.release(load_theory(imp))
-    val text_edits = Text.Edit.replace(offset, old_content, new_content)
     session.update(Document.Blobs.empty, List(
       node_name -> Document.Node.Deps(node_header),
-      node_name -> Document.Node.Edits(text_edits),
+      node_name -> Document.Node.Edits(edits),
       node_name -> Document.Node.Perspective(true, Text.Perspective.full, Document.Node.Overlays.empty)))
   }
 
@@ -155,10 +152,9 @@ class PIDE_MCP_Session(
             val text_after = text.drop(prefix_len)
             val suffix_len =
               snapshot_after.reverseIterator.zip(text_after.reverseIterator).takeWhile(_ == _).length
-            text_edit(node_name, prefix_len,
-              snapshot_after.dropRight(suffix_len),
-              text_after.dropRight(suffix_len),
-              text)
+            val edits = Text.Edit.replace(prefix_len, snapshot_after.dropRight(suffix_len),
+              text_after.dropRight(suffix_len))
+            text_edit(node_name, edits, text)
           }
           text
         }
@@ -171,7 +167,24 @@ class PIDE_MCP_Session(
   def read(node_name: Document.Node.Name): Exn.Result[String] =
     if (node_name.is_theory) read_theory(node_name) else read_file(node_name)
 
+  sealed trait Edit_Mode
+  case object Edit_Replace extends Edit_Mode
+  case object Edit_Insert_Before extends Edit_Mode
+  case object Edit_Insert_After extends Edit_Mode
+
+  object Edit_Mode {
+    def parse(s: String): Exn.Result[Edit_Mode] = Exn.capture {
+      s match {
+        case "replace" => Edit_Replace
+        case "insert_before" => Edit_Insert_Before
+        case "insert_after" => Edit_Insert_After
+        case _ => error("Invalid edit mode: " + s)
+      }
+    }
+  }
+
   private def compute_edit(
+    mode: Edit_Mode,
     lines: List[String],
     new_text: String,
     start_line: Int,
@@ -183,11 +196,18 @@ class PIDE_MCP_Session(
     if (actual_old.stripTrailing != old_text.stripTrailing)
       error(s"old_text mismatch at lines $start_line-$end_line.\nExpected:\n\"$old_text\"\nActual:\n\"$actual_old\"")
     val prefix = lines.take(start_idx)
+    val range = lines.slice(start_idx, end_line)
     val suffix = lines.drop(end_line)
-    (prefix ++ Library.split_lines(new_text) ++ suffix).mkString("\n")
+    val new_lines = Library.split_lines(new_text)
+    (mode match {
+      case Edit_Replace => prefix ++ new_lines ++ suffix
+      case Edit_Insert_Before => prefix ++ new_lines ++ range ++ suffix
+      case Edit_Insert_After => prefix ++ range ++ new_lines ++ suffix
+    }).mkString("\n")
   }
 
   def read_edit(
+    mode: Edit_Mode,
     node_name: Document.Node.Name,
     new_text: String,
     start_line: Option[Int],
@@ -199,13 +219,20 @@ class PIDE_MCP_Session(
     val current_text = Exn.release(read(node_name))
     val doc = Line.Document(current_text)
     val (s, e) = Exn.release(PIDE_MCP_Util.resolve_lines(start_line, end_line, doc.lines.length))
-    val computed_text = compute_edit(doc.lines.map(_.text), new_text, s, e, old_text)
+    val computed_text = compute_edit(mode, doc.lines.map(_.text), new_text, s, e, old_text)
     val write = computed_text != current_text
     if (write) {
       File.write(node_name.path, Symbol.encode(computed_text))
       if (node_name.is_theory) {
         val offset = doc.offset(Line.Position(line = s - 1)).get
-        text_edit(node_name, offset, old_text, new_text, computed_text)
+        val edits = mode match {
+          case Edit_Replace => Text.Edit.replace(offset, old_text, new_text)
+          case Edit_Insert_Before => List(Text.Edit.insert(offset, new_text))
+          case Edit_Insert_After =>
+            val after_offset = doc.offset(Line.Position(line = e)).get
+            List(Text.Edit.insert(after_offset, new_text))
+        }
+        text_edit(node_name, edits, computed_text)
       } else Exn.release(load_file(node_name))
     }
     (computed_text, write)

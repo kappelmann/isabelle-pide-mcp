@@ -61,20 +61,24 @@ object PIDE_MCP_Tool_Schemas {
       ))
     ),
     edit -> Tool_Def(
-      description = "Edit a file by replacing a line range. "
-        + "Omit both start_line and end_line for a full-file replace. "
-        + "Give start_line only to replace from there to the end. "
-        + "Give both to replace exactly that range. "
+      description = "Edit a file by either **replacing, inserting before, or inserting after a line range**. "
+        + "Omit both start_line and end_line to select the full file. "
+        + "Give start_line only to select from there to the end of the file. "
+        + "Give end_line only to select from the start of the file to end_line. "
+        + "Give both to select exactly that range. "
         + "Note: base session files are static and cannot be edited. "
         + implicit_reload_file,
       input_schema = JSON.Object("type" -> "object", "properties" -> JSON.Object(
         origin_prop,
+        "mode" -> JSON.Object("type" -> "string",
+          "enum" -> List("replace", "insert_before", "insert_after"),
+          "description" -> "Edit mode"),
         "text" -> JSON.Object("type" -> "string", "description" -> "New text to write"),
         start_line_opt_prop,
         end_line_opt_prop,
         "old_text" -> JSON.Object("type" -> "string",
           "description" -> "Current text at the target lines. **Must match the current content of those lines modulo trailing whitespace, or the edit is rejected.**")
-      ), "required" -> List("origin", "text", "old_text")),
+      ), "required" -> List("origin", "mode", "text", "old_text")),
       annotations = Some(JSON.Object("destructiveHint" -> true))
     ),
     find_entities -> Tool_Def(
