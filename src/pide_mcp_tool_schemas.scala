@@ -13,6 +13,7 @@ sealed case class Tool_Def(description: String, input_schema: JSON.Object.T,
   annotations: Option[JSON.Object.T] = None)
 
 object PIDE_MCP_Tool_Schemas {
+  val create_file: String = "create_file"
   val create_scratch: String = "create_scratch"
   val edit: String = "edit"
   val find_entities: String = "find_entities"
@@ -38,6 +39,16 @@ object PIDE_MCP_Tool_Schemas {
       "description" -> "Last line to include (default: end of file).", "minimum" -> 1)
 
   val all: List[(String, Tool_Def)] = List(
+    create_file -> Tool_Def(
+      description = "Create an empty file at the given path. "
+        + "Creates missing parent directories if necessary. "
+        + "If the file already exists, it does nothing. "
+        + "**Do not use this for temporary files/exploration. Use create_scratch instead.**",
+      input_schema = JSON.Object("type" -> "object", "properties" -> JSON.Object(
+        "path" -> JSON.Object("type" -> "string",
+          "description" -> "File path to create (e.g. \"./Algebra/algebra_simp.ML\" or \"/path/to/My_Theory.thy\")")
+      ), "required" -> List("path"))
+    ),
     create_scratch -> Tool_Def(
       description = "Create a temporary theory for experimentation that does not interfere with user accessible files. "
         + "Use this whenever you think you need to do iterative developments or when you want to find and explore theorems, syntax, concepts, commands, ML code, etc. Write back final results to files accessible to the user. "
@@ -47,8 +58,7 @@ object PIDE_MCP_Tool_Schemas {
           "description" -> "Label to identify this scratch theory (auto-generated if omitted)"),
         "imports" -> JSON.Object("type" -> "array", "items" -> JSON.Object("type" -> "string"),
           "description" -> "Isabelle theories to import (as they should literally occur in the theory header)",
-          "default" -> PIDE_MCP_Tool_Handlers.default_imports)
-      ))
+          "default" -> PIDE_MCP_Tool_Handlers.default_imports)))
     ),
     edit -> Tool_Def(
       description = "Edit a file by replacing a line range. "
@@ -120,7 +130,7 @@ object PIDE_MCP_Tool_Schemas {
           "description" -> "Include scratch theories",
           "default" -> false)
       )),
-       annotations = Some(JSON.Object("readOnlyHint" -> true))
+      annotations = Some(JSON.Object("readOnlyHint" -> true))
     ),
     list_session_directories -> Tool_Def(
       description = "List all directories from which Isabelle attempts to load files. "

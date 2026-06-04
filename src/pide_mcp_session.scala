@@ -211,6 +211,14 @@ class PIDE_MCP_Session(
     (computed_text, write)
   }
 
+  def create_file(path: Path): Exn.Result[Boolean] = Exn.capture {
+    val abs_path = PIDE_MCP_Util.canonical_path(path)
+    if (abs_path.file.isDirectory) error("Path " + abs_path.implode + " is an existing directory.")
+    abs_path.file.getParentFile.mkdirs()
+    if (!abs_path.file.exists) { File.write(abs_path, ""); true }
+    else false
+  }
+
   def create_scratch_theory(
     name_suffix: Option[String] = None,
     imports: List[String]

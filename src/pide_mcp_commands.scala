@@ -13,7 +13,8 @@ object PIDE_MCP_Commands {
 
   object Status {
     val unprocessed = "unprocessed"
-    val running = "running"
+    // experimental verbose name: remind agents that running commands of non-termination
+    val running = "still_running_possibly_nonterminating"
     val warned = "warned"
     val failed = "failed"
     val finished = "finished"

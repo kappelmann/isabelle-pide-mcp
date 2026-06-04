@@ -28,7 +28,7 @@ Operational rules (each rule is elaborated in the sections below):
 - **Restrict by `start_line` / `end_line`** when querying - avoids analysing data for hundreds of finished commands in large theories.
 - **`get_state` takes flags** (`include_types`, `include_facts`,...) - pass them when you need them.
 - **`sorry` is reported as `commands_bad`, not as `commands_errors`.** A clean theory has `commands_bad = 0` AND `commands_errors = 0`.
-- **If `commands_running > 0` for more than ~30s, suspect a loop** - restructure rather than wait.
+- **If `> 0` commands are running for more than ~30s, suspect a loop** - restructure rather than wait.
 - **Time bounds**: proof methods typically finish in <5s; `sledgehammer` in <30s. Anything longer should make you suspicious.
 - **Proof search order**: `try0`, then `sledgehammer`. Concept search: `find_theorems`, then `find_consts`.
 - **Edits**: `old_text` must match the existing lines modulo trailing whitespace.
@@ -63,7 +63,7 @@ Prioritize the following principles in this order:
 - **Proof methods typically terminate in less than 5 seconds.**
 - **Sledgehammer typically terminates in less than 30 seconds.**
 - If commands take longer, be suspicious! Only if you are very confident that a proof legitimately needs more time wait a bit longer. Short waits typically let you move faster!
-- **If `get_state` shows `> 0` running commands for more than ~30 seconds, suspect a non-termination** (a loop or overly expensive proof search). Restructure rather than wait.
+- **If `get_state` shows `> 0` running commands for more than ~30 seconds, suspect non-termination** (a loop or overly expensive proof search). Restructure rather than wait.
 
 #### (Proof) Search
 - **Use `create_scratch` to test large changes in a scratch theory before radically changing an existing theory.**

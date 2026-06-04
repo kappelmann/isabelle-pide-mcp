@@ -13,6 +13,7 @@ class PIDE_MCP_Tool_Handlers(session: PIDE_MCP_Session) {
 
   def handle(name: String, params: JSON.Object.T): Exn.Result[JSON.T] = {
     name match {
+      case PIDE_MCP_Tool_Schemas.create_file => handle_create_file(params)
       case PIDE_MCP_Tool_Schemas.create_scratch => handle_create_scratch(params)
       case PIDE_MCP_Tool_Schemas.edit => handle_edit(params)
       case PIDE_MCP_Tool_Schemas.find_entities => handle_find_entities(params)
@@ -43,6 +44,13 @@ class PIDE_MCP_Tool_Handlers(session: PIDE_MCP_Session) {
     val origin = JSON.string(params, "origin").getOrElse(error("Missing origin parameter"))
     Exn.release(session.node_name(origin))
   }
+
+  private def handle_create_file(params: JSON.Object.T): Exn.Result[JSON.T] =
+    Exn.capture {
+      val file_path = JSON.string(params, "path").getOrElse(error("Missing path parameter"))
+      val created = Exn.release(session.create_file(Path.explode(file_path)))
+      if (created) "File created" else "File already exists"
+    }
 
   private def handle_create_scratch(params: JSON.Object.T): Exn.Result[JSON.T] =
     Exn.capture {
