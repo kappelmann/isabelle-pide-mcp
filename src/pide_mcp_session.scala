@@ -21,8 +21,8 @@ class PIDE_MCP_Session(
   session_requirements: Boolean = false,
   fresh_build: Boolean = false,
 ) {
-  private val scratch_theory_prefix: String = "PIDE_MCP_Scratch_"
-  private val scratch_tmpdir_prefix: String = "pide_mcp_scratch"
+  private val scratch_prefix: String = "tmp_pide_mcp_scratch_"
+  private val scratch_tmpdir_prefix: String = "tmp_pide_mcp_scratch"
   private val session_id: UUID.T = UUID.random()
 
   private var resources: Headless.Resources = _
@@ -86,7 +86,7 @@ class PIDE_MCP_Session(
   def loaded_theories(snapshot: Option[Document.Snapshot] = None)
     : (List[Document.Node.Name], List[Document.Node.Name], List[Document.Node.Name]) = {
     val all_nodes = snapshot.getOrElse(session.snapshot()).version.nodes.topological_order
-    val (scratch, non_scratch) = all_nodes.partition(_.theory.contains(scratch_theory_prefix))
+    val (scratch, non_scratch) = all_nodes.partition(_.theory.contains(scratch_prefix)) // FIXME: not 100% reliable
     val base_session_names = resources.session_base.loaded_theories.keys.toSet
     val (base_session, dynamic) = non_scratch.partition(n => base_session_names.contains(n.theory))
     (base_session, dynamic, scratch)
@@ -221,34 +221,23 @@ class PIDE_MCP_Session(
 
   def create_scratch_theory(
     name_suffix: Option[String] = None,
-    imports: List[String]
-  ): Exn.Result[Document.Node.Name] =
+    extension: Option[String] = None
+  ): Exn.Result[Path] =
   {
     val suffix = name_suffix.getOrElse(UUID.random_string().filterNot(_ == '-').take(12))
-    val theory_name = scratch_theory_prefix + suffix
+    val base_name = scratch_prefix + suffix
+    val file_name = extension match { case Some(ext) => base_name + ext case None => base_name }
     val tmp_dir = Isabelle_System.tmp_dir(scratch_tmpdir_prefix)
     Exn.capture {
-      val theory_path = File.path(tmp_dir) + Path.basic(theory_name).thy
-      val abs = PIDE_MCP_Util.canonical_path(theory_path)
-      val node_name = Document.Node.Name(abs.implode, theory = theory_name)
-      val imports_line = imports.mkString("imports ", " ", "")
-      val file_content =
-        s"""theory $theory_name
-           |  $imports_line
-           |begin
-           |
-           |
-           |
-           |end""".stripMargin
-      File.write(node_name.path, Symbol.encode(file_content))
-      scratch_dirs(theory_name) = tmp_dir
-      Exn.release(load_theory(node_name))
-      node_name
+      val file_path = PIDE_MCP_Util.canonical_path(File.path(tmp_dir) + Path.basic(file_name))
+      File.write(file_path, "")
+      scratch_dirs(file_name) = tmp_dir
+      file_path
     } match {
-      case Exn.Res(node_name) => Exn.Res(node_name)
+      case Exn.Res(path) => Exn.Res(path)
       case Exn.Exn(ex) =>
         Isabelle_System.rm_tree(tmp_dir)
-        scratch_dirs.remove(theory_name)
+        scratch_dirs.remove(file_name)
         Exn.Exn(ex)
     }
   }

@@ -31,7 +31,7 @@ Operational rules (each rule is elaborated in the sections below):
 - **Time bounds**: proof methods typically finish in <5s; `sledgehammer` in <30s. Anything longer should make you suspicious.
 - **Proof search order**: `try0`, then `sledgehammer`. Concept search: `find_theorems`, then `find_consts`.
 - **Edits**: `old_text` must match the existing lines modulo trailing whitespace.
-- **`create_scratch`**: use for exploration and alternatives. (Typically) use the same imports on them as the ones you use for the development that you are creating a scratch theory for.
+- **`create_scratch`**: use for exploration and alternatives. (Typically) use the same imports on scratch theories as the ones you use for the development that you are creating a scratch theory for.
 
 ## General Principles for Formalizations
 
@@ -68,7 +68,7 @@ Prioritize the following principles in this order:
 - **Use `create_scratch` to test large changes in a scratch theory before radically changing an existing theory.**
 - **Scratch theories persist for the session** - they are not deleted until the server stops. You may further change and explore them once created.
 - Use the scratch theories to try proofs and search tools without polluting your main development. Exception: if it is just a brief exploration (e.g. calling `sledgehammer` or `find_theorems` on the currently open goals), just do it in the same theory.
-- For `create_scratch`, pass the imports matching your needs. Typically, it is the same imports as the ones you use for the development that you are creating a scratch theory for.
+- For scratch theories, pass the imports matching your needs. Typically, it is the same imports as the ones you use for the development that you are creating a scratch theory for.
 - **Run `try0`, `sledgehammer` (in that order!) for proof search and check the output of these tools.**
 - Run `find_theorems`, `find_consts` (in that order!) for concept search and check the output of these tools.
 - Note that `sledgehammer` is searching for useful theorems and can potentially be much faster in finding them than you searching for them individually.
@@ -81,7 +81,7 @@ Prioritize the following principles in this order:
 
 **Incremental workflow** (for developing complex proofs):
 ```
-1. create_scratch → theory_name, theory_path, content
+1. create_scratch → scratch theory_path
 
 2. edit → extend the scratch theory (insert new content)
 

@@ -55,9 +55,9 @@ class PIDE_MCP_Tool_Handlers(session: PIDE_MCP_Session) {
   private def handle_create_scratch(params: JSON.Object.T): Exn.Result[JSON.T] =
     Exn.capture {
       val name_suffix = JSON.string(params, "name_suffix")
-      val imports = JSON.strings(params, "imports").getOrElse(PIDE_MCP_Tool_Handlers.default_imports)
-      val node_name = Exn.release(session.create_scratch_theory(name_suffix, imports))
-      JSON.Object("origin" -> session.origin(node_name))
+      val extension = JSON.string(params, "extension")
+      val path = Exn.release(session.create_scratch_theory(name_suffix, extension))
+      JSON.Object("path" -> path.implode)
     }
 
   private def handle_edit(params: JSON.Object.T): Exn.Result[JSON.T] =
@@ -163,7 +163,6 @@ class PIDE_MCP_Tool_Handlers(session: PIDE_MCP_Session) {
 }
 
 object PIDE_MCP_Tool_Handlers {
-  val default_imports: List[String] = List("Main")
   val snippet_preview_lines: Int = 3
   val commands_limit: Int = 500
 }

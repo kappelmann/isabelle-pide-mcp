@@ -72,7 +72,7 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session, log: Logger, verbose: Boolean =
               "serverInfo" -> JSON.Object("name" -> Config.name, "version" -> Config.version),
               "instructions" -> ("Interactive proof development with Isabelle PIDE MCP.\n\n" +
                 "The server automatically and asynchronously checks all commands after edits. Use `get_state` frequently to verify nothing is stuck or failed.\n" +
-                "Use `create_scratch` to test proof strategies, automation, and searches before editing your main theory.\n" +
+                "Use `create_scratch` to create temporary files for experimentation.\n" +
                 "Add material incrementally - large edits make errors and nontermination hard to isolate.\n" +
                 "If a command takes longer than a few seconds, be suspicious and restructure rather than wait."))))
 

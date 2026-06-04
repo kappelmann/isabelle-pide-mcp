@@ -50,15 +50,15 @@ object PIDE_MCP_Tool_Schemas {
       ), "required" -> List("path"))
     ),
     create_scratch -> Tool_Def(
-      description = "Create a temporary theory for experimentation that does not interfere with user accessible files. "
+      description = "Create a temporary file for experimentation that does not interfere with user accessible files. "
         + "Use this whenever you think you need to do iterative developments or when you want to find and explore theorems, syntax, concepts, commands, ML code, etc. Write back final results to files accessible to the user. "
         + "Temporary files are cleaned up when the MCP session ends.",
       input_schema = JSON.Object("type" -> "object", "properties" -> JSON.Object(
         "name_suffix" -> JSON.Object("type" -> "string",
-          "description" -> "Label to identify this scratch theory (auto-generated if omitted)"),
-        "imports" -> JSON.Object("type" -> "array", "items" -> JSON.Object("type" -> "string"),
-          "description" -> "Isabelle theories to import (as they should literally occur in the theory header)",
-          "default" -> PIDE_MCP_Tool_Handlers.default_imports)))
+          "description" -> "Label to identify the scratch file (auto-generated if omitted)"),
+        "extension" -> JSON.Object("type" -> "string",
+          "description" -> "File extension (typically \".thy\" or \".ML\")")
+      ))
     ),
     edit -> Tool_Def(
       description = "Edit a file by replacing a line range. "
