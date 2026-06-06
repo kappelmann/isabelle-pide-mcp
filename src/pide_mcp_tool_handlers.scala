@@ -121,9 +121,9 @@ class PIDE_MCP_Tool_Handlers(session: PIDE_MCP_Session) {
             Exn.release(PIDE_MCP_Commands.state_entries_theory_base_session(snapshot, Some(range)))
           else PIDE_MCP_Commands.state_entries_theory_dynamic(snapshot, Some(range))
         } else PIDE_MCP_Commands.state_entry_file(snapshot, Some(range)).iterator)
-        .take(limit).toList
+        .toList
       val opts = PIDE_MCP_Commands.State_Options(include_types, include_facts, include_infos, include_full_markup)
-      val command_states = PIDE_MCP_Commands.state_entries_json(snapshot, entries, doc, opts)
+      val command_states = PIDE_MCP_Commands.state_entries_json(snapshot, entries.take(limit), doc, opts)
       val summary = PIDE_MCP_Commands.state_summary_json(snapshot, entries.iterator)
       val command_count_keys = PIDE_MCP_Commands.Status.all.toSet + "bad"
       JSON.Object(
