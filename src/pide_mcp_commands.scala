@@ -236,32 +236,37 @@ object PIDE_MCP_Commands {
     }
   }
 
-  def state_summary_json(snapshot: Document.Snapshot, entries: Iterator[State_Entry]): JSON.Object.T = {
+  def state_summary_json(entries: List[JSON.Object.T]): JSON.Object.T = {
     val cmd_counts = scala.collection.mutable.Map[String, Int]().withDefaultValue(0)
+    val cmd_details = scala.collection.mutable.Map[String, List[JSON.T]]().withDefaultValue(Nil)
     var total_timing_ms = 0L
-    entries.foreach { case State_Entry(cmd, range, res) =>
-      val st = status(snapshot, cmd)
-      total_timing_ms += st.timings.sum(Date.now()).ms
-
-      for (flag <- status_list_range(snapshot, st, range)) cmd_counts(flag) += 1
-      cmd_counts("bad") += bad_json(snapshot, range).length
-      res.foreach { elem =>
-        if (Protocol.is_error(elem)) cmd_counts("errors") += 1
-        else if (Protocol.is_warning_or_legacy(elem)) cmd_counts("warnings") += 1
-      }
+    def count_detail(entry: JSON.Object.T, json_field: String, key: String): Unit = {
+      val list = JSON.strings(entry, json_field).getOrElse(Nil)
+      if (list.nonEmpty) { cmd_counts(key) += list.length; cmd_details(key) ::= entry }
     }
-    def entry(k: String): (String, JSON.T) = k -> cmd_counts(k)
+    entries.foreach { entry =>
+      total_timing_ms += JSON.long(entry, "timing_ms").get
+      for (flag <- JSON.strings(entry, "status").get) {
+        cmd_counts(flag) += 1
+        cmd_details(flag) ::= entry
+      }
+      count_detail(entry, "bad", "bad")
+      count_detail(entry, "error", "errors")
+      count_detail(entry, "warning", "warnings")
+    }
+    def detail_entry(k: String): (String, JSON.T) =
+      k -> JSON.Object("count" -> cmd_counts(k), "commands" -> cmd_details(k).reverse)
     JSON.Object(
       "total_timing_ms" -> total_timing_ms,
-      entry(Status.unprocessed),
-      entry(Status.running),
-      entry(Status.warned),
-      entry(Status.failed),
-      entry(Status.finished),
-      entry(Status.canceled),
-      entry("bad"),
-      entry("errors"),
-      entry("warnings"))
+      detail_entry(Status.unprocessed),
+      detail_entry(Status.running),
+      detail_entry(Status.warned),
+      detail_entry(Status.failed),
+      Status.finished -> cmd_counts(Status.finished),
+      Status.canceled -> cmd_counts(Status.canceled),
+      detail_entry("bad"),
+      detail_entry("errors"),
+      detail_entry("warnings"))
   }
 
   def definitions_json(

@@ -112,7 +112,7 @@ class PIDE_MCP_Tool_Handlers(session: PIDE_MCP_Session) {
       val include_facts = JSON.bool(params, "include_facts").getOrElse(false)
       val include_infos = JSON.bool(params, "include_infos").getOrElse(false)
       val include_full_markup = JSON.bool(params, "include_full_markup").getOrElse(false)
-      val limit = JSON.int(params, "commands_limit").getOrElse(PIDE_MCP_Tool_Handlers.commands_limit)
+      val limit_opt = JSON.int(params, "commands_limit")
 
       val range = PIDE_MCP_Util.range(doc, s, e)
       val entries =
@@ -123,13 +123,14 @@ class PIDE_MCP_Tool_Handlers(session: PIDE_MCP_Session) {
         } else PIDE_MCP_Commands.state_entry_file(snapshot, Some(range)).iterator)
         .toList
       val opts = PIDE_MCP_Commands.State_Options(include_types, include_facts, include_infos, include_full_markup)
-      val command_states = PIDE_MCP_Commands.state_entries_json(snapshot, entries.take(limit), doc, opts)
-      val summary = PIDE_MCP_Commands.state_summary_json(snapshot, entries.iterator)
+      val command_states = PIDE_MCP_Commands.state_entries_json(snapshot, entries, doc, opts)
+      val summary = PIDE_MCP_Commands.state_summary_json(command_states)
       val command_count_keys = PIDE_MCP_Commands.Status.all.toSet + "bad"
+      val command_states_limited = limit_opt.map(command_states.take).getOrElse(command_states)
       JSON.Object(
         summary.toList.map { case (k, v) =>
           if (command_count_keys.contains(k)) ("commands_" + k, v) else (k, v)
-        } :+ ("commands" -> command_states): _*)
+        } :+ ("commands" -> JSON.Object("count" -> command_states.length, "count_returned" -> command_states_limited.length, "commands" -> command_states_limited)): _*)
     }
 
   private def handle_list_loaded_theories(params: JSON.Object.T): Exn.Result[JSON.T] =
@@ -165,5 +166,4 @@ class PIDE_MCP_Tool_Handlers(session: PIDE_MCP_Session) {
 
 object PIDE_MCP_Tool_Handlers {
   val snippet_preview_lines: Int = 3
-  val commands_limit: Int = 500
 }

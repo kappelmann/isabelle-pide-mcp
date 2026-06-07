@@ -100,7 +100,7 @@ object PIDE_MCP_Tool_Schemas {
     ),
     get_state -> Tool_Def(
       description = "Inspect the state of a (range in a) file: goals, variables, errors, warnings, etc. "
-        + "Returns a summary (number of errors, warnings, number of commands running, finished, etc., total timing,...) and details for all commands selected. "
+        + "Returns a summary (errors, warnings, commands still running, total timing,...) and details for all commands in range. "
         + "**Use this frequently to check if you are making progress, what is left to be done, and importantly, if certain commands are still processing, potentially even looping.** "
         + "For files, the response has a single command entry derived from the command that loaded it in the respective theory. "
         + implicit_load_file,
@@ -121,9 +121,10 @@ object PIDE_MCP_Tool_Schemas {
           "description" -> "Include full PIDE markup information. This gets very large - **use only sparingly and very targeted to get local details**.",
           "default" -> false),
         "commands_limit" -> JSON.Object("type" -> "integer",
-          "description" -> ("Maximum number of commands to return. Set to 0 if you only want to get summary statistics. "
-            + "Note that the returned summary statistics will still include all commands, even the truncated ones."),
-          "default" -> PIDE_MCP_Tool_Handlers.commands_limit),
+          "description" -> ("Maximum number of commands to return. Omit to return all commands. "
+            + "Set to 0 if you only want to get summary statistics. "
+            + "Note that the returned summary statistics will still include all commands, even the truncated ones. "
+            + "Warning: for large ranges, there are thousands of commands that may flood your context.")),
       ), "required" -> List("origin")),
       annotations = Some(JSON.Object("readOnlyHint" -> true))
     ),

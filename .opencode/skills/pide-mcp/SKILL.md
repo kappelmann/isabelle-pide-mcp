@@ -27,7 +27,7 @@ Operational rules (each rule is elaborated in the sections below):
 - **After every edit, call `get_state`** to see status, errors, warnings.
 - **Restrict by `start_line` / `end_line`** when querying - avoids analysing data for hundreds of finished commands in large theories.
 - **`get_state` takes flags** (`include_types`, `include_facts`,...) - pass them when you need them.
-- **`sorry` is reported as `commands_bad`, not as `commands_errors`.** A clean theory has `commands_bad = 0` AND `commands_errors = 0`.
+- **`sorry` is reported as `commands_bad`, not as `commands_errors`.** A clean theory has 0 bad commands AND 0 errors AND 0 failures.
 - **If `> 0` commands are running for more than ~30s, suspect a loop** - restructure rather than wait.
 - **Time bounds**: proof methods typically finish in <5s; `sledgehammer` in <30s. Anything longer should make you suspicious.
 - **Proof search order**: `try0`, then `sledgehammer`. Concept search: `find_theorems`, then `find_consts`.
