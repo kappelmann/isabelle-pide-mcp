@@ -263,7 +263,7 @@ object PIDE_MCP_Commands {
       detail_entry(Status.warned),
       detail_entry(Status.failed),
       Status.finished -> cmd_counts(Status.finished),
-      Status.canceled -> cmd_counts(Status.canceled),
+      detail_entry(Status.canceled),
       detail_entry("bad"),
       detail_entry("errors"),
       detail_entry("warnings"))
