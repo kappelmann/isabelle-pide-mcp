@@ -58,16 +58,17 @@ Usage: isabelle pide_mcp [OPTIONS]
 
       val log = Logger.make_file(log_path, default = Logger.console)
       val build_progress = new Console_Progress
-      val pide_session = new PIDE_MCP_Session(logic, log, session_dirs, options,
-        session_ancestor = session_ancestor, session_requirements = session_requirements,
-        fresh_build = fresh_build)
-
+      var opt_session: Option[PIDE_MCP_Session] = None
       try {
         log("Starting Isabelle PIDE session...")
-        Exn.release(pide_session.start(build_progress))
+        val session = Exn.release(PIDE_MCP_Session(
+          logic, log, session_dirs, options,
+          session_ancestor = session_ancestor, session_requirements = session_requirements,
+          fresh_build = fresh_build, build_progress = build_progress))
+        opt_session = Some(session)
         log("Session started. Now starting MCP server listening on stdin/stdout.")
 
-        val server = new PIDE_MCP_Server(pide_session, log, verbose)
+        val server = new PIDE_MCP_Server(session, log, verbose)
         server.run()
       } catch {
         case ex: Exception =>
@@ -75,7 +76,7 @@ Usage: isabelle pide_mcp [OPTIONS]
           sys.exit(1)
       } finally {
         log("Stopping Isabelle PIDE MCP session...")
-        pide_session.stop()
+        opt_session.foreach(_.stop())
       }
     })
 }

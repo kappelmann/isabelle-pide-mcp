@@ -7,41 +7,45 @@ PIDE MCP session and resource operations.
 package isabelle.pide.mcp
 
 import isabelle._
-import scala.language.unsafeNulls
 import scala.collection.mutable
 import java.io.{File => JFile}
 
 
-class PIDE_MCP_Session(
-  session_name: String,
-  private val log: Logger,
-  dirs: List[Path] = Nil,
-  private val options: Options = Options.init(),
-  session_ancestor: Option[String] = None,
-  session_requirements: Boolean = false,
-  fresh_build: Boolean = false,
-) {
-  private val scratch_prefix: String = "tmp_pide_mcp_scratch_"
-  private val scratch_tmpdir_prefix: String = "tmp_pide_mcp_scratch"
-  private val session_id: UUID.T = UUID.random()
-
-  private var resources: Headless.Resources = _
-  private var session: Headless.Session = _
-  private val scratch_dirs = mutable.Map[String, JFile]()
-
-  def start(build_progress: Progress = new Progress): Exn.Result[Unit] = Exn.capture {
+object PIDE_MCP_Session {
+  def apply(
+    session_name: String,
+    log: Logger,
+    dirs: List[Path] = Nil,
+    options: Options = Options.init(),
+    session_ancestor: Option[String] = None,
+    session_requirements: Boolean = false,
+    fresh_build: Boolean = false,
+    build_progress: Progress = new Progress,
+  ): Exn.Result[PIDE_MCP_Session] = Exn.capture {
     val opts = options + "show_states=true" + "show_results=true"
     val session_background = Sessions.background(opts, session_name, dirs = dirs,
       session_ancestor = session_ancestor, session_requirements = session_requirements).check_errors
     Build.build(opts, selection = Sessions.Selection.session(session_background.session_name),
       build_heap = true, dirs = dirs, infos = session_background.infos,
       fresh_build = fresh_build, progress = build_progress).check
-    resources = Headless.Resources(opts, session_background, log)
-    session = resources.start_session()
+    val resources = Headless.Resources(opts, session_background, log)
+    val session = resources.start_session()
+    new PIDE_MCP_Session(dirs = dirs, resources = resources, session = session)
   }
+}
+
+class PIDE_MCP_Session private(
+  private val dirs: List[Path] = Nil,
+  private val resources: Headless.Resources,
+  private val session: Headless.Session
+) {
+  private val scratch_prefix: String = "tmp_pide_mcp_scratch_"
+  private val scratch_tmpdir_prefix: String = "tmp_pide_mcp_scratch"
+  private val session_id: UUID.T = UUID.random()
+  private val scratch_dirs = mutable.Map[String, JFile]()
 
   def stop(): Unit = {
-    if (session != null) session.stop()
+    session.stop()
     scratch_dirs.values.foreach(Isabelle_System.rm_tree)
   }
 
@@ -241,7 +245,7 @@ class PIDE_MCP_Session(
   def create_file(path: Path): Exn.Result[Boolean] = Exn.capture {
     val abs_path = PIDE_MCP_Util.canonical_path(path)
     if (abs_path.file.isDirectory) error("Path " + abs_path.implode + " is an existing directory.")
-    abs_path.file.getParentFile.mkdirs()
+    Isabelle_System.make_directory(abs_path.dir)
     if (!abs_path.file.exists) { File.write(abs_path, ""); true }
     else false
   }
@@ -251,7 +255,7 @@ class PIDE_MCP_Session(
     extension: Option[String] = None
   ): Exn.Result[Path] =
   {
-    val suffix = name_suffix.getOrElse(UUID.random_string().filterNot(_ == '-').take(12))
+    val suffix = name_suffix.getOrElse(Date.now().format(Date.Format("yyyy_MM_dd_HH_mm_ss_SSS")))
     val base_name = scratch_prefix + suffix
     val file_name = extension match { case Some(ext) => base_name + ext case None => base_name }
     val tmp_dir = Isabelle_System.tmp_dir(scratch_tmpdir_prefix)
