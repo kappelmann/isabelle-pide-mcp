@@ -71,8 +71,7 @@ class PIDE_MCP_Tool_Handlers(session: PIDE_MCP_Session) {
       val (new_text, written) = Exn.release(session.read_edit(mode, node_name, text, start_line, end_line, old_text))
       val (status, description) = if (written) ("written", "Changes written")
         else ("unchanged", "Unchanged - did you replace the text by itself?")
-      val file_content = PIDE_MCP_Util.numbered_lines(new_text, 1)
-      JSON.Object("status" -> status, "description" -> description, "file_content" -> file_content)
+      JSON.Object("status" -> status, "description" -> description)
     }
 
   private val definition_kinds =
