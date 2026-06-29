@@ -7,9 +7,9 @@ This repository contains:
 ## Usage Notes
 
 To get started (see details below), you install the MCP, register it to a coding agent, and then you can start prompting.
-To interactively explore the agent's changes, you may also run an Isabelle/jEdit or Isabelle/VSCode session next to the coding agent that uses the MCP (cf. screenshow).
+To interactively explore the agent's changes, you may also run an Isabelle/jEdit or Isabelle/VSCode session next to the coding agent that uses the MCP (cf. screenshot).
 
-<img width="2048" height="1242" alt="image" src="https://private-user-images.githubusercontent.com/7101032/614672321-63deb955-c44c-4cd5-8458-961e3d073cb4.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3ODI3NDgxMTcsIm5iZiI6MTc4Mjc0NzgxNywicGF0aCI6Ii83MTAxMDMyLzYxNDY3MjMyMS02M2RlYjk1NS1jNDRjLTRjZDUtODQ1OC05NjFlM2QwNzNjYjQucG5nP1gtQW16LUFsZ29yaXRobT1BV1M0LUhNQUMtU0hBMjU2JlgtQW16LUNyZWRlbnRpYWw9QUtJQVZDT0RZTFNBNTNQUUs0WkElMkYyMDI2MDYyOSUyRnVzLWVhc3QtMSUyRnMzJTJGYXdzNF9yZXF1ZXN0JlgtQW16LURhdGU9MjAyNjA2MjlUMTU0MzM3WiZYLUFtei1FeHBpcmVzPTMwMCZYLUFtei1TaWduYXR1cmU9ODJiMTBjNGUyNGIzNTAwZWNmNTc0YTM0YTQ5ZmQwMzA0NmRlMTA4Nzk4NjEzNjRiNTMwOWNhYWM4OWFmZWQ1MSZYLUFtei1TaWduZWRIZWFkZXJzPWhvc3QmcmVzcG9uc2UtY29udGVudC10eXBlPWltYWdlJTJGcG5nIn0.A1iUveHI5nuYNh-2qLyL961fgeOhcIQ1hrFFGwVOZ-8" />
+<img width="2048" height="1242" alt="Isabelle/jEdit and coding agent side by side" src="./docs/jedit_and_coding_agent.png" />
 
 **Take note of the following when using the MCP:**
 - The MCP manages its own PIDE session. In particular, this means that your editor's session and the MCP's sessions are independent of each other.
@@ -52,10 +52,10 @@ As usual, all options are displayed using `pide_mcp -?` (they follow the typical
 
 ## Agent Skills
 
-The `skills` folders (in `.opencode/` and `.claude/`) contain the following guidances for AI agents:
-- `isabelle-formalization`: Formalization guidances and best practices.
+The `skills` folders (in `.opencode/` and `.claude/`) contain the following guidance for AI agents:
+- `isabelle-formalization`: Guidance and best practices for formalization.
 - `isabelle-proof-development`: Guidance on proof search, automation, and concept search.
-- `pide-mcp`: How to use this MCP effectively.
+- `pide-mcp`: Guidance on using this MCP effectively.
 You may adjust these guidances as you wish.
 
 ## Known Limitations/Future Work
@@ -71,7 +71,7 @@ You may adjust these guidances as you wish.
 
 ## Related Work
 
-[I/Q](https://github.com/awslabs/AutoCorrode/tree/main/iq) is an alternative Isabelle MCP that integrates with Isablle/jEdit (using a shared document state).
+[I/Q](https://github.com/awslabs/AutoCorrode/tree/main/iq) is an alternative Isabelle MCP that integrates with Isabelle/jEdit (using a shared document state).
 PIDE MCP was designed to be a headless (editor-agnostic) and minimalistic alternative to I/Q.
 Experience reports using both systems are very welcome: we hope that the strengths of both MCPs can be combined in the future.
 
