@@ -24,12 +24,12 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
 
 ## Installing the MCP Server
 
-1. Install the supported Isabelle version (or newer). The supported version is stored in [ISABELLE\_VERSION](./ISABELLE_VERSION). Insert the version number in the command below:
+1. Install the supported Isabelle version. The supported version is stored in [ISABELLE\_VERSION](./ISABELLE_VERSION). Newer versions may also work (without guarantee). Insert the version number into the command below:
 ```bash
 hg clone https://isabelle.in.tum.de/repos/isabelle
 isabelle/Admin/init -r <VERSION_NUMBER>
 ```
-2. Install the component. Insert the file path to this directory in the command below:
+2. Install the component. Insert the file path to this directory into the command below:
 ```bash
 isabelle/bin/isabelle components -u <PATH_TO_THIS_DIRECTORY>
 ```
@@ -61,7 +61,7 @@ You may adjust these guidances as you wish.
 
 ## Known Limitations/Future Work
 
-- Isabelle 2025-2 is not supported. The first stable release is planned for Isabelle 2026.
+- Isabelle2025-2 is not supported. The first stable release is planned for Isabelle2026.
 - Command timings for pre-built sessions are currently returned as 0.
 - It would be desirable to have the option to share a PIDE session among the MCP and editors (Isabelle/jEdit, Isabelle/VSCode).
   This requires changes in the Isabelle distribution sources.
