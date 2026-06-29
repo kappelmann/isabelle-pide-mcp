@@ -3,7 +3,7 @@
   "mcp": {
     "isabelle-pide-mcp": {
       "type": "local",
-      "command": ["/Users/andreipopescu/GitRepositories/isabelle/bin/isabelle", "pide_mcp", "-v", "-l", "HOL"],
+      "command": ["/Users/kevin/Programming/isabelle/isabelle/bin/isabelle", "pide_mcp", "-v", "-l", "HOL"],
       "enabled": true
     }
   }
