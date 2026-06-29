@@ -1,7 +1,8 @@
 # Isabelle PIDE MCP Server
 
 This repository contains:
-1. A Model Context Protocol (MCP) server that provides AI agents tools to interactively work with Isabelle theories and ML files via a headless Isabelle/PIDE session.
+1. A Model Context Protocol (MCP) server that provides AI agents tools to interactively work with Isabelle theories and ML files via an Isabelle/PIDE session.
+   The MCP is minimal, headless, and editor-agnostic. You can let the agent work on its own or run it alongside Isabelle/jEdit or Isabelle/VSCode.
 2. A set of agent skills on how to effectively use the MCP and general guidance for formalization tasks and Isabelle.
 
 ## Usage Notes
@@ -71,8 +72,7 @@ You may adjust these guidances as you wish.
 
 ## Related Work
 
-[I/Q](https://github.com/awslabs/AutoCorrode/tree/main/iq) is an alternative Isabelle MCP that integrates with Isabelle/jEdit (using a shared document state).
-PIDE MCP was designed to be a headless (editor-agnostic) and minimalistic alternative to I/Q.
+[I/Q](https://github.com/awslabs/AutoCorrode/tree/main/iq) is an alternative Isabelle MCP that provides an Isabelle/jEdit-centred workflow (using a shared document state).
 Experience reports using both systems are very welcome: we hope that the strengths of both MCPs can be combined in the future.
 
 ## Feedback, Questions, Discussions
