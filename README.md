@@ -2,7 +2,7 @@
 
 This repository contains:
 1. A Model Context Protocol (MCP) server that provides AI agents tools to interactively work with Isabelle theories and ML files via an Isabelle/PIDE session.
-   The MCP is minimal, headless, and editor-agnostic. You can let the agent work on its own or run it alongside Isabelle/jEdit or Isabelle/VSCode.
+   The MCP is headless and editor-agnostic. You can let the agent work on its own or run it alongside Isabelle/jEdit or Isabelle/VSCode.
 2. A set of agent skills on how to effectively use the MCP and general guidance for formalization tasks and Isabelle.
 
 ## Usage Notes
