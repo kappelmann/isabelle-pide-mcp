@@ -7,7 +7,9 @@ This repository contains:
 ## Usage Notes
 
 To get started (see details below), you install the MCP, register it to a coding agent, and then you can start prompting.
-To interactively explore the agent's changes, you may also run an Isabelle/jEdit or Isabelle/VSCode session next to the coding agent that uses the MCP (cf. screenshow below).
+To interactively explore the agent's changes, you may also run an Isabelle/jEdit or Isabelle/VSCode session next to the coding agent that uses the MCP (cf. screenshow).
+
+<img width="2048" height="1242" alt="image" src="https://private-user-images.githubusercontent.com/7101032/614672321-63deb955-c44c-4cd5-8458-961e3d073cb4.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3ODI3NDgxMTcsIm5iZiI6MTc4Mjc0NzgxNywicGF0aCI6Ii83MTAxMDMyLzYxNDY3MjMyMS02M2RlYjk1NS1jNDRjLTRjZDUtODQ1OC05NjFlM2QwNzNjYjQucG5nP1gtQW16LUFsZ29yaXRobT1BV1M0LUhNQUMtU0hBMjU2JlgtQW16LUNyZWRlbnRpYWw9QUtJQVZDT0RZTFNBNTNQUUs0WkElMkYyMDI2MDYyOSUyRnVzLWVhc3QtMSUyRnMzJTJGYXdzNF9yZXF1ZXN0JlgtQW16LURhdGU9MjAyNjA2MjlUMTU0MzM3WiZYLUFtei1FeHBpcmVzPTMwMCZYLUFtei1TaWduYXR1cmU9ODJiMTBjNGUyNGIzNTAwZWNmNTc0YTM0YTQ5ZmQwMzA0NmRlMTA4Nzk4NjEzNjRiNTMwOWNhYWM4OWFmZWQ1MSZYLUFtei1TaWduZWRIZWFkZXJzPWhvc3QmcmVzcG9uc2UtY29udGVudC10eXBlPWltYWdlJTJGcG5nIn0.A1iUveHI5nuYNh-2qLyL961fgeOhcIQ1hrFFGwVOZ-8" />
 
 **Take note of the following when using the MCP:**
 - The MCP manages its own PIDE session. In particular, this means that your editor's session and the MCP's sessions are independent of each other.
