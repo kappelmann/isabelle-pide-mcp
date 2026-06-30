@@ -13,7 +13,7 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
 <img width="2048" height="1242" alt="Isabelle/jEdit and coding agent side by side" src="./docs/jedit_and_coding_agent.png" />
 
 **Take note of the following when using the MCP:**
-- The MCP manages its own PIDE session. In particular, this means that your editor's session and the MCP's sessions are independent of each other.
+- The MCP manages its own PIDE session. In particular, this means that your editor's session and the MCP's session are independent of each other.
   For example, commands will be processed by the MCP's session AND the editor's session,
   and Isabelle options passed to the editor session (e.g. included session directories) also have to be passed to the MCP.
 - If you edit the same files as the MCP, it will only see your changes once they are written to disk.
@@ -57,6 +57,7 @@ The `skills` folders (in `.opencode/` and `.claude/`) contain the following guid
 - `isabelle-formalization`: Guidance and best practices for formalization.
 - `isabelle-proof-development`: Guidance on proof search, automation, and concept search.
 - `pide-mcp`: Guidance on using this MCP effectively.
+
 You may adjust these guidances as you wish.
 
 ## Known Limitations/Future Work
