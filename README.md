@@ -78,6 +78,6 @@ Experience reports using both systems are very welcome: we hope that the strengt
 
 ## Feedback, Questions, Discussions
 
-Please use the [Isabelle Zulip](TODO link).
+Please use [this Isabelle Zulip stream](https://isabelle.zulipchat.com/#narrow/channel/202967-New-Members-.26-Projects/topic/PIDE.20MCP).
 Alternatively, contact Kevin Kappelmann by email.
 
