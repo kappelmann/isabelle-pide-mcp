@@ -81,3 +81,12 @@ Experience reports using both systems are very welcome: we hope that the strengt
 Please use [this Isabelle Zulip stream](https://isabelle.zulipchat.com/#narrow/channel/202967-New-Members-.26-Projects/topic/PIDE.20MCP).
 Alternatively, contact Kevin Kappelmann by email.
 
+## Acknowledgments
+
+We thank Maximilian Schäffeler, Lukas Stevens, Mohammad Abdulaziz, Andrei Popescu, Dmitriy Traytel, and Tobias Nipkow 
+for their helpful feedback and testing.
+
+## Citation
+
+See `CITATION.cff` for citation information.
+
