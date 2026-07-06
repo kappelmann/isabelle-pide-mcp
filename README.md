@@ -88,5 +88,6 @@ for their helpful feedback and testing.
 
 ## Citation
 
-See `CITATION.cff` for citation information.
+See [CITATION.cff](./CITATION.cff) for citation information.
+[![DOI](https://zenodo.org/badge/1266468011.svg)](https://doi.org/10.5281/zenodo.21218654)
 
