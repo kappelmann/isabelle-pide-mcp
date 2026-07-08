@@ -1,13 +1,12 @@
 /*  Title:      PIDE_MCP/pide_mcp_name_space_entry.scala
     Author:     Kevin Kappelmann
 
-Name space entry utilities for the PIDE MCP server.
+Name space entry utilities.
 */
 
 package isabelle.pide.mcp
 
 import isabelle._
-
 
 object PIDE_MCP_Name_Space_Entry {
 
@@ -43,7 +42,7 @@ object PIDE_MCP_Name_Space_Entry {
     val origin = session.origin(node_name)
     if (filter_origins.nonEmpty && !filter_origins.contains(origin)) None
     else {
-      val source = if (snippet_lines > 0) Some(Exn.release(session.read(node_name))) else None
+      val source = if (snippet_lines > 0) Some(Exn.release(session.read_load(node_name))) else None
       Some(mk_definition_json(name, entry.kind, entry.def_label, origin = Some(origin),
         line = Some(line), source = source, snippet_lines = snippet_lines))
     }

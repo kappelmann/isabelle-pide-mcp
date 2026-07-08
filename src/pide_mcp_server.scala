@@ -27,8 +27,10 @@ object RPC_Error {
   val SERVER_ERROR: Int = -32000
 }
 
+object PIDE_MCP_Server
+
+
 class PIDE_MCP_Server(session: PIDE_MCP_Session, log: Logger, verbose: Boolean = false) {
-  private val handlers = new PIDE_MCP_Tool_Handlers(session)
 
   private def respond(out: PrintWriter, body: JSON.Object.T): Unit =
     out.synchronized {
@@ -70,17 +72,15 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session, log: Logger, verbose: Boolean =
               "protocolVersion" -> negotiate_protocol_version(client_version),
               "capabilities" -> JSON.Object("tools" -> JSON.Object()),
               "serverInfo" -> JSON.Object("name" -> Config.name, "version" -> Config.version),
-              "instructions" -> ("Interactive proof development with Isabelle PIDE MCP.\n\n" +
-                "The server automatically and asynchronously checks all commands after edits. Use `get_state` frequently to verify nothing is stuck or failed.\n" +
-                "Use `create_scratch` to create temporary files for experimentation.\n" +
-                "Add material incrementally - large edits make errors and nontermination hard to isolate.\n" +
+              "instructions" -> ("Interactive proof development with Isabelle PIDE MCP. " +
+                "Add material incrementally - large edits make errors and nontermination hard to isolate. " +
                 "If a command takes longer than a few seconds, be suspicious and restructure rather than wait."))))
 
           case Some("tools/list") =>
-            val tools = PIDE_MCP_Tool_Schemas.all.map { case (name, schema) =>
-              val entry = JSON.Object("name" -> name, "description" -> schema.description,
-                "inputSchema" -> schema.input_schema)
-              schema.annotations match {
+            val tools = session.tool_table.values.toList.sortBy(_.name).map { tool =>
+              val entry = JSON.Object("name" -> tool.name, "description" -> tool.description,
+                "inputSchema" -> tool.input_schema)
+              tool.annotations match {
                 case Some(a) => entry + ("annotations" -> a)
                 case None => entry
               }
@@ -123,18 +123,22 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session, log: Logger, verbose: Boolean =
     try {
       parse_tool_call(request) match {
         case Some((name, args)) =>
-          handlers.handle(name, args) match {
-            case Exn.Res(result) =>
-              val content_text = JSON.Format(result)
-              respond(out, rpc_result(id, JSON.Object(
-                "content" -> List(JSON.Object(
-                  "type" -> "text",
-                  "text" -> content_text
-                ))
-              )))
-            case Exn.Exn(e) =>
-              log.error_message("Tool call error: " + Exn.message(e))
-              respond(out, rpc_error(id, RPC_Error.SERVER_ERROR, Exn.message(e)))
+          session.tool_table.get(name) match {
+            case Some(tool) =>
+              tool.handle(args) match {
+                case Exn.Res(result) =>
+                  val content_text = JSON.Format(result)
+                  respond(out, rpc_result(id, JSON.Object(
+                    "content" -> List(JSON.Object(
+                      "type" -> "text",
+                      "text" -> content_text
+                    ))
+                  )))
+                case Exn.Exn(e) =>
+                  log.error_message("Tool call error: " + Exn.message(e))
+                  respond(out, rpc_error(id, RPC_Error.SERVER_ERROR, Exn.message(e)))
+              }
+            case None => respond(out, rpc_error(id, RPC_Error.SERVER_ERROR, s"Tool not found: $name"))
           }
         case None => respond(out, rpc_error(id, RPC_Error.INVALID_PARAMS, "Missing params or tool name"))
       }

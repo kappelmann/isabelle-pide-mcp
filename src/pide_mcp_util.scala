@@ -1,7 +1,7 @@
 /*  Title:      PIDE_MCP/pide_mcp_util.scala
     Author:     Kevin Kappelmann
 
-General utils for the PIDE MCP server.
+General utilities.
 */
 
 package isabelle.pide.mcp
@@ -14,25 +14,6 @@ object PIDE_MCP_Util {
   def strip_theory_suffix(path_str: String): String =
     path_str.stripSuffix(theory_suffix)
 
-  private def require_valid_lines(
-    start_line: Option[Int],
-    end_line: Option[Int],
-    total_lines: Int
-  ): Exn.Result[Unit] = Exn.capture {
-    for (s <- start_line if s < 1 || s > total_lines)
-      error(s"start_line $s out of bounds (file has $total_lines lines)")
-    for (e <- end_line if e < 1 || e > total_lines)
-      error(s"end_line $e out of bounds (file has $total_lines lines)")
-    for (s <- start_line; e <- end_line if e < s)
-      error(s"end_line $e < start_line $s")
-  }
-
-  def resolve_lines(start_line: Option[Int], end_line: Option[Int], total_lines: Int): Exn.Result[(Int, Int)] =
-    Exn.capture {
-      Exn.release(require_valid_lines(start_line, end_line, total_lines))
-      (start_line.getOrElse(1), end_line.getOrElse(total_lines))
-    }
-
   def range(doc: Line.Document, start_line: Int, end_line: Int): Text.Range =
     Text.Range(
       doc.offset(Line.Position(line = start_line - 1)).getOrElse(0),
@@ -41,19 +22,19 @@ object PIDE_MCP_Util {
   def numbered_line(line: Int, text: String): String =
     s"${line}: ${text}"
 
-  def numbered_lines(text: String, start: Int): String = {
-    val lines = Line.Document(text).lines
-    lines.zipWithIndex.map { case (l, i) =>
-      numbered_line(start + i, l.text)
-    }.mkString("\n")
-  }
+  def numbered_lines(lines: List[String], start: Int): String =
+    lines.zipWithIndex.map { case (l, i) => numbered_line(start + i, l) }.mkString("\n")
 
-  def numbered_lines_range(text: String, start: Int, end: Int): String = {
-    val lines = Line.Document(text).lines
-    val start_idx = start - 1
-    val end_idx = end.min(lines.length)
-    numbered_lines(lines.slice(start_idx, end_idx).map(_.text).mkString("\n"), start)
-  }
+  def numbered_lines(text: String, start: Int): String =
+    numbered_lines(Line.Document(text).lines.map(_.text), start)
+
+  def numbered_lines_range(lines: List[String], start: Int, end: Int): String =
+    numbered_lines(lines.slice(start - 1, end.min(lines.length)), start)
+
+  def numbered_lines_range(text: String, start: Int, end: Int): String =
+    numbered_lines_range(Line.Document(text).lines.map(_.text), start, end)
+
+  def canonical_path(path: Path): Path = path.expand.canonical
 
   def display_name(entry: Option[Name_Space.Entry], range: Text.Range, source: String): String =
     entry.map(_.name).filter(_.nonEmpty).getOrElse(range.substring(source))
@@ -102,6 +83,4 @@ object PIDE_MCP_Util {
 
   def elem_body_plain_text(elem: XML.Elem): String =
     Pretty.string_of(elem.body, pure = true)
-
-  def canonical_path(path: Path): Path = path.expand.canonical
 }

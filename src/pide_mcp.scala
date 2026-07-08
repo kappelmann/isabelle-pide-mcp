@@ -1,7 +1,7 @@
 /*  Title:      PIDE_MCP/pide_mcp.scala
     Author:     Kevin Kappelmann
 
-Entry point for the PIDE MCP server.
+Entry point for PIDE MCP.
 */
 
 package isabelle.pide.mcp
@@ -62,7 +62,7 @@ Usage: isabelle pide_mcp [OPTIONS]
       try {
         log("Starting Isabelle PIDE session...")
         val session = Exn.release(PIDE_MCP_Session(
-          logic, log, session_dirs, options,
+          logic, Exn.release(PIDE_MCP_Tool_Util.make_tool_table), log, session_dirs, options,
           session_ancestor = session_ancestor, session_requirements = session_requirements,
           fresh_build = fresh_build, build_progress = build_progress))
         opt_session = Some(session)
@@ -81,4 +81,4 @@ Usage: isabelle pide_mcp [OPTIONS]
     })
 }
 
-class PIDE_MCP_Tool extends Isabelle_Scala_Tools(PIDE_MCP.isabelle_tool)
+class PIDE_MCP_Application extends Isabelle_Scala_Tools(PIDE_MCP.isabelle_tool)

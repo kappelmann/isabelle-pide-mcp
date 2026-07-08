@@ -1,24 +1,26 @@
 # Isabelle PIDE MCP Server
 
 This repository contains:
-1. A Model Context Protocol (MCP) server that provides AI agents tools to interactively work with Isabelle theories and ML files via an Isabelle/PIDE session.
-   The MCP is headless and editor-agnostic. You can let the agent work on its own or run it alongside Isabelle/jEdit or Isabelle/VSCode.
-2. A set of agent skills on how to effectively use the MCP and general guidance for formalization tasks and Isabelle.
+1. A Model Context Protocol (MCP) server to **let AI agents interactively work with Isabelle** theories and ML files via an Isabelle/PIDE session.
+   The MCP server is **headless** and **editor-agnostic**: you can let the agent work on its own or run it alongside Isabelle/jEdit or Isabelle/VSCode.
+   The MCP server is also **customizable** and **extensible**: you can freely add and remove MCP tools offered to the agents.
+2. A curated set of MCP tools for typical Isabelle workflows (auto-formalization, state inspection, entity lookups, etc.).
+3. A set of agent skills on how to effectively use the MCP and provided tools and general guidance for formalization tasks and Isabelle.
 
 ## Usage Notes
 
-To get started (see details below), you install the MCP, register it to a coding agent, and then you can start prompting.
-To interactively explore the agent's changes, you may also run an Isabelle/jEdit or Isabelle/VSCode session next to the coding agent that uses the MCP (cf. screenshot).
+To get started (see details below), you install the MCP server, register it to a coding agent, and then you can start prompting.
+To interactively explore the agent's changes, you may also run an Isabelle/jEdit or Isabelle/VSCode session next to the coding agent that uses the MCP server (cf. screenshot).
 
 <img width="2048" height="1242" alt="Isabelle/jEdit and coding agent side by side" src="./docs/jedit_and_coding_agent.png" />
 
-**Take note of the following when using the MCP:**
-- The MCP manages its own PIDE session. In particular, this means that your editor's session and the MCP's session are independent of each other.
-  For example, commands will be processed by the MCP's session AND the editor's session,
-  and Isabelle options passed to the editor session (e.g. included session directories) also have to be passed to the MCP.
-- If you edit the same files as the MCP, it will only see your changes once they are written to disk.
-  The MCP automatically synchronizes with disk on every read and write.
-  Vice versa, if a file is edited via the MCP, you may need to manually reload the file in your editor in case the editor does not auto-reload on disk changes.
+**Take note of the following when using the MCP server:**
+- The server manages its own PIDE session. In particular, this means that your editor's session and the MCP server's session are independent of each other.
+  For example, commands will be processed by the MCP server's session AND the editor's session,
+  and Isabelle options passed to the editor session (e.g. included session directories) also have to be passed to the MCP server.
+- If you edit the same files as the MCP server, it will only see your changes once they are written to disk.
+  The provided MCP tools automatically synchronize with disk on every read and write.
+  Vice versa, if a file is edited via the MCP server, you may need to manually reload the file in your editor in case the editor does not auto-reload on disk changes.
   In Isabelle/jEdit, it is sometimes necessary to reload manually (e.g. by using the F5 key). Isabelle/VSCode supports auto-reload. 
 - If you want the agent to see proof states in pre-built base sessions, you have to build them with `-o show_states`.
 
@@ -47,16 +49,30 @@ As usual, all options are displayed using `pide_mcp -?` (they follow the typical
 ### Connecting Coding Agents to the MCP Server
 
 - For **OpenCode**, copy/adjust folder `.opencode` and start OpenCode in the same base directory.
-  - **You have to adjust the path to isabelle in `.opencode/opencode.json`** and possibly the options you want to pass to the MCP (e.g. included session directories).
+  - **You have to adjust the path to isabelle in `.opencode/opencode.json`** and possibly the options you want to pass to the MCP server (e.g. included session directories).
 - For **Claude Code**, copy/adjust `.claude` and `.mcp.json` and start Claude Code in the same base directory. 
-  - **You have to adjust the path to isabelle in `.mcp.json`** and possibly the options you want to pass to the MCP (e.g. included session directories).
+  - **You have to adjust the path to isabelle in `.mcp.json`** and possibly the options you want to pass to the MCP server (e.g. included session directories).
+
+## Customizing the MCP Server's Tools
+
+Tools that should be offered by the server must extend `PIDE_MCP_Tools` and be registered via the `services` field in `build.props`.
+- Disable tools by removing them from `services`.
+- Add tools by adding the relevant source files to `sources` and the relevant class to `services`.
+- Restart the MCP server after editing the services.
+
+You can either use the PIDE MCP's `build.props` (modify [`etc/build.props`](./etc/build.props))
+or use a different Scala component:
+1. Create a Scala component.
+1. Add `env:ISABELLE_PIDE_MCP_JAR` to the component's `requirements` in `build.props`.
+1. Add your tools' `sources` and `services`.
+1. Register the component: `isabelle components -u <PATH_TO_THE_COMPONENT>`.
 
 ## Agent Skills
 
 The `skills` folders (in `.opencode/` and `.claude/`) contain the following guidance for AI agents:
 - `isabelle-formalization`: Guidance and best practices for formalization.
 - `isabelle-proof-development`: Guidance on proof search, automation, and concept search.
-- `pide-mcp`: Guidance on using this MCP effectively.
+- `pide-mcp`: Guidance on using the provided MCP tools effectively.
 
 You may adjust these guidances as you wish.
 
@@ -64,17 +80,16 @@ You may adjust these guidances as you wish.
 
 - Isabelle2025-2 is not supported. The first stable release is planned for Isabelle2026.
 - Command timings for pre-built sessions are currently returned as 0.
-- It would be desirable to have the option to share a PIDE session among the MCP and editors (Isabelle/jEdit, Isabelle/VSCode).
+- It would be desirable to have the option to share a PIDE session among the MCP server and editors (Isabelle/jEdit, Isabelle/VSCode).
   This requires changes in the Isabelle distribution sources.
 - It would be desirable to explore changes with PIDE without altering the affected document's state, 
   cf. this [email by Hanno Becker](https://isabelle.zulipchat.com/#narrow/channel/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20Isabelle.2FREPL/near/581059372).
   This requires changes in the Isabelle distribution sources.
-- Support of dynamic extensions ("plugins") such that users can modularly add new MCP tools on their own.
 
 ## Related Work
 
-[I/Q](https://github.com/awslabs/AutoCorrode/tree/main/iq) is an alternative Isabelle MCP that provides an Isabelle/jEdit-centred workflow (using a shared document state).
-Experience reports using both systems are very welcome: we hope that the strengths of both MCPs can be combined in the future.
+[I/Q](https://github.com/awslabs/AutoCorrode/tree/main/iq) is an alternative Isabelle MCP server that provides an Isabelle/jEdit-centred workflow (using a shared document state).
+Experience reports using both systems are very welcome: we hope that the strengths of both MCP servers can be combined in the future.
 
 ## Feedback, Questions, Discussions
 

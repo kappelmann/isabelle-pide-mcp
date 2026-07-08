@@ -1,13 +1,12 @@
 /*  Title:      PIDE_MCP/pide_mcp_commands.scala
     Author:     Kevin Kappelmann
 
-Command utilities for the PIDE MCP server.
+Command utilities.
 */
 
 package isabelle.pide.mcp
 
 import isabelle._
-
 
 object PIDE_MCP_Commands {
 

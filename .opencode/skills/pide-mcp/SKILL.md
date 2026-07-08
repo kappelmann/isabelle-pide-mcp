@@ -16,6 +16,9 @@ Use this skill when working with Isabelle theory files (*.thy) or ML files (*.ML
 
 ## Quick Reference
 
+PIDE MCP comes with a customizable set of tools. 
+This SKILL file describes some basic tools that might be available.
+Also load other SKILL files that describe tools offered by PIDE MCP.
 Operational rules (each rule is elaborated in the sections below):
 
 - **After every edit, call `get_state`** to see status, errors, warnings.
@@ -23,7 +26,6 @@ Operational rules (each rule is elaborated in the sections below):
 - **`get_state` takes flags** (`include_types`, `include_facts`,...) - pass them when you need them.
 - **`sorry` is reported as `commands_bad`, not as `commands_errors`.** A clean theory has 0 bad commands AND 0 errors AND 0 failures.
 - **If `> 0` commands are running for more than ~30s, suspect a loop** - restructure rather than wait.
-- **Edits**: `old_text` must match the existing lines modulo trailing whitespace.
 - **`create_scratch`**: use for exploration and alternatives. (Typically) use the same imports on scratch theories as the ones you use for the development that you are creating a scratch theory for.
 
 ## Interaction with Isabelle via PIDE MCP
@@ -34,7 +36,7 @@ Operational rules (each rule is elaborated in the sections below):
 - **If you experience discrepancies between the PIDE state and the file's disk content, use read on the affected file to re-synchronise the content.** Such discrepancies might happen, for example, when a human user is working on the same file as you or when you didn't edit a file via PIDE but with primitive file operations.
 - **Avoid absolute file path imports for theories. Use session-qualified theory names for sessions available to you.** See `list_session_directories` on how to find session qualifiers.
 - When you are told to synchronise, just re-read the file.
-- **Edits require `old_text` (the expected content at target lines). If the file changed since you last read it (e.g., a human edited it concurrently), the edit is rejected with a mismatch error showing expected vs actual content. The comparison is modulo trailing whitespace, so minor newline differences are tolerated.**
+- **Edits require `old_text` (the text to be searched for in the target range). If the file changed since you last read it (e.g., a human edited it concurrently), old_text might not be found and the edit be rejected. Re-synchronise in this case.**
 
 ### After Every Edit
 1. **Check for errors/unfinished/successful commands after edits with `get_state`**.
