@@ -1,0 +1,14 @@
+PIDE MCP NEWS -- history of user-relevant changes
+=================================================
+
+New in this PIDE MCP version
+----------------------------
+
+* Add tool plugin system: users can freely add and remove (new) tools.
+* The edit tool now matches substrings within a given range and can edit multiple occurrences at once. 
+  This is in line with how most coding agents implement their edit tools.
+
+New in PIDE MCP c13a4bd3c018
+----------------------------
+
+* Initial release compatible with Isabelle/c13a4bd3c018
