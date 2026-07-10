@@ -8,6 +8,12 @@ New in this PIDE MCP version
 * The edit tool now matches substrings within a given range and can edit multiple occurrences at once. 
   This is in line with how most coding agents implement their edit tools.
 
+New in PIDE MCP 2025-2
+----------------------------
+
+* Port of PIDE MCP c13a4bd3c018 compatible with Isabelle2025-2
+* Includes tool plugin system and edit tool improvements from post PIDE MCP c13a4bd3c018 release
+
 New in PIDE MCP c13a4bd3c018
 ----------------------------
 
