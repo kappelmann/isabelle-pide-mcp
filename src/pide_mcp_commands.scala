@@ -87,7 +87,7 @@ object PIDE_MCP_Commands {
       case Text.Info(r, infos @ (info :: _)) if info.range == r => // only keep leaf nodes
         val at_range = infos.filter(_.range == r)
         val name_at = PIDE_MCP_Util.display_name(
-          at_range.collectFirst { case Text.Info(_, XML.Elem(Markup.Entity(entry), _)) => entry },
+          at_range.collectFirst { case Text.Info(_, XML.Elem(Name_Space.Entity(entry), _)) => entry },
           r, snapshot.node.source)
         kind_and_type(at_range).map { case (kind, t) =>
           JSON.Object("name" -> name_at, "kind" -> kind, "type" -> t)
@@ -99,7 +99,7 @@ object PIDE_MCP_Commands {
   def facts_json(snapshot: Document.Snapshot, range: Text.Range): List[String] = {
     val fact_kinds = Set(Markup.FACT, Markup.DYNAMIC_FACT, Markup.LITERAL_FACT)
     snapshot.select(range, Markup.Elements(Markup.ENTITY), _ => {
-      case Text.Info(_, XML.Elem(Markup.Entity(entry), _)) if fact_kinds.contains(entry.kind) =>
+      case Text.Info(_, XML.Elem(Name_Space.Entity(entry), _)) if fact_kinds.contains(entry.kind) =>
         Some(entry.name)
       case _ => None
     }).map(_.info)
@@ -279,7 +279,7 @@ object PIDE_MCP_Commands {
   ): Exn.Result[Map[String, List[JSON.Object.T]]] = Exn.capture {
     val restricted = PIDE_MCP_Util.restrict_source_range(snapshot, range)
     snapshot.select(restricted, Markup.Elements(Markup.ENTITY), _ => {
-      case Text.Info(r, XML.Elem(Markup.Entity(entry), _))
+      case Text.Info(r, XML.Elem(Name_Space.Entity(entry), _))
         if definition_kinds.contains(entry.kind) =>
         val name = PIDE_MCP_Util.display_name(Some(entry), r, snapshot.node.source)
         Some(Exn.release(PIDE_MCP_Name_Space_Entry.definition_json(session, snapshot, entry, name,

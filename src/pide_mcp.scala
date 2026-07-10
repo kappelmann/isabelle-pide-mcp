@@ -56,7 +56,7 @@ Usage: isabelle pide_mcp [OPTIONS]
       val more_args = getopts(args)
       if (more_args.nonEmpty) getopts.usage()
 
-      val log = Logger.make_file(log_path, default = Logger.console)
+      val log: Logger = if (log_path.isEmpty) new System_Logger() else Logger.make_file(log_path)
       val build_progress = new Console_Progress
       var opt_session: Option[PIDE_MCP_Session] = None
       try {
@@ -72,7 +72,7 @@ Usage: isabelle pide_mcp [OPTIONS]
         server.run()
       } catch {
         case ex: Exception =>
-          log.error_message("PIDE MCP error: " + Exn.print(ex))
+          log("PIDE MCP error: " + Exn.print(ex))
           sys.exit(1)
       } finally {
         log("Stopping Isabelle PIDE MCP session...")

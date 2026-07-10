@@ -33,7 +33,7 @@ object PIDE_MCP_Session {
       mcp_session
     } catch {
       case ex: Exception =>
-        log.error_message("Error initializing tool: " + Exn.message(ex))
+        log("Error initializing tool: " + Exn.message(ex))
         mcp_session.stop()
         throw ex
     }
@@ -52,7 +52,7 @@ class PIDE_MCP_Session private(
     tool_table.values.foreach { tool =>
       try tool.stop()
       catch { case ex: Exception =>
-        resources.log.error_message("Error stopping tool " + tool.name + ": " + Exn.message(ex)) 
+        resources.log("Error stopping tool " + tool.name + ": " + Exn.message(ex)) 
       }
     }
     session.stop()

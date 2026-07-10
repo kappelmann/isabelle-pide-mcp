@@ -4,6 +4,7 @@ requirements = env:ISABELLE_SCALA_JAR
 sources = \
   src/pide_mcp.scala \
   src/pide_mcp_commands.scala \
+  src/pide_mcp_name_space.scala \
   src/pide_mcp_name_space_entry.scala \
   src/pide_mcp_server.scala \
   src/pide_mcp_session.scala \
