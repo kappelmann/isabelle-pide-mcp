@@ -7,6 +7,13 @@ This repository contains:
 2. A curated set of MCP tools for typical Isabelle workflows (auto-formalization, state inspection, entity lookups, etc.).
 3. A set of agent skills on how to effectively use the MCP and provided tools and general guidance for formalization tasks and Isabelle.
 
+## Supported Isabelle Versions
+
+PIDE MCP releases are aligned with Isabelle releases.
+
+- The latest supported Isabelle release is `Isabelle2025-2`. Use branch `2025-2` of this repository for this version.
+- Use branch `main` for the PIDE MCP's development version, which possibly requires a development version of Isabelle, documented in [ISABELLE\_VERSION](./ISABELLE_VERSION).
+
 ## Usage Notes
 
 To get started (see details below), you install the MCP server, register it to a coding agent, and then you can start prompting.
@@ -26,7 +33,7 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
 
 ## Installing the MCP Server
 
-1. Install the supported Isabelle version. The supported version is stored in [ISABELLE\_VERSION](./ISABELLE_VERSION). Newer versions may also work (without guarantee). Insert the version number into the command below:
+1. Install the supported Isabelle version. The supported version is stored in [ISABELLE\_VERSION](./ISABELLE_VERSION). Newer versions may also work (without guarantee). If you use a version compatible with an Isabelle release, [download it](https://isabelle.in.tum.de/). If you use a development version, insert the version number into the command below:
 ```bash
 hg clone https://isabelle.in.tum.de/repos/isabelle
 isabelle/Admin/init -r <VERSION_NUMBER>
@@ -78,7 +85,6 @@ You may adjust these guidances as you wish.
 
 ## Known Limitations/Future Work
 
-- Isabelle2025-2 is not supported. The first stable release is planned for Isabelle2026.
 - Command timings for pre-built sessions are currently returned as 0.
 - It would be desirable to have the option to share a PIDE session among the MCP server and editors (Isabelle/jEdit, Isabelle/VSCode).
   This requires changes in the Isabelle distribution sources.
