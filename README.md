@@ -7,6 +7,8 @@ This repository contains:
 2. A curated set of MCP tools for typical Isabelle workflows (auto-formalization, state inspection, entity lookups, etc.).
 3. A set of agent skills on how to effectively use the MCP and provided tools and general guidance for formalization tasks and Isabelle.
 
+**Find the preprint here: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21519364.svg)](https://doi.org/10.5281/zenodo.21519364)**
+
 ## Supported Isabelle Versions
 
 PIDE MCP releases are aligned with Isabelle releases.
@@ -109,6 +111,42 @@ for their helpful feedback and testing.
 
 ## Citation
 
-See [CITATION.cff](./CITATION.cff) for citation information.
-[![DOI](https://zenodo.org/badge/1266468011.svg)](https://doi.org/10.5281/zenodo.21218654)
+Cite the preprint: 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21519364.svg)](https://doi.org/10.5281/zenodo.21519364)
+```
+@misc{pide_mcp,
+  author     = {Kappelmann, Kevin},
+  title      = {{PIDE MCP}: Connecting {AI} Agents to {Isabelle}},
+  year       = 2026,
+  publisher  = {Zenodo},
+  doi        = {10.5281/zenodo.21519364},
+  url        = {https://doi.org/10.5281/zenodo.21519364}
+}
+```
+
+Cite this release (PIDE MCP `c13a4bd3c018`): 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21218655.svg)](https://doi.org/10.5281/zenodo.21218655)
+```
+@software{pide_mcp_code_release,
+  author     = {Kappelmann, Kevin},
+  title      = {{Isabelle PIDE MCP}},
+  license    = {LGPL-3.0},
+  year       = 2026,
+  publisher  = {Zenodo},
+  version    = {c13a4bd3c018},
+  doi        = {10.5281/zenodo.21218655},
+  url        = {https://doi.org/10.5281/zenodo.21218655}
+}
+```
+
+Cite this repository:
+```
+@software{pide_mcp_code,
+  author  = {Kappelmann, Kevin},
+  title   = {{Isabelle PIDE MCP}},
+  license = {LGPL-3.0},
+  year    = {2026},
+  url     = {https://github.com/kappelmann/isabelle-pide-mcp}
+}
+```
 
