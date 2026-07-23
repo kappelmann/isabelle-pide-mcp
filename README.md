@@ -124,8 +124,8 @@ Cite the preprint:
 }
 ```
 
-Cite this release (PIDE MCP `c13a4bd3c018`): 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21218655.svg)](https://doi.org/10.5281/zenodo.21218655)
+Cite PIDE MCP release: 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21218654.svg)](https://doi.org/10.5281/zenodo.21218654)
 ```
 @software{pide_mcp_code_release,
   author     = {Kappelmann, Kevin},
@@ -134,8 +134,8 @@ Cite this release (PIDE MCP `c13a4bd3c018`):
   year       = 2026,
   publisher  = {Zenodo},
   version    = {c13a4bd3c018},
-  doi        = {10.5281/zenodo.21218655},
-  url        = {https://doi.org/10.5281/zenodo.21218655}
+  doi        = {10.5281/zenodo.21218654},
+  url        = {https://doi.org/10.5281/zenodo.21218654}
 }
 ```
 
