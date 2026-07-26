@@ -19,13 +19,15 @@ Use this skill when working with Isabelle theory files (*.thy) or ML files (*.ML
 PIDE MCP comes with a customizable set of tools. 
 This SKILL file describes some basic tools that might be available.
 Also load other SKILL files that describe tools offered by PIDE MCP.
-Operational rules (each rule is elaborated in the sections below):
+Operational rules (further elaborated in the sections below):
 
 - **After every edit, call `get_state`** to see status, errors, warnings.
 - **Restrict by `start_line` / `end_line`** when querying - avoids analysing data for hundreds of finished commands in large theories.
 - **`get_state` takes flags** (`include_types`, `include_facts`,...) - pass them when you need them.
 - **`sorry` is reported as `commands_bad`, not as `commands_errors`.** A clean theory has 0 bad commands AND 0 errors AND 0 failures.
 - **If `> 0` commands are running for more than ~30s, suspect a loop** - restructure rather than wait.
+- **Use `get_progress` whenever you think the process is stuck** - it shows progress of theories and lists currently running commands.
+- **Use `get_progress` for a global overview and `get_state` for theory-local information.**
 - **`create_scratch`**: use for exploration and alternatives. (Typically) use the same imports on scratch theories as the ones you use for the development that you are creating a scratch theory for.
 
 ## Interaction with Isabelle via PIDE MCP
@@ -47,6 +49,7 @@ Operational rules (each rule is elaborated in the sections below):
 - **Proof methods typically terminate in less than 5 seconds.**
 - If commands take longer, be suspicious! Only if you are very confident that a proof legitimately needs more time wait a bit longer. Short waits typically let you move faster!
 - **If `get_state` shows `> 0` running commands for more than ~30 seconds, suspect non-termination** (a loop or overly expensive computation). Restructure rather than wait.
+- **Use `get_progress` to show the progress and currently running commands across all theories.** 
 
 ### Scratch Theories
 - **Use `create_scratch` to test large changes in a scratch theory before radically changing an existing theory.**
@@ -85,17 +88,8 @@ Moreover, you can use Isar commands if necessary, for example:
 
 ### Common Pitfalls
 
-#### Scratch Theory Usage
-- ❌ **Don't:** Try to import scratch theories from your main development
-- ✅ **Do:** Use scratch theories for experimentation, then copy successful results back to main theory
-  ```
-  1. create_scratch to test approach
-  2. Verify it works in scratch theory
-  3. Copy successful proof back to main theory with edit
-  ```
-
 #### Large Changes
-- ❌ **Don't:** Add 100 lines of new definitions and proofs in one edit
+- ❌ **Don't:** Add hundreds of lines of new definitions and proofs in one edit
 - ✅ **Do:** Add incrementally - a few definitions at a time, check after each
   - Easier to identify source of errors
   - Faster feedback on timeouts
@@ -115,12 +109,22 @@ Moreover, you can use Isar commands if necessary, for example:
   edit  (* Continue only after verification *)
   ```
 
+#### Scratch Theory Usage
+- ❌ **Don't:** Try to import scratch theories from your main development
+- ✅ **Do:** Use scratch theories for experimentation, then copy successful results back to main theory
+  ```
+  1. create_scratch to test approach
+  2. Verify it works in scratch theory
+  3. Copy successful proof back to main theory with edit
+  ```
+
 ### Error Recovery
 
-If you encounter errors or nondetermination:
-1. Check the exact error
-2. Isolate the problem: use `sorry` to skip problematic parts temporarily
-3. Make incremental fixes: make small changes and check after each
-4. Use `create_scratch` for experimentation and alternatives
+If you encounter errors or non-termination:
+1. Check the exact error.
+2. Isolate the problem: use `sorry` to skip problematic parts temporarily.
+3. Make incremental fixes: make small changes and check after each.
+4. Use `create_scratch` for experimentation and alternatives.
 5. Increase wait for termination if needed, but prefer refactoring over long waits!
+6. If you think the process is unresponsive, use `get_progress`.
 

@@ -39,11 +39,9 @@ object PIDE_MCP_Util {
   def display_name(entry: Option[Name_Space.Entry], range: Text.Range, source: String): String =
     entry.map(_.name).filter(_.nonEmpty).getOrElse(range.substring(source))
 
-  def node_defined(snapshot: Document.Snapshot, node_name: Document.Node.Name): Boolean =
-    snapshot.version.nodes.domain.contains(node_name)
-
-  def node_defined(snapshot: Document.Snapshot): Boolean =
-    node_defined(snapshot, snapshot.node_name)
+  // a cleaned theory remains in version.nodes but with empty source
+  def is_loaded_theory(snapshot: Document.Snapshot, node_name: Document.Node.Name): Boolean =
+    snapshot.version.nodes(node_name).source.nonEmpty
 
   def find_loading_command(snapshot: Document.Snapshot, file_name: Document.Node.Name): Option[Command] =
     snapshot.version.nodes.iterator.flatMap { case (_, node) =>
