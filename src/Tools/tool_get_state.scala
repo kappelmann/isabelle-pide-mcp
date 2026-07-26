@@ -64,13 +64,10 @@ class Tool_Get_State extends PIDE_MCP_Tool("get_state") {
     val opts = PIDE_MCP_Commands.State_Options(include_types, include_facts, include_infos, include_full_markup)
     val command_states = PIDE_MCP_Commands.state_entries_json(snapshot, entries, doc, opts)
     val summary = PIDE_MCP_Commands.state_summary_json(command_states)
-    val command_count_keys = PIDE_MCP_Commands.Status.all.toSet + "bad"
     val command_states_limited = limit_opt.map(command_states.take).getOrElse(command_states)
-    JSON.Object(
-      summary.toList.map { case (k, v) =>
-        if (command_count_keys.contains(k)) ("commands_" + k, v) else (k, v)
-      } :+ ("commands" -> JSON.Object("count" -> command_states.length,
-        "count_returned" -> command_states_limited.length, "commands" -> command_states_limited)): _*)
+    PIDE_MCP_Commands.prefix_command_status_keys(summary) +
+      ("commands" -> JSON.Object("count" -> command_states.length,
+        "count_returned" -> command_states_limited.length, "commands" -> command_states_limited))
   }
 }
 

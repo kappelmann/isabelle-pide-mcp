@@ -14,7 +14,7 @@ object PIDE_MCP_Tool_Schema {
 
   val origin_prop =
     "origin" -> JSON.Object("type" -> "string",
-      "description" -> "Session-qualified theory name (e.g. \"HOL.Nat\") or file path (e.g. \"foo.ML\")")
+      "description" -> "Session-qualified theory name (e.g. \"HOL.Nat\") or file path (e.g. \"foo.ML\").")
   val start_line_prop =
     "start_line" -> JSON.Object("type" -> "integer",
       "description" -> "First line to include.", "minimum" -> 1)

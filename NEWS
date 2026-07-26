@@ -4,6 +4,9 @@ PIDE MCP NEWS -- history of user-relevant changes
 New in this PIDE MCP version
 ----------------------------
 
+* New tool unload: Remove ("clean") a theory and its dependents.
+* New tool get_progress: show progress of theories and currently processed commands.
+* list_loaded_theories now excludes non-theories.
 * Add tool plugin system: users can freely add and remove (new) tools.
 * The edit tool now matches substrings within a given range and can edit multiple occurrences at once. 
   This is in line with how most coding agents implement their edit tools.

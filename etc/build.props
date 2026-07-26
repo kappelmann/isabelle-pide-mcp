@@ -15,17 +15,21 @@ sources = \
   src/Tools/tool_create_scratch.scala \
   src/Tools/tool_edit.scala \
   src/Tools/tool_find_entities.scala \
+  src/Tools/tool_get_progress.scala \
   src/Tools/tool_get_state.scala \
   src/Tools/tool_list_loaded_theories.scala \
   src/Tools/tool_list_session_directories.scala \
-  src/Tools/tool_read.scala
+  src/Tools/tool_read.scala \
+  src/Tools/tool_unload.scala
 services = \
   isabelle.pide.mcp.PIDE_MCP_Application \
   isabelle.pide.mcp.Tools_Create_File \
   isabelle.pide.mcp.Tools_Create_Scratch \
   isabelle.pide.mcp.Tools_Edit \
   isabelle.pide.mcp.Tools_Find_Entities \
+  isabelle.pide.mcp.Tools_Get_Progress \
   isabelle.pide.mcp.Tools_Get_State \
   isabelle.pide.mcp.Tools_List_Loaded_Theories \
   isabelle.pide.mcp.Tools_List_Session_Directories \
-  isabelle.pide.mcp.Tools_Read
+  isabelle.pide.mcp.Tools_Read \
+  isabelle.pide.mcp.Tools_Unload

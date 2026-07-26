@@ -21,6 +21,13 @@ object PIDE_MCP_Commands {
     val all: List[String] = List(unprocessed, running, warned, failed, finished, canceled)
   }
 
+  def command_status_key(key: String): String = "commands_" + key
+
+  def prefix_command_status_keys(obj: JSON.Object.T): JSON.Object.T = {
+    val command_status_keys = Status.all.toSet + "bad"
+    obj.map { case (k, v) => if (command_status_keys.contains(k)) (command_status_key(k), v) else (k, v) }
+  }
+
   def status(snapshot: Document.Snapshot, command: Command): Document_Status.Command_Status =
     snapshot.state.command_status(snapshot.version, command)
 

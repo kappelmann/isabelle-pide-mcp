@@ -91,7 +91,7 @@ class PIDE_MCP_Session private(
     if (is_base_session_theory(node_name)) session.read_theory(node_name.theory, unicode_symbols = true) // base session
     else {
       val snapshot = session.get_state().snapshot(node_name)
-      if (PIDE_MCP_Util.node_defined(snapshot)) snapshot // dynamic theory
+      if (PIDE_MCP_Util.is_loaded_theory(snapshot, node_name)) snapshot // dynamic theory
       else error("No PIDE snapshot available for " + origin(node_name))
     }
   }
@@ -120,6 +120,15 @@ class PIDE_MCP_Session private(
 
   def load(node_name: Document.Node.Name): Exn.Result[Unit] =
     if (node_name.is_theory) load_theory(node_name) else load_file(node_name)
+
+  def unload(node_names: List[Document.Node.Name]): Exn.Result[List[Document.Node.Name]] =
+    Exn.capture {
+      val snapshot = session.snapshot()
+      val dependents = snapshot.version.nodes.descendants(node_names)
+        .filter(name => PIDE_MCP_Util.is_loaded_theory(snapshot, name))
+      resources.clean_theories(session = session, id = session_id, theories = dependents)
+      dependents
+    }
 
   def text_edits(
     node_name: Document.Node.Name,
