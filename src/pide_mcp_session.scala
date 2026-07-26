@@ -136,7 +136,7 @@ class PIDE_MCP_Session private(
     full_text: String
   ): Unit = {
     val node_header = resources.check_thy(node_name, Scan.char_reader(full_text))
-    for (imp <- node_header.imports) Exn.release(load_theory(imp))
+    for (imp <- node_header.imports_no_pos) Exn.release(load_theory(imp))
     session.update(Document.Blobs.empty, List(
       node_name -> Document.Node.Deps(node_header),
       node_name -> Document.Node.Edits(edits),
