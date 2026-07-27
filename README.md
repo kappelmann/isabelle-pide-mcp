@@ -13,7 +13,7 @@ This repository contains:
 
 PIDE MCP releases are aligned with Isabelle releases.
 
-- The latest supported Isabelle release is `Isabelle2025-2`. Use branch `2025-2` of this repository for this version.
+- The latest supported Isabelle release is `Isabelle2025-2`. Use branch `Isabelle2025-2` of this repository for this version.
 - Use branch `main` for the PIDE MCP's development version, which possibly requires a development version of Isabelle, documented in [ISABELLE\_VERSION](./ISABELLE_VERSION).
 
 ## Usage Notes
