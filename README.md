@@ -62,6 +62,14 @@ As usual, all options are displayed using `pide_mcp -?` (they follow the typical
 - For **Claude Code**, copy/adjust `.claude` and `.mcp.json` and start Claude Code in the same base directory. 
   - **You have to adjust the path to isabelle in `.mcp.json`** and possibly the options you want to pass to the MCP server (e.g. included session directories).
 
+**Note for Windows users:**
+1. Make sure that `etc/settings` uses `LF` line breaks.
+2. Your coding agent needs to open Isabelle via cygwin. For example, in Claude Code, you can use the following MCP configuration (with adjusted paths):
+```
+      "command": "C:\\Users\\kevin\\Isabelle\\contrib\\cygwin\\bin\\bash.exe",
+      "args": ["--login", "-c", "\"C:/Users/kevin/Isabelle/bin/isabelle\" pide_mcp -v -l HOL"]
+```
+
 ## Customizing the MCP Server's Tools
 
 Tools that should be offered by the server must extend `PIDE_MCP_Tools` and be registered via the `services` field in `build.props`.
