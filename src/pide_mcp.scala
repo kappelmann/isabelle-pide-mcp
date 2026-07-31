@@ -57,7 +57,7 @@ Usage: isabelle pide_mcp [OPTIONS]
       if (more_args.nonEmpty) getopts.usage()
 
       val log = Logger.make_file(log_path, default = Logger.console)
-      val build_progress = new Console_Progress
+      val build_progress = new Console_Progress(stderr = true)
       var opt_session: Option[PIDE_MCP_Session] = None
       try {
         log("Starting Isabelle PIDE session...")

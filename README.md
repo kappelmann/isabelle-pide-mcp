@@ -26,7 +26,7 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
 **Take note of the following when using the MCP server:**
 - The server manages its own PIDE session. In particular, this means that your editor's session and the MCP server's session are independent of each other.
   For example, commands will be processed by the MCP server's session AND the editor's session,
-  and Isabelle options passed to the editor session (e.g. included session directories) also have to be passed to the MCP server.
+  and Isabelle options passed to the editor session (e.g. base session and included session directories) also have to be passed to the MCP server.
 - If you edit the same files as the MCP server, it will only see your changes once they are written to disk.
   The provided MCP tools automatically synchronize with disk on every read and write.
   Vice versa, if a file is edited via the MCP server, you may need to manually reload the file in your editor in case the editor does not auto-reload on disk changes.
@@ -58,13 +58,13 @@ As usual, all options are displayed using `pide_mcp -?` (they follow the typical
 ### Connecting Coding Agents to the MCP Server
 
 - For **OpenCode**, copy/adjust folder `.opencode` and start OpenCode in the same base directory.
-  - **You have to adjust the path to isabelle in `.opencode/opencode.json`** and possibly the options you want to pass to the MCP server (e.g. included session directories).
+  - **You have to adjust the path to isabelle in `.opencode/opencode.json`** and possibly the options you want to pass to the MCP server (e.g. base session and included session directories).
 - For **Claude Code**, copy/adjust `.claude` and `.mcp.json` and start Claude Code in the same base directory. 
-  - **You have to adjust the path to isabelle in `.mcp.json`** and possibly the options you want to pass to the MCP server (e.g. included session directories).
+  - **You have to adjust the path to isabelle in `.mcp.json`** and possibly the options you want to pass to the MCP server (e.g. base session and included session directories).
 
 **Note for Windows users:**
 1. Make sure that `etc/settings` uses `LF` line breaks.
-2. Your coding agent needs to open Isabelle via cygwin. For example, in Claude Code, you can use the following MCP configuration (with adjusted paths):
+2. Your coding agent needs to open Isabelle via cygwin. For example, in Claude Code, you can use the following MCP configuration (with adjusted paths and options):
 ```
       "command": "C:\\Users\\kevin\\Isabelle\\contrib\\cygwin\\bin\\bash.exe",
       "args": ["--login", "-c", "\"C:/Users/kevin/Isabelle/bin/isabelle\" pide_mcp -v -l HOL"]
