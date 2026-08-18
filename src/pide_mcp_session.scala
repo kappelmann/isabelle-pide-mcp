@@ -90,6 +90,8 @@ class PIDE_MCP_Session private(
 
   def snapshot(): Document.Snapshot = session.snapshot()
 
+  def await_stable_snapshot(): Document.Snapshot = session.await_stable_snapshot()
+
   def node_snapshot(node_name: Document.Node.Name): Exn.Result[Document.Snapshot] =
     switch(session.snapshot(), node_name)
 
