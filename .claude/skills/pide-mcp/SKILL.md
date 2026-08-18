@@ -24,7 +24,7 @@ Operational rules (further elaborated in the sections below):
 - **After every edit, call `get_state`** to see status, errors, warnings.
 - **Restrict by `start_line` / `end_line`** when querying - avoids analysing data for hundreds of finished commands in large theories.
 - **`get_state` takes flags** (`include_types`, `include_facts`,...) - pass them when you need them.
-- **`sorry` is reported as `commands_bad`, not as `commands_errors`.** A clean theory has 0 bad commands AND 0 errors AND 0 failures.
+- **`sorry` is reported as `bad`, not as an `error`.** A clean theory has 0 bad commands AND 0 errors AND 0 failures.
 - **If `> 0` commands are running for more than ~30s, suspect a loop** - restructure rather than wait.
 - **Use `get_progress` whenever you think the process is stuck** - it shows progress of theories and lists currently running commands.
 - **Use `get_progress` for a global overview and `get_state` for theory-local information.**
@@ -42,7 +42,7 @@ Operational rules (further elaborated in the sections below):
 
 ### After Every Edit
 1. **Check for errors/unfinished/successful commands after edits with `get_state`**.
-2. **`sorry`s are included as "bad" commands. `commands_errors` counts actual failures. A "clean" state requires both to be 0.**
+2. **`sorry`s are included as `bad` commands. `errors` counts actual failures. A "clean" state requires both to be 0.**
 
 ### Time Management
 - **Avoid adding large amounts of new material at once, as it makes it hard to identify the source of errors and nontermination.**

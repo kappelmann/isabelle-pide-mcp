@@ -52,7 +52,7 @@ object Tool_Get_Progress {
   ): List[JSON.Object.T] = {
     val opts = PIDE_MCP_Commands.State_Options()
     theories.flatMap { name =>
-      val node_snapshot = snapshot.state.snapshot(node_name = name)
+      val node_snapshot = snapshot.switch(name)
       val doc = Line.Document(node_snapshot.node.source)
       PIDE_MCP_Commands.state_entries_theory_dynamic(node_snapshot, None).toList.flatMap { entry =>
         Option.when(PIDE_MCP_Commands.status(node_snapshot, entry.cmd).is_running) {
@@ -83,8 +83,8 @@ class Tool_Get_Progress extends PIDE_MCP_Tool("get_progress") {
     val origins = JSON.strings(params, "origins").getOrElse(Nil)
       .map(s => session.origin(Exn.release(session.node_name(s)))).toSet
 
-    val snapshot = session.session.snapshot()
-    val (_, dynamic) = Tool_List_Loaded_Theories.loaded_theories(session, snapshot)
+    val snapshot = session.snapshot()
+    val (_, dynamic) = Tool_List_Loaded_Theories.loaded_theories(session, snapshot.version.nodes)
     val theory_names = if (origins.isEmpty) dynamic
       else dynamic.filter(name => origins.contains(session.origin(name)))
     val commands_running = Tool_Get_Progress.commands_running_json(session, snapshot, theory_names)
