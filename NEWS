@@ -5,6 +5,7 @@ New in this PIDE MCP version
 ----------------------------
 
 * Update to Isabelle/f672c186c3bb
+* Await stable snapshot after editing operations (without blocking other tools)
 * Reworked loading and editing: closes several issues reported by Diego Marmsoler and Yong Kiam Tan (stuck process due to invalid imports and de-synchronisation of session and resources, edit race conditions, etc.)
 * New tool unload: Remove ("clean") a theory and its dependents.
 * New tool get_progress: show progress of theories and currently processed commands.
@@ -17,7 +18,7 @@ New in PIDE MCP 2025-2
 ----------------------------
 
 * Port of PIDE MCP c13a4bd3c018 compatible with Isabelle2025-2
-* Includes tool plugin system, edit tool improvements, list_loaded_theories fix, and unload and get_progress tools from post PIDE MCP c13a4bd3c018 release
+* Includes all post PIDE MCP c13a4bd3c018 updates until the release of PIDE MCP 2026
 
 New in PIDE MCP c13a4bd3c018
 ----------------------------

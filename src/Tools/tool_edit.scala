@@ -118,8 +118,10 @@ class Tool_Edit extends PIDE_MCP_Tool("edit") {
     val end_line = JSON.int(params, "end_line")
     val (new_text, count) = Exn.release(Tool_Edit.read_update_edit(
       session, mode, node_name, text, start_line, end_line, old_text, edit_all = edit_all))
-    val (status, description) = if (count > 0) ("written", s"Edited $count occurrence(s)")
-      else ("unchanged", "Unchanged - did you replace the text by itself?")
+    val (status, description) = if (count > 0) {
+        session.await_stable_snapshot()
+        ("written", s"Edited $count occurrence(s)")
+      } else ("unchanged", "Unchanged - did you replace the text by itself?")
     JSON.Object("status" -> status, "description" -> description)
   }
 }

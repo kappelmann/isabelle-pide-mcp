@@ -22,6 +22,7 @@ class Tool_Unload extends PIDE_MCP_Tool("unload") {
     val origins = JSON.strings(params, "origins").getOrElse(error("Missing origins"))
     val node_names = origins.map { s => Exn.release(session.node_name(s)) }
     val unloaded = Exn.release(session.unload(node_names))
+    if (unloaded.nonEmpty) session.await_stable_snapshot()
     JSON.Object("unloaded" -> unloaded.map(session.origin))
   }
 }
