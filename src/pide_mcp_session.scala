@@ -6,6 +6,8 @@ package isabelle.pide.mcp
 
 import isabelle._
 
+import scala.annotation.tailrec
+
 object PIDE_MCP_Session {
   def apply(
     session_name: String,
@@ -26,8 +28,7 @@ object PIDE_MCP_Session {
       fresh_build = fresh_build, progress = build_progress).check
     val resources = Headless.Resources(opts, session_background, log)
     val session = resources.start_session()
-    val mcp_session = new PIDE_MCP_Session(dirs = dirs, resources = resources, session = session,
-      tool_table = tool_table)
+    val mcp_session = new PIDE_MCP_Session(dirs = dirs, session = session, tool_table = tool_table)
     try {
       mcp_session.tool_table.values.foreach(_.init(mcp_session))
       mcp_session
@@ -42,17 +43,17 @@ object PIDE_MCP_Session {
 
 class PIDE_MCP_Session private(
   val dirs: List[Path] = Nil,
-  val resources: Headless.Resources,
   val session: Headless.Session,
   val tool_table: Map[String, PIDE_MCP_Tool]
 ) {
-  private val session_id: UUID.T = UUID.random()
+
+  def resources: Headless.Resources = session.resources
 
   def stop(): Unit = {
     tool_table.values.foreach { tool =>
       try tool.stop()
       catch { case ex: Exception =>
-        resources.log("Error stopping tool " + tool.name + ": " + Exn.message(ex)) 
+        resources.log("Error stopping tool " + tool.name + ": " + Exn.message(ex))
       }
     }
     session.stop()
@@ -85,98 +86,154 @@ class PIDE_MCP_Session private(
     } else node_name.node // full path
 
   def is_base_session_theory(node_name: Document.Node.Name): Boolean =
-    resources.session_base.known_theories.contains(node_name.theory)
+    resources.loaded_theory(node_name)
 
-  def node_snapshot(node_name: Document.Node.Name): Exn.Result[Document.Snapshot] = Exn.capture {
+  def snapshot(): Document.Snapshot = session.snapshot()
+
+  def node_snapshot(node_name: Document.Node.Name): Exn.Result[Document.Snapshot] =
+    switch(session.snapshot(), node_name)
+
+  def switch(
+    snapshot: => Document.Snapshot,
+    node_name: Document.Node.Name
+  ): Exn.Result[Document.Snapshot] = Exn.capture {
     if (is_base_session_theory(node_name)) session.read_theory(node_name.theory, unicode_symbols = true) // base session
     else {
-      val snapshot = session.get_state().snapshot(node_name)
-      if (PIDE_MCP_Util.is_loaded_theory(snapshot, node_name)) snapshot // dynamic theory
+      val snapshot1 = snapshot
+      val new_snapshot =
+        (if (is_base_session_theory(snapshot1.node_name)) session.snapshot() else snapshot1).switch(node_name)
+      if (PIDE_MCP_Util.is_loaded_dynamic(new_snapshot.version.nodes, node_name)) new_snapshot // dynamic theory
       else error("No PIDE snapshot available for " + origin(node_name))
     }
   }
 
-  private def do_load(
-    theories: List[Document.Node.Name] = Nil,
-    files: List[Document.Node.Name] = Nil
-  ): Exn.Result[Unit] =
+  def tip_version(): Exn.Result[Document.Version] =
+    Exn.capture { session.get_state().history.tip.version.join }
+
+  def read_file_content(node_name: Document.Node.Name): Exn.Result[String] =
     Exn.capture {
-      resources.load_theories(
-        session = session, id = session_id,
-        theories = theories, files = files,
-        unicode_symbols = true, progress = new Progress)
+      resources.make_theory_content(node_name).getOrElse(
+        Symbol.decode(Line.normalize(File.read(node_name.path))))
     }
 
-  def load_theory(node_name: Document.Node.Name): Exn.Result[Unit] = Exn.capture {
-    node_snapshot(node_name) match {
-      case Exn.Res(_) => () // only load if necessary
-      case Exn.Exn(_) =>
-        val deps = resources.dependencies(List(node_name -> Position.none)).check_errors
-        Exn.release(do_load(theories = deps.theories, files = deps.loaded_files))
+  def write_file_content(path: Path, text: String): Exn.Result[Unit] =
+    Exn.capture { File.write(path, Symbol.encode(Line.normalize(text))) }
+
+  def node_source(
+    snapshot: Document.Snapshot,
+    node_name: Document.Node.Name
+  ): Exn.Result[String] =
+    switch(snapshot, node_name) match {
+      case Exn.Res(new_snapshot) => Exn.Res(new_snapshot.node.source)
+      case Exn.Exn(_) => read_file_content(node_name)
     }
+
+  def update(edits: List[Document.Edit_Text]): Unit =
+    if (edits.nonEmpty) {
+      val blobs = for (case (name, Document.Node.Blob(blob)) <- edits) yield name -> blob
+      session.update(Document.Blobs(blobs.toMap), edits)
+    }
+
+  private def replace_edits(old_text: String, new_text: String): List[Text.Edit] = {
+    val prefix = old_text.iterator.zip(new_text.iterator).takeWhile(_ == _).length
+    val (old_rest, new_rest) = (old_text.drop(prefix), new_text.drop(prefix))
+    val suffix = old_rest.reverseIterator.zip(new_rest.reverseIterator).takeWhile(_ == _).length
+    Text.Edit.replace(prefix, old_rest.dropRight(suffix), new_rest.dropRight(suffix))
   }
 
-  def load_file(node_name: Document.Node.Name): Exn.Result[Unit] = do_load(files = List(node_name))
+  private case class Node_Model(
+    node_name: Document.Node.Name,
+    node: Document.Node,
+    text: String,
+    visible: Boolean
+  ) extends Document.Model {
+    def session: Document.Session = PIDE_MCP_Session.this.session
+    def node_required: Boolean = text.nonEmpty
+    def untyped_data: AnyRef = File_Format.registry.parse_data(node_name, text)
 
-  def load(node_name: Document.Node.Name): Exn.Result[Unit] =
-    if (node_name.is_theory) load_theory(node_name) else load_file(node_name)
+    lazy val pending_edits: List[Text.Edit] = replace_edits(node.source, text)
+    def is_stable: Boolean = pending_edits.isEmpty
+
+    def get_text(range: Text.Range): Option[String] = range.try_substring(text)
+
+    def get_blob: Option[Document.Blobs.Item] =
+      if (is_theory) None
+      else Some(Document.Blobs.Item(
+        Bytes(Symbol.encode(text)), text, Symbol.Text_Chunk(text), changed = !is_stable))
+
+    def node_header: Document.Node.Header =
+      resources.special_header(node_name).getOrElse(
+        resources.check_thy(node_name, Scan.char_reader(text)))
+
+    def node_perspective: Document.Node.Perspective_Text.T =
+      Document.Node.Perspective(text.nonEmpty,
+        if (visible) Text.Perspective.full else Text.Perspective.empty,
+        Document.Node.Overlays.empty)
+
+    def edits: List[Document.Edit_Text] =
+      if (is_stable) Nil else node_edits(node_header, pending_edits, node_perspective)
+  }
+
+  def read_update(
+    nodes: List[(Document.Node.Name, Boolean)]
+  ): Exn.Result[Map[Document.Node.Name, String]] = Exn.capture {
+    val models = synchronized {
+      val version = Exn.release(tip_version())
+      val models1 = for ((name, visible) <- nodes)
+        yield Node_Model(name, version.nodes(name), Exn.release(read_file_content(name)), visible)
+      update(models1.flatMap(_.edits))
+      models1
+    }
+    (for (model <- models) yield model.node_name -> model.text).toMap
+  }
+
+  private def required_nodes(
+    version: Document.Version,
+    seen: Set[Document.Node.Name]
+  ): Set[Document.Node.Name] = {
+    def is_required(name: Document.Node.Name): Boolean =
+      !seen(name) && !is_base_session_theory(name) &&
+      !PIDE_MCP_Util.is_loaded_dynamic(version.nodes, name) &&
+      (name.path.is_file || resources.make_theory_content(name).isDefined)
+    val thy_files = version.nodes.iterator.flatMap { case (name, node) =>
+        node.header.imports.iterator ++ resources.make_theory_name(name).iterator
+      }.distinct.filter(is_required)
+    val thy_files_closure =
+      resources.dependencies(thy_files.map((_, Position.none)).toList).theories
+    val aux_files = resources.undefined_blobs(version)
+    (thy_files_closure ++ aux_files).toSet.filter(is_required)
+  }
+
+  def resolve_dependencies(): Unit = {
+    @tailrec def loop(seen: Set[Document.Node.Name]): Unit = {
+      val names = required_nodes(Exn.release(tip_version()), seen)
+      if (names.nonEmpty) {
+        Exn.release(read_update((for (name <- names) yield name -> true).toList))
+        loop(seen ++ names)
+      }
+    }
+    loop(Set.empty)
+  }
+
+  def read_update_resolve(node_name: Document.Node.Name): Exn.Result[String] = Exn.capture {
+    if (is_base_session_theory(node_name)) Exn.release(node_snapshot(node_name)).node.source
+    else {
+      val text = Exn.release(read_update(List(node_name -> true)))(node_name)
+      resolve_dependencies()
+      text
+    }
+  }
 
   def unload(node_names: List[Document.Node.Name]): Exn.Result[List[Document.Node.Name]] =
     Exn.capture {
-      val snapshot = session.snapshot()
-      val dependents = snapshot.version.nodes.descendants(node_names)
-        .filter(name => PIDE_MCP_Util.is_loaded_theory(snapshot, name))
-      resources.clean_theories(session = session, id = session_id, theories = dependents)
-      dependents
-    }
-
-  def text_edits(
-    node_name: Document.Node.Name,
-    edits: List[Text.Edit],
-    full_text: String
-  ): Unit = {
-    val node_header = resources.check_thy(node_name, Scan.char_reader(full_text))
-    for (imp <- node_header.imports) Exn.release(load_theory(imp))
-    session.update(Document.Blobs.empty, List(
-      node_name -> Document.Node.Deps(node_header),
-      node_name -> Document.Node.Edits(edits),
-      node_name -> Document.Node.Perspective(true, Text.Perspective.full, Document.Node.Overlays.empty)))
-  }
-
-  def read_load_file(node_name: Document.Node.Name): Exn.Result[String] =
-    Exn.capture {
-      val text = Symbol.decode(File.read(node_name.path))
-      Exn.release(load_file(node_name))
-      text
-    }
-
-  def read_load_theory(node_name: Document.Node.Name): Exn.Result[String] =
-    Exn.capture {
-      node_snapshot(node_name) match {
-        case Exn.Res(snapshot) =>
-          val snapshot_text = snapshot.node.source
-          if (is_base_session_theory(node_name)) snapshot_text
-          else {
-            val text = Symbol.decode(File.read(node_name.path))
-            if (text != snapshot_text) {
-              val prefix_len = snapshot_text.iterator.zip(text.iterator).takeWhile(_ == _).length
-              val snapshot_after = snapshot_text.drop(prefix_len)
-              val text_after = text.drop(prefix_len)
-              val suffix_len =
-                snapshot_after.reverseIterator.zip(text_after.reverseIterator).takeWhile(_ == _).length
-              val edits = Text.Edit.replace(prefix_len, snapshot_after.dropRight(suffix_len),
-                text_after.dropRight(suffix_len))
-              text_edits(node_name, edits, text)
-            }
-            text
-          }
-        case Exn.Exn(_) =>
-          Exn.release(load_theory(node_name))
-          Symbol.decode(File.read(node_name.path))
+      for (name <- node_names if is_base_session_theory(name))
+        error("Cannot unload base session theory " + origin(name))
+      synchronized {
+        val nodes = Exn.release(tip_version()).nodes
+        val descendants = nodes.descendants(node_names).filter(PIDE_MCP_Util.is_loaded_dynamic(nodes, _))
+        update(descendants.flatMap(name =>
+          Node_Model(name, nodes(name), "", visible = false).edits))
+        descendants
       }
     }
-
-  def read_load(node_name: Document.Node.Name): Exn.Result[String] =
-    if (node_name.is_theory) read_load_theory(node_name) else read_load_file(node_name)
-
 }

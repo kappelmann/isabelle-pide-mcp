@@ -237,7 +237,7 @@ object PIDE_MCP_Commands {
     range: Option[Text.Range]
   ): Option[State_Entry] = {
     val restricted = PIDE_MCP_Util.restrict_source_range(snapshot, range)
-    PIDE_MCP_Util.find_loading_command(snapshot, snapshot.node_name).map { cmd =>
+    PIDE_MCP_Util.find_load_command(snapshot.version.nodes, snapshot.node_name).map { cmd =>
       State_Entry(cmd, restricted, results(snapshot, cmd, 0, restricted).toList)
     }
   }

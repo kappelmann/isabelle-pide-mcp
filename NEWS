@@ -4,6 +4,7 @@ PIDE MCP NEWS -- history of user-relevant changes
 New in this PIDE MCP version
 ----------------------------
 
+* Reworked loading and editing: closes several issues reported by Diego Marmsoler and Yong Kiam Tan (stuck process due to invalid imports and de-synchronisation of session and resources, edit race conditions, etc.)
 * New tool unload: Remove ("clean") a theory and its dependents.
 * New tool get_progress: show progress of theories and currently processed commands.
 * list_loaded_theories now excludes non-theories.

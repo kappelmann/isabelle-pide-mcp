@@ -32,6 +32,7 @@ object PIDE_MCP_Name_Space_Entry {
 
   private def source_definition_json(
     session: PIDE_MCP_Session,
+    snapshot: Document.Snapshot,
     entry: Name_Space.Entry,
     name: String,
     node_name: Document.Node.Name,
@@ -42,7 +43,8 @@ object PIDE_MCP_Name_Space_Entry {
     val origin = session.origin(node_name)
     if (filter_origins.nonEmpty && !filter_origins.contains(origin)) None
     else {
-      val source = if (snippet_lines > 0) Some(Exn.release(session.read_load(node_name))) else None
+      val source =
+        Option.when(snippet_lines > 0)(Exn.release(session.node_source(snapshot, node_name)))
       Some(mk_definition_json(name, entry.kind, entry.def_label, origin = Some(origin),
         line = Some(line), source = source, snippet_lines = snippet_lines))
     }
@@ -57,16 +59,20 @@ object PIDE_MCP_Name_Space_Entry {
     filter_origins: Set[String],
     def_entry_not_loaded: String
   ): Exn.Result[Option[JSON.Object.T]] = Exn.capture {
-    def resolve_entry(origin_str: String, line: Int): Option[JSON.Object.T] = {
-      session.node_name(origin_str) match {
-        case Exn.Res(node_name) =>
-          Exn.release(source_definition_json(session, entry, name, node_name, line, snippet_lines, filter_origins))
-        case Exn.Exn(ex) =>
-          Some(mk_definition_json(name, entry.kind, entry.def_label, origin = Some(origin_str),
-            line = Some(line), note = Some("The definition entry's source file " + origin_str
-              + " could not be resolved: " + Exn.message(ex))))
+    def unresolved(origin_str: String, line: Int, ex: Throwable): Option[JSON.Object.T] =
+      Some(mk_definition_json(name, entry.kind, entry.def_label, origin = Some(origin_str),
+        line = Some(line), note = Some("The definition entry's source file " + origin_str
+          + " could not be resolved: " + Exn.message(ex))))
+
+    def resolve_entry(origin_str: String, line: Int): Option[JSON.Object.T] =
+      Exn.capture {
+        val node_name = Exn.release(session.node_name(origin_str))
+        Exn.release(source_definition_json(
+          session, snapshot, entry, name, node_name, line, snippet_lines, filter_origins))
+      } match {
+        case Exn.Res(res) => res
+        case Exn.Exn(ex) => unresolved(origin_str, line, ex)
       }
-    }
     entry.properties match {
       case Position.Item_Def_File(def_file, def_line, _) => resolve_entry(def_file, def_line)
       case Position.Item_Def_Id(def_id, def_range) =>

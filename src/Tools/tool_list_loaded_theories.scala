@@ -7,12 +7,11 @@ package isabelle.pide.mcp
 import isabelle._
 
 object Tool_List_Loaded_Theories {
-  def loaded_theories(session: PIDE_MCP_Session, snapshot: Document.Snapshot)
+  def loaded_theories(session: PIDE_MCP_Session, nodes: Document.Nodes)
     : (List[Document.Node.Name], List[Document.Node.Name]) = {
-    val all_nodes = snapshot.version.nodes.topological_order.filter(_.is_theory)
-    val base_session_names = session.resources.session_base.loaded_theories.keys.toSet
-    val (base_session, dynamic) = all_nodes.partition(n => base_session_names.contains(n.theory))
-    (base_session, dynamic.filter(n => PIDE_MCP_Util.is_loaded_theory(snapshot, n)))
+    val all_nodes = nodes.topological_order.filter(_.is_theory)
+    val (base_session, dynamic) = all_nodes.partition(session.is_base_session_theory)
+    (base_session, dynamic.filter(PIDE_MCP_Util.is_loaded_dynamic(nodes, _)))
   }
 }
 
@@ -26,7 +25,7 @@ class Tool_List_Loaded_Theories extends PIDE_MCP_Tool("list_loaded_theories") {
 
   def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
     val (base_session, dynamic) =
-      Tool_List_Loaded_Theories.loaded_theories(session, session.session.snapshot())
+      Tool_List_Loaded_Theories.loaded_theories(session, Exn.release(session.tip_version()).nodes)
     def to_entry(node_name: Document.Node.Name) = JSON.Object("origin" -> session.origin(node_name))
     JSON.Object(
       "dynamic" -> dynamic.map(to_entry),

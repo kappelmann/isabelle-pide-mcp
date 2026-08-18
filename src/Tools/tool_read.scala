@@ -21,7 +21,7 @@ class Tool_Read extends PIDE_MCP_Tool("read") {
 
   def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
     val node_name = Exn.release(PIDE_MCP_Tool_Util.origin_param(session, params))
-    val text = Exn.release(session.read_load(node_name))
+    val text = Exn.release(session.read_update_resolve(node_name))
     val start_line = JSON.int(params, "start_line")
     val end_line = JSON.int(params, "end_line")
     val lines_count = Line.Document(text).lines.length

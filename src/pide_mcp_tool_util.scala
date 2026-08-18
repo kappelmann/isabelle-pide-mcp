@@ -35,12 +35,17 @@ object PIDE_MCP_Tool_Util {
       session.node_snapshot(node_name) match {
         case Exn.Res(snapshot) => snapshot
         case Exn.Exn(_) =>
-          Exn.release(session.load(node_name))
-          error(s"The origin ${session.origin(node_name)} was not previously loaded and has now been queued for loading. "
-            + "The requested information was thus not ready yet. "
-            + retry_soon_message)
+          if (PIDE_MCP_Util.is_loaded_dynamic(Exn.release(session.tip_version()).nodes, node_name))
+            error(s"The origin ${session.origin(node_name)} is loaded but has not been processed yet. "
+              + retry_soon_message)
+          else {
+            Exn.release(session.read_update_resolve(node_name))
+            error(s"The origin ${session.origin(node_name)} was not previously loaded and has now been queued for loading. "
+              + retry_soon_message)
+          }
       }
-    if (!node_name.is_theory && !PIDE_MCP_Util.is_file_loaded(snapshot, node_name))
+    if (!node_name.is_theory &&
+        PIDE_MCP_Util.find_load_command(snapshot.version.nodes, node_name).isEmpty)
       error(s"File ${session.origin(node_name)} is not loaded by any theory. Load the containing theory first.")
     snapshot
   }

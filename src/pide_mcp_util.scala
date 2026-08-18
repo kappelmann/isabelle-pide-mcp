@@ -39,17 +39,14 @@ object PIDE_MCP_Util {
   def display_name(entry: Option[Name_Space.Entry], range: Text.Range, source: String): String =
     entry.map(_.name).filter(_.nonEmpty).getOrElse(range.substring(source))
 
-  // a cleaned theory remains in version.nodes but with empty source
-  def is_loaded_theory(snapshot: Document.Snapshot, node_name: Document.Node.Name): Boolean =
-    snapshot.version.nodes(node_name).source.nonEmpty
+  // a cleaned node remains in version.nodes but with empty source
+  def is_loaded_dynamic(nodes: Document.Nodes, node_name: Document.Node.Name): Boolean =
+    nodes(node_name).source.nonEmpty
 
-  def find_loading_command(snapshot: Document.Snapshot, file_name: Document.Node.Name): Option[Command] =
-    snapshot.version.nodes.iterator.flatMap { case (_, node) =>
+  def find_load_command(nodes: Document.Nodes, file_name: Document.Node.Name): Option[Command] =
+    nodes.iterator.flatMap { case (_, node) =>
       node.load_commands.find(_.blobs_names.contains(file_name))
     }.nextOption()
-
-  def is_file_loaded(snapshot: Document.Snapshot, file_name: Document.Node.Name): Boolean =
-    find_loading_command(snapshot, file_name).isDefined
 
   def restrict_source_range(snapshot: Document.Snapshot, range: Option[Text.Range]): Text.Range = {
     val full = Text.Range.length(snapshot.node.source)

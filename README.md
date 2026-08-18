@@ -96,6 +96,7 @@ You may adjust these guidances as you wish.
 ## Known Limitations/Future Work
 
 - Command timings for pre-built sessions are currently returned as 0.
+- Node sources of base session blobs should be loaded from database. They are currently read from disk.
 - It would be desirable to have the option to share a PIDE session among the MCP server and editors (Isabelle/jEdit, Isabelle/VSCode).
   This requires changes in the Isabelle distribution sources.
 - It would be desirable to explore changes with PIDE without altering the affected document's state, 
