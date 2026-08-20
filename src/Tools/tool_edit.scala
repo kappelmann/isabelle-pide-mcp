@@ -85,6 +85,7 @@ object Tool_Edit {
 class Tool_Edit extends PIDE_MCP_Tool("edit") {
   def description: String =
     "Edit a file by either replacing, prepending to, or appending to a matching old text in a given range. "
+      + "Returns once Isabelle has processed the edit, which takes longer if the origin's dependencies were not loaded yet. "
       + "Note: base session files are static and cannot be edited. "
       + PIDE_MCP_Tool_Schema.implicit_reload_file
 
