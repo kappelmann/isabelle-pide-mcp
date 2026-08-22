@@ -39,7 +39,8 @@ object PIDE_MCP_Tool_Util {
             error(s"The origin ${session.origin(node_name)} is loaded but has not been processed yet. "
               + retry_soon_message)
           else {
-            Exn.release(session.read_update_resolve(node_name))
+            Exn.release(session.read_update_resolve(
+              node_name, Text.Perspective.empty, await_stable_before_resolve = false, hide_others = false))
             error(s"The origin ${session.origin(node_name)} was not previously loaded and has now been queued for loading. "
               + retry_soon_message)
           }

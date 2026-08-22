@@ -54,7 +54,9 @@ object Tool_Edit {
     if (session.is_base_session_theory(node_name))
       error("Cannot edit base session theory " + session.origin(node_name))
     session.synchronized {
-      val current_text = Exn.release(session.read_update_resolve(node_name))
+      val current_text =
+        Exn.release(session.read_update(
+          List(node_name -> Text.Perspective.full), hide_others = true))(node_name)
       val doc = Line.Document(current_text)
       val (s, e) = Exn.release(PIDE_MCP_Tool_Util.resolve_lines(start_line, end_line, doc.lines.length))
       val edit_range = PIDE_MCP_Util.range(doc, s, e)
@@ -73,11 +75,11 @@ object Tool_Edit {
       val computed_text = offsets.foldLeft(current_text) { (text, offset) =>
         apply_edit(mode, text, offset, actual_old_text, new_text)
       }
-      if (computed_text != current_text) {
-        Exn.release(session.write_file_content(node_name.path, computed_text))
-        (Exn.release(session.read_update_resolve(node_name)), offsets.length)
-      }
-      else (computed_text, 0)
+      val changed = computed_text != current_text
+      if (changed) Exn.release(session.write_file_content(node_name.path, computed_text))
+      val text = Exn.release(session.read_update_resolve(
+        node_name, Text.Perspective.full, await_stable_before_resolve = true, hide_others = true))
+      (text, if (changed) offsets.length else 0)
     }
   }
 }
@@ -119,10 +121,8 @@ class Tool_Edit extends PIDE_MCP_Tool("edit") {
     val end_line = JSON.int(params, "end_line")
     val (new_text, count) = Exn.release(Tool_Edit.read_update_edit(
       session, mode, node_name, text, start_line, end_line, old_text, edit_all = edit_all))
-    val (status, description) = if (count > 0) {
-        session.await_stable_snapshot()
-        ("written", s"Edited $count occurrence(s)")
-      } else ("unchanged", "Unchanged - did you replace the text by itself?")
+    val (status, description) = if (count > 0) ("written", s"Edited $count occurrence(s)")
+      else ("unchanged", "Unchanged - did you replace the text by itself?")
     JSON.Object("status" -> status, "description" -> description)
   }
 }
