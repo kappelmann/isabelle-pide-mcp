@@ -40,8 +40,13 @@ object PIDE_MCP_Util {
     entry.map(_.name).filter(_.nonEmpty).getOrElse(range.substring(source))
 
   // a cleaned node remains in version.nodes but with empty source
-  def is_loaded_dynamic(nodes: Document.Nodes, node_name: Document.Node.Name): Boolean =
-    nodes(node_name).source.nonEmpty
+  def is_loaded_dynamic(nodes: Document.Nodes, node_name: Document.Node.Name): Boolean = {
+    val node = nodes(node_name)
+    node.get_blob match {
+      case Some(blob) => blob.source.nonEmpty
+      case None => node.commands.nonEmpty
+    }
+  }
 
   def find_load_command(nodes: Document.Nodes, file_name: Document.Node.Name): Option[Command] =
     nodes.iterator.flatMap { case (_, node) =>

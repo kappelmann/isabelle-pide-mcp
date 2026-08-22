@@ -147,7 +147,7 @@ class PIDE_MCP_Session private(
     node_name: Document.Node.Name,
     node: Document.Node,
     text: String,
-    visible: Boolean
+    text_perspective: Text.Perspective
   ) extends Document.Model {
     def session: Document.Session = PIDE_MCP_Session.this.session
     def node_required: Boolean = text.nonEmpty
@@ -168,22 +168,38 @@ class PIDE_MCP_Session private(
         resources.check_thy(node_name, Scan.char_reader(text)))
 
     def node_perspective: Document.Node.Perspective_Text.T =
-      Document.Node.Perspective(text.nonEmpty,
-        if (visible) Text.Perspective.full else Text.Perspective.empty,
-        Document.Node.Overlays.empty)
+      if (is_theory)
+        Document.Node.Perspective(node_required, text_perspective, node.perspective.overlays)
+      else Document.Node.Perspective_Text.empty
 
     def edits: List[Document.Edit_Text] =
-      if (is_stable) Nil else node_edits(node_header, pending_edits, node_perspective)
+      if (is_stable && node.edit_perspective == node_perspective) Nil
+      else node_edits(node_header, pending_edits, node_perspective)
   }
 
+  private def hide_edits(
+    version: Document.Version,
+    keep: Set[Document.Node.Name]
+  ): Iterator[Document.Edit_Text] =
+    for {
+      (name, node) <- version.nodes.iterator
+      if !keep(name) && !node.text_perspective.is_empty
+    } yield name -> Document.Node.Perspective(
+      node.perspective.required, Text.Perspective.empty, node.perspective.overlays)
+
   def read_update(
-    nodes: List[(Document.Node.Name, Boolean)]
+    nodes: List[(Document.Node.Name, Text.Perspective)],
+    hide_others: Boolean
   ): Exn.Result[Map[Document.Node.Name, String]] = Exn.capture {
     val models = synchronized {
       val version = Exn.release(tip_version())
-      val models1 = for ((name, visible) <- nodes)
-        yield Node_Model(name, version.nodes(name), Exn.release(read_file_content(name)), visible)
-      update(models1.flatMap(_.edits))
+      val models1 = for ((name, text_perspective) <- nodes)
+        yield Node_Model(
+          name, version.nodes(name), Exn.release(read_file_content(name)), text_perspective)
+      val other_edits =
+        if (hide_others) hide_edits(version, nodes.map { case (name, _) => name }.toSet)
+        else Iterator.empty
+      update((other_edits ++ models1.iterator.flatMap(_.edits)).toList)
       models1
     }
     (for (model <- models) yield model.node_name -> model.text).toMap
@@ -200,30 +216,47 @@ class PIDE_MCP_Session private(
     val thy_files = version.nodes.iterator.flatMap { case (name, node) =>
         node.header.imports_no_pos.iterator ++ resources.make_theory_name(name).iterator
       }.distinct.filter(is_required)
-    val thy_files_closure =
-      resources.dependencies(thy_files.map((_, Position.none)).toList).theories
+    val deps = resources.dependencies(thy_files.map((_, Position.none)).toList)
+    val dep_files = try deps.loaded_files catch { case ERROR(_) => Nil }
     val aux_files = resources.undefined_blobs(version)
-    (thy_files_closure ++ aux_files).toSet.filter(is_required)
+    (deps.theories ++ dep_files ++ aux_files).toSet.filter(is_required)
   }
 
   def resolve_dependencies(): Unit = {
     @tailrec def loop(seen: Set[Document.Node.Name]): Unit = {
       val names = required_nodes(Exn.release(tip_version()), seen)
       if (names.nonEmpty) {
-        Exn.release(read_update((for (name <- names) yield name -> true).toList))
+        Exn.release(read_update(
+          (for (name <- names) yield name -> Text.Perspective.empty).toList, hide_others = false))
         loop(seen ++ names)
       }
     }
     loop(Set.empty)
   }
 
-  def read_update_resolve(node_name: Document.Node.Name): Exn.Result[String] = Exn.capture {
+  def read_update_resolve(
+    node_name: Document.Node.Name,
+    text_perspective: Text.Perspective,
+    await_stable_before_resolve: Boolean,
+    hide_others: Boolean
+  ): Exn.Result[String] = Exn.capture {
     if (is_base_session_theory(node_name)) Exn.release(node_snapshot(node_name)).node.source
     else {
-      val text = Exn.release(read_update(List(node_name -> true)))(node_name)
+      val text =
+        Exn.release(read_update(List(node_name -> text_perspective), hide_others))(node_name)
+      if (await_stable_before_resolve) await_stable_snapshot()
       resolve_dependencies()
       text
     }
+  }
+
+  private def unload_edits(
+    node_name: Document.Node.Name,
+    node: Document.Node
+  ): List[Document.Edit_Text] = {
+    val model = Node_Model(node_name, node, "", Text.Perspective.empty)
+    model.node_edits(
+      Document.Node.no_header, model.pending_edits, Document.Node.Perspective_Text.empty)
   }
 
   def unload(node_names: List[Document.Node.Name]): Exn.Result[List[Document.Node.Name]] =
@@ -233,8 +266,7 @@ class PIDE_MCP_Session private(
       synchronized {
         val nodes = Exn.release(tip_version()).nodes
         val descendants = nodes.descendants(node_names).filter(PIDE_MCP_Util.is_loaded_dynamic(nodes, _))
-        update(descendants.flatMap(name =>
-          Node_Model(name, nodes(name), "", visible = false).edits))
+        update(descendants.flatMap(name => unload_edits(name, nodes(name))))
         descendants
       }
     }
