@@ -6,7 +6,7 @@ New in this PIDE MCP version
 
 * Update to Isabelle version as specified in [ISABELLE\_VERSION](./ISABELLE_VERSION)
 * Update get_state: include tracing, remove unprocessed command details, and fix wrong message line number attribution for blobs.
-* Set visible perspective on last read or edited origin only. Dependencies are hidden. Use option pide_mcp_range_context to set numer of lines around range that stay visible.
+* Set visible perspective on last read or edited origin only. Dependencies are hidden. Use option pide_mcp_range_context to set number of lines around range that stay visible.
 * Await stable snapshot after editing operations (without blocking other tools)
 * Reworked loading and editing: closes several issues reported by Diego Marmsoler and Yong Kiam Tan (stuck process due to invalid imports and de-synchronisation of session and resources, edit race conditions, etc.)
 * New tool unload: Remove ("clean") a theory and its dependents.
