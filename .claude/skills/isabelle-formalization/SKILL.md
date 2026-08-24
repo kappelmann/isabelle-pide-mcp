@@ -1,7 +1,6 @@
 ---
 name: isabelle-formalization
 description: Developing formalizations in the Isabelle proof assistant. Use this skill whenever you are working on a formalization in Isabelle.
-compatibility: claude-code
 metadata:
   version: "1.0"
 ---

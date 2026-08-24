@@ -1,7 +1,6 @@
 ---
 name: isabelle-proof-development
 description: Developing proofs in the Isabelle proof assistant. Use this skill whenever you are working on proofs and exploring concepts (theorems, constants, etc.) in Isabelle.
-compatibility: opencode
 metadata:
   version: "1.0"
 ---
