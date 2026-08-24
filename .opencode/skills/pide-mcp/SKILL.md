@@ -22,12 +22,12 @@ Also load other SKILL files that describe tools offered by PIDE MCP.
 Operational rules (further elaborated in the sections below):
 
 - **After every edit, call `get_state`** to see status, errors, warnings.
-- **Restrict by `start_line` / `end_line`** when querying - avoids analysing data for hundreds of finished commands in large theories.
-- **`get_state` takes flags** (`include_types`, `include_facts`,...) - pass them when you need them.
+- **Restrict by `start_line` / `end_line`** when querying to avoid analysing data for hundreds of finished commands in large theories.
 - **`sorry` is reported as `bad`, not as an `error`.** A clean theory has 0 bad commands AND 0 errors AND 0 failures.
 - **If `> 0` commands are running for more than ~30s, suspect a loop** - restructure rather than wait.
 - **Use `get_progress` whenever you think the process is stuck** - it shows progress of theories and lists currently running commands.
 - **Use `get_progress` for a global overview and `get_state` for theory-local information.**
+- **The PIDE perspective** is set by some tools and marks the commands for which print functions are run, which return extra output e.g. automatic `quickcheck` and `solve_direct` information.
 - **`create_scratch`**: use for exploration and alternatives. (Typically) use the same imports on scratch theories as the ones you use for the development that you are creating a scratch theory for.
 
 ## Interaction with Isabelle via PIDE MCP

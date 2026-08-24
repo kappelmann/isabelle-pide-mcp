@@ -39,34 +39,52 @@ object PIDE_MCP_Tool_Util {
             error(s"The origin ${session.origin(node_name)} is loaded but has not been processed yet. "
               + retry_soon_message)
           else {
-            Exn.release(session.read_update_resolve(
-              node_name, Text.Perspective.empty, await_stable_before_resolve = false, hide_others = false))
-            error(s"The origin ${session.origin(node_name)} was not previously loaded and has now been queued for loading. "
+            Exn.release(session.read_update_resolve(node_name, List((1, Some(0))), // pass empty range to load empty nodes
+              await_stable_before_resolve = false, hide_others = false, range_context = 0))
+            error(s"The origin ${session.origin(node_name)} was not loaded and has now been queued for loading. "
               + retry_soon_message)
           }
       }
-    if (!node_name.is_theory &&
-        PIDE_MCP_Util.find_load_command(snapshot.version.nodes, node_name).isEmpty)
+    if (!node_name.is_theory && snapshot.commands_loading.isEmpty)
       error(s"File ${session.origin(node_name)} is not loaded by any theory. Load the containing theory first.")
     snapshot
   }
 
-  private def require_valid_lines(
-    start_line: Option[Int],
-    end_line: Option[Int],
-    total_lines: Int
+  def require_ordered_lines(
+    opt_start_line: Option[Int],
+    opt_end_line: Option[Int]
   ): Exn.Result[Unit] = Exn.capture {
-    for (s <- start_line if s < 1 || s > total_lines)
-      error(s"start_line $s out of bounds (file has $total_lines lines)")
-    for (e <- end_line if e < 1 || e > total_lines)
-      error(s"end_line $e out of bounds (file has $total_lines lines)")
-    for (s <- start_line; e <- end_line if e < s)
-      error(s"end_line $e < start_line $s")
+    for (start_line <- opt_start_line; end_line <- opt_end_line if end_line < start_line)
+      error(s"end_line $end_line < start_line $start_line")
   }
 
-  def resolve_lines(start_line: Option[Int], end_line: Option[Int], total_lines: Int): Exn.Result[(Int, Int)] =
+  def require_lines_in_bounds(
+    opt_start_line: Option[Int],
+    opt_end_line: Option[Int],
+    total_lines: Int
+  ): Exn.Result[Unit] = Exn.capture {
+    for (start_line <- opt_start_line if start_line < 1 || start_line > total_lines)
+      error(s"start_line $start_line out of bounds (file has $total_lines lines)")
+    for (end_line <- opt_end_line if end_line < 1 || end_line > total_lines)
+      error(s"end_line $end_line out of bounds (file has $total_lines lines)")
+  }
+
+  def require_valid_lines(
+    opt_start_line: Option[Int],
+    opt_end_line: Option[Int],
+    total_lines: Int
+  ): Exn.Result[Unit] = Exn.capture {
+    Exn.release(require_ordered_lines(opt_start_line, opt_end_line))
+    Exn.release(require_lines_in_bounds(opt_start_line, opt_end_line, total_lines))
+  }
+
+  def resolve_lines(
+    opt_start_line: Option[Int],
+    opt_end_line: Option[Int],
+    total_lines: Int
+  ): Exn.Result[(Int, Int)] =
     Exn.capture {
-      Exn.release(require_valid_lines(start_line, end_line, total_lines))
-      (start_line.getOrElse(1), end_line.getOrElse(total_lines))
+      Exn.release(require_valid_lines(opt_start_line, opt_end_line, total_lines))
+      (opt_start_line.getOrElse(1), opt_end_line.getOrElse(total_lines))
     }
 }

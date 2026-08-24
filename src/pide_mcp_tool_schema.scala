@@ -11,6 +11,7 @@ import isabelle._
 object PIDE_MCP_Tool_Schema {
   val implicit_load_file: String = "Implicitly loads the file if required."
   val implicit_reload_file: String = "Implicitly (re)loads the file."
+  val range_visibility: String = "Sets the PIDE perspective on the range."
 
   val origin_prop =
     "origin" -> JSON.Object("type" -> "string",
@@ -18,10 +19,10 @@ object PIDE_MCP_Tool_Schema {
   val start_line_prop =
     "start_line" -> JSON.Object("type" -> "integer",
       "description" -> "First line to include.", "minimum" -> 1)
-  val start_line_opt_prop =
+  val opt_start_line_prop =
     "start_line" -> JSON.Object("type" -> "integer",
       "description" -> "First line to include.", "minimum" -> 1, "default" -> 1)
-  val end_line_opt_prop =
+  val opt_end_line_prop =
     "end_line" -> JSON.Object("type" -> "integer",
       "description" -> "Last line to include (default: end of file).", "minimum" -> 1)
 }
