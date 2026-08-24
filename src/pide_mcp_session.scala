@@ -49,6 +49,8 @@ class PIDE_MCP_Session private(
 
   def resources: Headless.Resources = session.resources
 
+  def range_context: Int = resources.options.int("pide_mcp_range_context")
+
   def stop(): Unit = {
     tool_table.values.foreach { tool =>
       try tool.stop()
@@ -62,9 +64,8 @@ class PIDE_MCP_Session private(
   private def path_node_name(path: Path): Exn.Result[Document.Node.Name] = Exn.capture {
     val abs = PIDE_MCP_Util.canonical_path(path)
     resources.find_theory(abs.file).getOrElse { // session theories
-      val base = abs.base.implode
       val candidate = Document.Node.Name(abs.implode, // full path file
-        theory = if (base.endsWith(PIDE_MCP_Util.theory_suffix)) PIDE_MCP_Util.strip_theory_suffix(base) else "")
+        theory = Thy_Header.theory_name(abs.implode))
       if (candidate.path.is_file) candidate
       else session.store.source_file(path.implode) match { // source_file can return identity for unknown files
         case Some(file) if Path.explode(file).is_file => Exn.release(node_name(file))
@@ -132,7 +133,7 @@ class PIDE_MCP_Session private(
 
   def update(edits: List[Document.Edit_Text]): Unit =
     if (edits.nonEmpty) {
-      val blobs = for (case (name, Document.Node.Blob(blob)) <- edits) yield name -> blob
+      val blobs = edits.collect { case (name, Document.Node.Blob(blob)) => name -> blob }
       session.update(Document.Blobs(blobs.toMap), edits)
     }
 
@@ -178,31 +179,37 @@ class PIDE_MCP_Session private(
   }
 
   private def hide_edits(
-    version: Document.Version,
+    nodes: Document.Nodes,
     keep: Set[Document.Node.Name]
   ): Iterator[Document.Edit_Text] =
-    for {
-      (name, node) <- version.nodes.iterator
-      if !keep(name) && !node.text_perspective.is_empty
-    } yield name -> Document.Node.Perspective(
-      node.perspective.required, Text.Perspective.empty, node.perspective.overlays)
+    nodes.iterator.collect {
+      case (name, node) if !keep(name) && !node.text_perspective.is_empty =>
+        name -> Document.Node.Perspective(
+          node.perspective.required, Text.Perspective.empty, node.perspective.overlays)
+    }
 
   def read_update(
-    nodes: List[(Document.Node.Name, Text.Perspective)],
-    hide_others: Boolean
+    nodes: List[(Document.Node.Name, List[(Int, Option[Int])])],
+    hide_others: Boolean,
+    range_context: Int = range_context
   ): Exn.Result[Map[Document.Node.Name, String]] = Exn.capture {
     val models = synchronized {
       val version = Exn.release(tip_version())
-      val models1 = for ((name, text_perspective) <- nodes)
-        yield Node_Model(
-          name, version.nodes(name), Exn.release(read_file_content(name)), text_perspective)
+      val models1 = nodes.map { case (name, visible_lines) =>
+        val text = Exn.release(read_file_content(name))
+        val doc = Line.Document(text)
+        val line_ranges = visible_lines.map { case (start_line, opt_end_line) =>
+          (start_line, opt_end_line.getOrElse(doc.lines.length)) }
+        Node_Model(name, version.nodes(name), text,
+          PIDE_MCP_Util.text_perspective(doc, line_ranges, range_context))
+      }
       val other_edits =
-        if (hide_others) hide_edits(version, nodes.map { case (name, _) => name }.toSet)
+        if (hide_others) hide_edits(version.nodes, nodes.map { case (name, _) => name }.toSet)
         else Iterator.empty
       update((other_edits ++ models1.iterator.flatMap(_.edits)).toList)
       models1
     }
-    (for (model <- models) yield model.node_name -> model.text).toMap
+    models.map(model => model.node_name -> model.text).toMap
   }
 
   private def required_nodes(
@@ -226,8 +233,7 @@ class PIDE_MCP_Session private(
     @tailrec def loop(seen: Set[Document.Node.Name]): Unit = {
       val names = required_nodes(Exn.release(tip_version()), seen)
       if (names.nonEmpty) {
-        Exn.release(read_update(
-          (for (name <- names) yield name -> Text.Perspective.empty).toList, hide_others = false))
+        Exn.release(read_update(names.toList.map(_ -> Nil), hide_others = false))
         loop(seen ++ names)
       }
     }
@@ -236,14 +242,15 @@ class PIDE_MCP_Session private(
 
   def read_update_resolve(
     node_name: Document.Node.Name,
-    text_perspective: Text.Perspective,
+    visible_lines: List[(Int, Option[Int])],
     await_stable_before_resolve: Boolean,
-    hide_others: Boolean
+    hide_others: Boolean,
+    range_context: Int = range_context
   ): Exn.Result[String] = Exn.capture {
     if (is_base_session_theory(node_name)) Exn.release(node_snapshot(node_name)).node.source
     else {
-      val text =
-        Exn.release(read_update(List(node_name -> text_perspective), hide_others))(node_name)
+      val text = Exn.release(
+        read_update(List(node_name -> visible_lines), hide_others, range_context))(node_name)
       if (await_stable_before_resolve) await_stable_snapshot()
       resolve_dependencies()
       text

@@ -1,0 +1,4 @@
+(* :mode=isabelle-options: *)
+
+option pide_mcp_range_context : int = 50 for pide_mcp
+  -- "lines around a read or edited range that are marked visible"

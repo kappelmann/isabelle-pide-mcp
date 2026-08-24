@@ -11,26 +11,30 @@ class Tool_Read extends PIDE_MCP_Tool("read") {
     "Read line-numbered content for a given range. Use this to get the file's content. "
       + "Also use it to re-synchronise the file's disk content with the PIDE session if you experience discrepancies between the PIDE state and the external disk state (e.g. due to external edits). "
       + "Returns once Isabelle has processed the read, which takes longer if the origin's dependencies were not loaded yet. "
+      + PIDE_MCP_Tool_Schema.range_visibility + " "
       + PIDE_MCP_Tool_Schema.implicit_reload_file
 
   def input_schema: JSON.Object.T =
     JSON.Object("type" -> "object", "properties" -> JSON.Object(
       PIDE_MCP_Tool_Schema.origin_prop,
-      PIDE_MCP_Tool_Schema.start_line_opt_prop,
-      PIDE_MCP_Tool_Schema.end_line_opt_prop
+      PIDE_MCP_Tool_Schema.opt_start_line_prop,
+      PIDE_MCP_Tool_Schema.opt_end_line_prop
     ), "required" -> List("origin"))
 
   override def annotations: Option[JSON.Object.T] = Some(JSON.Object("readOnlyHint" -> true))
 
   def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
     val node_name = Exn.release(PIDE_MCP_Tool_Util.origin_param(session, params))
+    val opt_start_line = JSON.int(params, "start_line")
+    val opt_end_line = JSON.int(params, "end_line")
+    Exn.release(PIDE_MCP_Tool_Util.require_ordered_lines(opt_start_line, opt_end_line))
     val text = Exn.release(session.read_update_resolve(
-      node_name, Text.Perspective.full, await_stable_before_resolve = true, hide_others = true))
-    val start_line = JSON.int(params, "start_line")
-    val end_line = JSON.int(params, "end_line")
+      node_name, List((opt_start_line.getOrElse(1), opt_end_line)),
+      await_stable_before_resolve = true, hide_others = true))
     val lines_count = Line.Document(text).lines.length
-    val (s, e) = Exn.release(PIDE_MCP_Tool_Util.resolve_lines(start_line, end_line, lines_count))
-    PIDE_MCP_Util.numbered_lines_range(text, s, e)
+    val (start_line, end_line) =
+      Exn.release(PIDE_MCP_Tool_Util.resolve_lines(opt_start_line, opt_end_line, lines_count))
+    PIDE_MCP_Util.numbered_lines_range(text, start_line, end_line)
   }
 }
 

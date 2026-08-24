@@ -28,10 +28,10 @@ class Tool_Find_Entities extends PIDE_MCP_Tool("find_entities") {
     JSON.Object("type" -> "object", "properties" -> JSON.Object(
       PIDE_MCP_Tool_Schema.origin_prop,
       PIDE_MCP_Tool_Schema.start_line_prop,
-      PIDE_MCP_Tool_Schema.end_line_opt_prop,
+      PIDE_MCP_Tool_Schema.opt_end_line_prop,
       "snippet_lines" -> JSON.Object("type" -> "integer",
         "description" -> "Number of context lines per definition source snippet (use 0 to omit).",
-        "minimum" -> 0, "default" -> 3),
+        "minimum" -> 0, "default" -> snippet_preview_lines),
       "filter_origins" -> JSON.Object("type" -> "array", "items" -> JSON.Object("type" -> "string"),
         "description" -> "List of origins (session-qualified theory names or file paths). If provided, only returns entities whose definition originates from one of these. Use this if you want to explore the entities defined by a given origin.")
     ), "required" -> List("origin", "start_line"))
@@ -41,17 +41,18 @@ class Tool_Find_Entities extends PIDE_MCP_Tool("find_entities") {
   def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
     val node_name = Exn.release(PIDE_MCP_Tool_Util.origin_param(session, params))
     val snapshot = PIDE_MCP_Tool_Util.require_loaded_origin_snapshot(session, node_name)
-    val start_line = JSON.int(params, "start_line").getOrElse(error("Missing or invalid start_line"))
-    val end_line_opt = JSON.int(params, "end_line")
+    val opt_start_line = JSON.int(params, "start_line")
+    if (opt_start_line.isEmpty) error("Missing or invalid start_line")
+    val opt_end_line = JSON.int(params, "end_line")
     val snippet_lines = JSON.int(params, "snippet_lines").getOrElse(snippet_preview_lines)
     val doc = Line.Document(snapshot.node.source)
-    val (s, end_line) =
-      Exn.release(PIDE_MCP_Tool_Util.resolve_lines(Some(start_line), end_line_opt, doc.lines.length))
+    val (start_line, end_line) =
+      Exn.release(PIDE_MCP_Tool_Util.resolve_lines(opt_start_line, opt_end_line, doc.lines.length))
     val filter_origins = JSON.strings(params, "filter_origins").getOrElse(Nil)
       .map(s => session.origin(Exn.release(session.node_name(s)))).toSet
-    val range = PIDE_MCP_Util.range(doc, s, end_line)
-    Exn.release(PIDE_MCP_Commands.definitions_json(session, snapshot, Some(range), snippet_lines,
-      filter_origins, definition_kinds,
+    val range = PIDE_MCP_Util.text_range(doc, start_line, end_line).get
+    Exn.release(PIDE_MCP_Name_Space_Entry.definitions_json(session, snapshot, Some(range),
+      snippet_lines, filter_origins, definition_kinds,
       "The definition entry has not been loaded yet. " + PIDE_MCP_Tool_Util.retry_soon_message))
   }
 }

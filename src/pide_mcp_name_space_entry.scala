@@ -67,8 +67,8 @@ object PIDE_MCP_Name_Space_Entry {
     def resolve_entry(origin_str: String, line: Int): Option[JSON.Object.T] =
       Exn.capture {
         val node_name = Exn.release(session.node_name(origin_str))
-        Exn.release(source_definition_json(
-          session, snapshot, entry, name, node_name, line, snippet_lines, filter_origins))
+        Exn.release(source_definition_json(session, snapshot, entry, name, node_name, line,
+          snippet_lines, filter_origins))
       } match {
         case Exn.Res(res) => res
         case Exn.Exn(ex) => unresolved(origin_str, line, ex)
@@ -82,6 +82,29 @@ object PIDE_MCP_Name_Space_Entry {
             note = Some(def_entry_not_loaded)))
         }
       case _ => None
+    }
+  }
+
+  def definitions_json(
+    session: PIDE_MCP_Session,
+    snapshot: Document.Snapshot,
+    range: Option[Text.Range],
+    snippet_lines: Int,
+    filter_origins: Set[String],
+    kinds: List[String],
+    def_entry_not_loaded: String
+  ): Exn.Result[Map[String, List[JSON.Object.T]]] = Exn.capture {
+    val restricted = PIDE_MCP_Util.restrict_text_range(snapshot.node.source, range)
+    snapshot.select(restricted, Markup.Elements(Markup.ENTITY), _ => {
+      case Text.Info(r, XML.Elem(Markup.Entity(entry), _)) if kinds.contains(entry.kind) =>
+        val name = PIDE_MCP_Util.display_name(Some(entry), r, snapshot.node.source)
+        Some(Exn.release(definition_json(session, snapshot, entry, name, snippet_lines, filter_origins,
+          def_entry_not_loaded)))
+      case _ => None
+    }).flatMap(_.info.toList).groupBy(e => JSON.string(e, "origin").getOrElse("")).map {
+      case (origin, entries) =>
+        origin -> entries.sortBy(e => (JSON.int(e, "line"), JSON.string(e, "name"), JSON.string(e, "kind")))
+          .distinctBy(e => (JSON.int(e, "line"), JSON.string(e, "name")))
     }
   }
 }
