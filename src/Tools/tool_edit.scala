@@ -114,23 +114,23 @@ class Tool_Edit extends PIDE_MCP_Tool("edit") {
       + PIDE_MCP_Tool_Schema.implicit_reload_file
 
   def input_schema: JSON.Object.T =
-    JSON.Object("type" -> "object", "properties" -> JSON.Object(
+    JSON_Object("type" -> "object", "properties" -> JSON_Object(
       PIDE_MCP_Tool_Schema.origin_prop,
-      "mode" -> JSON.Object("type" -> "string",
+      "mode" -> JSON_Object("type" -> "string",
         "enum" -> List("replace", "prepend", "append"),
         "description" -> "Edit mode",
         "default" -> "replace"),
-      "text" -> JSON.Object("type" -> "string", "description" -> "New text to write"),
+      "text" -> JSON_Object("type" -> "string", "description" -> "New text to write"),
       PIDE_MCP_Tool_Schema.opt_start_line_prop,
       PIDE_MCP_Tool_Schema.opt_end_line_prop,
-      "old_text" -> JSON.Object("type" -> "string",
+      "old_text" -> JSON_Object("type" -> "string",
         "description" -> "Text to find as a substring within the given range. If old_text is empty, the whole text in range is selected instead."),
-      "edit_all" -> JSON.Object("type" -> "boolean",
+      "edit_all" -> JSON_Object("type" -> "boolean",
         "description" -> "Edit every match or just a unique occurrence.",
         "default" -> false)
     ), "required" -> List("origin", "text", "old_text"))
 
-  override def annotations: Option[JSON.Object.T] = Some(JSON.Object("destructiveHint" -> true))
+  override def annotations: Option[JSON.Object.T] = Some(JSON_Object("destructiveHint" -> true))
 
   def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
     val node_name = Exn.release(PIDE_MCP_Tool_Util.origin_param(session, params))
@@ -146,7 +146,7 @@ class Tool_Edit extends PIDE_MCP_Tool("edit") {
       session, mode, node_name, text, opt_start_line, opt_end_line, old_text, edit_all = edit_all))
     val (status, description) = if (count > 0) ("written", s"Edited $count occurrence(s)")
       else ("unchanged", "Unchanged - did you replace the text by itself?")
-    JSON.Object("status" -> status, "description" -> description)
+    JSON_Object("status" -> status, "description" -> description)
   }
 }
 

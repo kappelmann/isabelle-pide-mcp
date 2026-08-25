@@ -76,7 +76,7 @@ object PIDE_MCP_Commands {
           at_range.collectFirst { case Text.Info(_, XML.Elem(Markup.Entity(entry), _)) => entry },
           r, snapshot.node.source)
         kind_and_type(at_range).map { case (kind, t) =>
-          JSON.Object("name" -> name_at, "kind" -> kind, "type" -> t)
+          JSON_Object("name" -> name_at, "kind" -> kind, "type" -> t)
         }
       case _ => None
     }.distinct
@@ -91,9 +91,12 @@ object PIDE_MCP_Commands {
     }).map(_.info)
   }
 
-  def bad_json(snapshot: Document.Snapshot, range: Text.Range): List[String] =
+  def bad_json(snapshot: Document.Snapshot, range: Text.Range): List[JSON.Object.T] =
     snapshot.select(range, Markup.Elements(Markup.BAD), _ => {
-      case Text.Info(r, _) => Some(r.substring(snapshot.node.source))
+      case Text.Info(r, elem) =>
+        Some(JSON_Object(
+          "message" -> PIDE_MCP_Util.elem_body_plain_text(elem),
+          "source" -> r.substring(snapshot.node.source)))
     }).map(_.info)
 
   def markup_json(
@@ -171,7 +174,7 @@ object PIDE_MCP_Commands {
     lazy val timing_ms: Long = cmd_status.timings.sum(Date.now()).ms
     lazy val errors: Int = results.count(Protocol.is_error)
     lazy val warnings: Int = results.count(Protocol.is_warning_or_legacy)
-    lazy val bad: List[String] = bad_json(snapshot, range)
+    lazy val bad: List[JSON.Object.T] = bad_json(snapshot, range)
     lazy val types: List[JSON.Object.T] = types_json(snapshot, range)
     lazy val facts: List[String] = facts_json(snapshot, range)
     lazy val markup: List[JSON.Object.T] = markup_json(snapshot, range, Markup.Elements.full)
@@ -194,7 +197,7 @@ object PIDE_MCP_Commands {
         Option.when(opts.include_infos)(texts_by_kind.get("information").map("information" -> _)).flatten,
         Option.when(opts.include_infos)(texts_by_kind.get("tracing").map("tracing" -> _)).flatten,
         Option.when(opts.include_full_markup)("markup" -> markup))
-      JSON.Object(entries.flatten: _*)
+      JSON_Object(entries.flatten: _*)
     }
   }
 
@@ -226,8 +229,8 @@ object PIDE_MCP_Commands {
       count_detail("warnings", entry.warnings, true)
     }
     def detail_entry(key: String): (String, JSON.T) =
-      key -> JSON.Object("count" -> cmd_counts(key), "commands" -> cmd_details(key).reverse)
-    prefix_command_status_keys(JSON.Object(
+      key -> JSON_Object("count" -> cmd_counts(key), "commands" -> cmd_details(key).reverse)
+    prefix_command_status_keys(JSON_Object(
       "total_timing_ms" -> total_timing_ms,
       detail_entry(Status.running),
       detail_entry(Status.warned),
@@ -238,7 +241,7 @@ object PIDE_MCP_Commands {
       detail_entry("warnings"),
       Status.unprocessed -> cmd_counts(Status.unprocessed),
       Status.finished -> cmd_counts(Status.finished))) +
-      ("commands" -> JSON.Object("count" -> count,
+      ("commands" -> JSON_Object("count" -> count,
         "count_returned" -> returned_commands.length, "commands" -> returned_commands.toList))
   }
 

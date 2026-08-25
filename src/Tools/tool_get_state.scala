@@ -15,30 +15,30 @@ class Tool_Get_State extends PIDE_MCP_Tool("get_state") {
       + PIDE_MCP_Tool_Schema.implicit_load_file
 
   def input_schema: JSON.Object.T =
-    JSON.Object("type" -> "object", "properties" -> JSON.Object(
+    JSON_Object("type" -> "object", "properties" -> JSON_Object(
       PIDE_MCP_Tool_Schema.origin_prop,
       PIDE_MCP_Tool_Schema.opt_start_line_prop,
       PIDE_MCP_Tool_Schema.opt_end_line_prop,
-      "include_types" -> JSON.Object("type" -> "boolean",
+      "include_types" -> JSON_Object("type" -> "boolean",
         "description" -> "Include types (Isabelle and ML) for variables and constants.",
         "default" -> false),
-      "include_facts" -> JSON.Object("type" -> "boolean",
+      "include_facts" -> JSON_Object("type" -> "boolean",
         "description" -> "Include facts/theorems used in range.",
         "default" -> false),
-      "include_infos" -> JSON.Object("type" -> "boolean",
+      "include_infos" -> JSON_Object("type" -> "boolean",
         "description" -> "Include writeln and information output in the state. This can get large, but often contains useful information. Avoid using it for large ranges if possible.",
         "default" -> false),
-      "include_full_markup" -> JSON.Object("type" -> "boolean",
+      "include_full_markup" -> JSON_Object("type" -> "boolean",
         "description" -> "Include full PIDE markup information. This gets very large - **use only sparingly and very targeted to get local details**.",
         "default" -> false),
-      "commands_limit" -> JSON.Object("type" -> "integer",
+      "commands_limit" -> JSON_Object("type" -> "integer",
         "description" -> ("Maximum number of commands to return. Omit to return all commands. "
           + "**Set to 0 whenever you only want to get summary information (e.g. to see if there are any errors, warnings, etc.).** "
           + "Note that the returned summary will count all commands, even the truncated ones. "
           + "Warning: for large ranges, there are thousands of commands that may flood your context. Set the commands limit to 0 if you do not need details."))
     ), "required" -> List("origin"))
 
-  override def annotations: Option[JSON.Object.T] = Some(JSON.Object("readOnlyHint" -> true))
+  override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
   def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
     val node_name = Exn.release(PIDE_MCP_Tool_Util.origin_param(session, params))

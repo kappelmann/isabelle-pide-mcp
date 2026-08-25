@@ -8,6 +8,12 @@ package isabelle.pide.mcp
 
 import isabelle._
 
+import scala.collection.immutable.VectorMap
+
+object JSON_Object {
+  def apply(entries: JSON.Object.Entry*): JSON.Object.T = VectorMap.from(entries)
+}
+
 object PIDE_MCP_Util {
   def text_range(doc: Line.Document, start_line: Int, end_line: Int): Option[Text.Range] =
     if (start_line - 1 > end_line) None
@@ -60,10 +66,10 @@ object PIDE_MCP_Util {
 
   def xml_to_json(tree: XML.Tree): JSON.Object.T = tree match {
     case XML.Elem(Markup(name, props), body) =>
-      val props_obj = JSON.Object(props: _*)
-      val base = JSON.Object("name" -> name, "body" -> body.map(xml_to_json))
+      val props_obj = JSON_Object(props: _*)
+      val base = JSON_Object("name" -> name, "body" -> body.map(xml_to_json))
       if (props_obj.isEmpty) base else base + ("props" -> props_obj)
-    case XML.Text(text) => JSON.Object("text" -> text)
+    case XML.Text(text) => JSON_Object("text" -> text)
   }
 
   def elem_body_plain_text(elem: XML.Elem): String =

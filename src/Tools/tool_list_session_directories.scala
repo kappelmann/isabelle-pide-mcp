@@ -18,9 +18,9 @@ class Tool_List_Session_Directories extends PIDE_MCP_Tool("list_session_director
       + "Note that session names, which you have to use for session-qualified loading of (library) theories, are stored in the ROOT files of these directories."
 
   def input_schema: JSON.Object.T =
-    JSON.Object("type" -> "object", "properties" -> JSON.Object.empty)
+    JSON_Object("type" -> "object", "properties" -> JSON.Object.empty)
 
-  override def annotations: Option[JSON.Object.T] = Some(JSON.Object("readOnlyHint" -> true))
+  override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
   def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
     Tool_List_Session_Directories.session_directories(session).map(_.implode)
