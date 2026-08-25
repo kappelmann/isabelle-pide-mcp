@@ -166,7 +166,7 @@ class PIDE_MCP_Session private(
 
     def node_header: Document.Node.Header =
       resources.special_header(node_name).getOrElse(
-        resources.check_thy(node_name, Scan.char_reader(text)))
+        resources.check_thy(session.session_options, node_name, Scan.char_reader(text)))
 
     def node_perspective: Document.Node.Perspective_Text.T =
       if (is_theory)
@@ -223,7 +223,8 @@ class PIDE_MCP_Session private(
     val thy_files = version.nodes.iterator.flatMap { case (name, node) =>
         node.header.imports_no_pos.iterator ++ resources.make_theory_name(name).iterator
       }.distinct.filter(is_required)
-    val deps = resources.dependencies(thy_files.map((_, Position.none)).toList)
+    val deps =
+      resources.dependencies(session.session_options, thy_files.map((_, Position.none)).toList)
     val dep_files = try deps.loaded_files catch { case ERROR(_) => Nil }
     val aux_files = resources.undefined_blobs(version)
     (deps.theories ++ dep_files ++ aux_files).toSet.filter(is_required)
@@ -263,7 +264,7 @@ class PIDE_MCP_Session private(
   ): List[Document.Edit_Text] = {
     val model = Node_Model(node_name, node, "", Text.Perspective.empty)
     model.node_edits(
-      Document.Node.no_header, model.pending_edits, Document.Node.Perspective_Text.empty)
+      Document.Node.Header.none, model.pending_edits, Document.Node.Perspective_Text.empty)
   }
 
   def unload(node_names: List[Document.Node.Name]): Exn.Result[List[Document.Node.Name]] =
