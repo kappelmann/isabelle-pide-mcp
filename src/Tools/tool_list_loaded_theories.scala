@@ -19,15 +19,15 @@ class Tool_List_Loaded_Theories extends PIDE_MCP_Tool("list_loaded_theories") {
   def description: String = "List all loaded theories from the session."
 
   def input_schema: JSON.Object.T =
-    JSON.Object("type" -> "object", "properties" -> JSON.Object.empty)
+    JSON_Object("type" -> "object", "properties" -> JSON.Object.empty)
 
-  override def annotations: Option[JSON.Object.T] = Some(JSON.Object("readOnlyHint" -> true))
+  override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
   def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
     val (base_session, dynamic) =
       Tool_List_Loaded_Theories.loaded_theories(session, Exn.release(session.tip_version()).nodes)
-    def to_entry(node_name: Document.Node.Name) = JSON.Object("origin" -> session.origin(node_name))
-    JSON.Object(
+    def to_entry(node_name: Document.Node.Name) = JSON_Object("origin" -> session.origin(node_name))
+    JSON_Object(
       "dynamic" -> dynamic.map(to_entry),
       "base_session" -> base_session.map(to_entry)
     )

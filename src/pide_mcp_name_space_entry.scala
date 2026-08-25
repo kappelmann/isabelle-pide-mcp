@@ -27,7 +27,7 @@ object PIDE_MCP_Name_Space_Entry {
         case _ => None
       },
       note.map("note" -> _)).flatten
-    JSON.Object(entries: _*)
+    JSON_Object(entries: _*)
   }
 
   private def source_definition_json(

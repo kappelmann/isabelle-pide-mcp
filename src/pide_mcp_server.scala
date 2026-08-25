@@ -40,11 +40,11 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session, log: Logger, verbose: Boolean =
     }
 
   private def rpc_result(id: Option[Any], result: JSON.Object.T): JSON.Object.T =
-    JSON.Object("jsonrpc" -> "2.0", "id" -> id.getOrElse(null), "result" -> result)
+    JSON_Object("jsonrpc" -> "2.0", "id" -> id.getOrElse(null), "result" -> result)
 
   private def rpc_error(id: Option[Any], code: Int, msg: String): JSON.Object.T =
-    JSON.Object("jsonrpc" -> "2.0", "id" -> id.getOrElse(null),
-      "error" -> JSON.Object("code" -> code, "message" -> msg))
+    JSON_Object("jsonrpc" -> "2.0", "id" -> id.getOrElse(null),
+      "error" -> JSON_Object("code" -> code, "message" -> msg))
 
   private def negotiate_protocol_version(client_version: String): String =
     if (client_version < Config.protocol_version) client_version
@@ -68,24 +68,24 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session, log: Logger, verbose: Boolean =
                 JSON.string(params, "protocolVersion").getOrElse(Config.protocol_version)
               case _ => Config.protocol_version
             }
-            respond(out, rpc_result(id, JSON.Object(
+            respond(out, rpc_result(id, JSON_Object(
               "protocolVersion" -> negotiate_protocol_version(client_version),
-              "capabilities" -> JSON.Object("tools" -> JSON.Object()),
-              "serverInfo" -> JSON.Object("name" -> Config.name, "version" -> Config.version),
+              "capabilities" -> JSON_Object("tools" -> JSON_Object()),
+              "serverInfo" -> JSON_Object("name" -> Config.name, "version" -> Config.version),
               "instructions" -> ("Interactive proof development with Isabelle PIDE MCP. " +
                 "Add material incrementally - large edits make errors and nontermination hard to isolate. " +
                 "If a command takes longer than a few seconds, be suspicious and restructure rather than wait."))))
 
           case Some("tools/list") =>
             val tools = session.tool_table.values.toList.sortBy(_.name).map { tool =>
-              val entry = JSON.Object("name" -> tool.name, "description" -> tool.description,
+              val entry = JSON_Object("name" -> tool.name, "description" -> tool.description,
                 "inputSchema" -> tool.input_schema)
               tool.annotations match {
                 case Some(a) => entry + ("annotations" -> a)
                 case None => entry
               }
             }
-            respond(out, rpc_result(id, JSON.Object("tools" -> tools)))
+            respond(out, rpc_result(id, JSON_Object("tools" -> tools)))
 
           case Some("tools/call") =>
             Isabelle_Thread.pool.submit(new Runnable {
@@ -128,8 +128,8 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session, log: Logger, verbose: Boolean =
               tool.handle(args) match {
                 case Exn.Res(result) =>
                   val content_text = JSON.Format(result)
-                  respond(out, rpc_result(id, JSON.Object(
-                    "content" -> List(JSON.Object(
+                  respond(out, rpc_result(id, JSON_Object(
+                    "content" -> List(JSON_Object(
                       "type" -> "text",
                       "text" -> content_text
                     ))

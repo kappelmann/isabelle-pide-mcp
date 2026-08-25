@@ -23,24 +23,24 @@ object Tool_Get_Progress {
     def theory_states_json: JSON.Object.T = {
       val nodes_status = Document_Status.Nodes_Status.empty.update_nodes(
         Date.now(), session.resources, snapshot.state, snapshot.version, domain = Some(theories.toSet))
-      val theory_states = JSON.Object(theories.map { name =>
+      val theory_states = JSON_Object(theories.map { name =>
         val node_status = nodes_status(name)
         // Node_Status.canceled is a boolean (is any command canceled), unlike get_state's "commands_canceled"
         // which is a per-command count; we hence omit it here to avoid confusion.
-        val command_status_counts = JSON.Object(
+        val command_status_counts = JSON_Object(
           PIDE_MCP_Commands.Status.unprocessed -> node_status.unprocessed,
           PIDE_MCP_Commands.Status.running -> node_status.running,
           PIDE_MCP_Commands.Status.warned -> node_status.warned,
           PIDE_MCP_Commands.Status.failed -> node_status.failed,
           PIDE_MCP_Commands.Status.finished -> node_status.finished)
-        session.origin(name) -> (JSON.Object(
+        session.origin(name) -> (JSON_Object(
           "overall_status" -> nodes_status.overall_status(name).toString,
           "percentage_commands_processed" -> node_status.percentage) ++
           PIDE_MCP_Commands.prefix_command_status_keys(command_status_counts))
       }: _*)
 
       val by_status = theories.groupMapReduce(nodes_status.overall_status(_).toString)(_ => 1)(_ + _)
-      val theory_status_counts = JSON.Object(Document_Status.Overall_Status.values.toList.map(s =>
+      val theory_status_counts = JSON_Object(Document_Status.Overall_Status.values.toList.map(s =>
         s.toString -> by_status.getOrElse(s.toString, 0)): _*)
 
       prefix_theory_status_keys(theory_status_counts) + ("theories" -> theory_states)
@@ -54,7 +54,7 @@ object Tool_Get_Progress {
         PIDE_MCP_Commands.state_entries_commands(node_snapshot, None).toList.flatMap { entry =>
           Option.when(entry.status.contains(PIDE_MCP_Commands.Status.running)) {
             val command_state = entry.json(doc, opts)
-            JSON.Object("origin" -> session.origin(name)) ++ command_state
+            JSON_Object("origin" -> session.origin(name)) ++ command_state
           }
         }
       }
@@ -68,14 +68,14 @@ class Tool_Get_Progress extends PIDE_MCP_Tool("get_progress") {
     + "Note that sorrys are not listed."
 
   def input_schema: JSON.Object.T =
-    JSON.Object("type" -> "object", "properties" -> JSON.Object(
-      "origins" -> JSON.Object("type" -> "array",
-        "items" -> JSON.Object("type" -> "string"),
+    JSON_Object("type" -> "object", "properties" -> JSON_Object(
+      "origins" -> JSON_Object("type" -> "array",
+        "items" -> JSON_Object("type" -> "string"),
         "description" -> ("Restrict to these origins (session-qualified theory names or file paths). "
           + "Omit to include all theories."))
     ))
 
-  override def annotations: Option[JSON.Object.T] = Some(JSON.Object("readOnlyHint" -> true))
+  override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
   def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
     val origins = JSON.strings(params, "origins").getOrElse(Nil)
@@ -86,7 +86,7 @@ class Tool_Get_Progress extends PIDE_MCP_Tool("get_progress") {
     val theory_names = if (origins.isEmpty) dynamic
       else dynamic.filter(name => origins.contains(session.origin(name)))
     val progress = Tool_Get_Progress.Theories_Progress(session, snapshot, theory_names)
-    JSON.Object(
+    JSON_Object(
       PIDE_MCP_Commands.command_status_key(PIDE_MCP_Commands.Status.running) ->
         progress.commands_running_json) ++
       progress.theory_states_json

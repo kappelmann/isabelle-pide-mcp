@@ -15,13 +15,13 @@ class Tool_Read extends PIDE_MCP_Tool("read") {
       + PIDE_MCP_Tool_Schema.implicit_reload_file
 
   def input_schema: JSON.Object.T =
-    JSON.Object("type" -> "object", "properties" -> JSON.Object(
+    JSON_Object("type" -> "object", "properties" -> JSON_Object(
       PIDE_MCP_Tool_Schema.origin_prop,
       PIDE_MCP_Tool_Schema.opt_start_line_prop,
       PIDE_MCP_Tool_Schema.opt_end_line_prop
     ), "required" -> List("origin"))
 
-  override def annotations: Option[JSON.Object.T] = Some(JSON.Object("readOnlyHint" -> true))
+  override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
   def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
     val node_name = Exn.release(PIDE_MCP_Tool_Util.origin_param(session, params))

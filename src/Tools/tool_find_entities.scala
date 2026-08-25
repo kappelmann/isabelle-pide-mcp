@@ -25,18 +25,18 @@ class Tool_Find_Entities extends PIDE_MCP_Tool("find_entities") {
       + " Implicitly (re)loads theories containing source snippets if required."
 
   def input_schema: JSON.Object.T =
-    JSON.Object("type" -> "object", "properties" -> JSON.Object(
+    JSON_Object("type" -> "object", "properties" -> JSON_Object(
       PIDE_MCP_Tool_Schema.origin_prop,
       PIDE_MCP_Tool_Schema.start_line_prop,
       PIDE_MCP_Tool_Schema.opt_end_line_prop,
-      "snippet_lines" -> JSON.Object("type" -> "integer",
+      "snippet_lines" -> JSON_Object("type" -> "integer",
         "description" -> "Number of context lines per definition source snippet (use 0 to omit).",
         "minimum" -> 0, "default" -> snippet_preview_lines),
-      "filter_origins" -> JSON.Object("type" -> "array", "items" -> JSON.Object("type" -> "string"),
+      "filter_origins" -> JSON_Object("type" -> "array", "items" -> JSON_Object("type" -> "string"),
         "description" -> "List of origins (session-qualified theory names or file paths). If provided, only returns entities whose definition originates from one of these. Use this if you want to explore the entities defined by a given origin.")
     ), "required" -> List("origin", "start_line"))
 
-  override def annotations: Option[JSON.Object.T] = Some(JSON.Object("readOnlyHint" -> true))
+  override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
   def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
     val node_name = Exn.release(PIDE_MCP_Tool_Util.origin_param(session, params))

@@ -23,8 +23,8 @@ class Tool_Create_File extends PIDE_MCP_Tool("create_file") {
       + "If the file already exists, it does nothing."
 
   def input_schema: JSON.Object.T =
-    JSON.Object("type" -> "object", "properties" -> JSON.Object(
-      "path" -> JSON.Object("type" -> "string",
+    JSON_Object("type" -> "object", "properties" -> JSON_Object(
+      "path" -> JSON_Object("type" -> "string",
         "description" -> "File path to create (e.g. \"./Algebra/algebra_simp.ML\" or \"/path/to/My_Theory.thy\")")
     ), "required" -> List("path"))
 

@@ -14,15 +14,15 @@ object PIDE_MCP_Tool_Schema {
   val range_visibility: String = "Sets the PIDE perspective on the range."
 
   val origin_prop =
-    "origin" -> JSON.Object("type" -> "string",
+    "origin" -> JSON_Object("type" -> "string",
       "description" -> "Session-qualified theory name (e.g. \"HOL.Nat\") or file path (e.g. \"foo.ML\").")
   val start_line_prop =
-    "start_line" -> JSON.Object("type" -> "integer",
+    "start_line" -> JSON_Object("type" -> "integer",
       "description" -> "First line to include.", "minimum" -> 1)
   val opt_start_line_prop =
-    "start_line" -> JSON.Object("type" -> "integer",
+    "start_line" -> JSON_Object("type" -> "integer",
       "description" -> "First line to include.", "minimum" -> 1, "default" -> 1)
   val opt_end_line_prop =
-    "end_line" -> JSON.Object("type" -> "integer",
+    "end_line" -> JSON_Object("type" -> "integer",
       "description" -> "Last line to include (default: end of file).", "minimum" -> 1)
 }

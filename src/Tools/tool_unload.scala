@@ -10,20 +10,20 @@ class Tool_Unload extends PIDE_MCP_Tool("unload") {
   def description: String = "Unload the given theories and their dependents."
 
   def input_schema: JSON.Object.T =
-    JSON.Object("type" -> "object", "properties" -> JSON.Object(
-      "origins" -> JSON.Object("type" -> "array",
-        "items" -> JSON.Object("type" -> "string"),
+    JSON_Object("type" -> "object", "properties" -> JSON_Object(
+      "origins" -> JSON_Object("type" -> "array",
+        "items" -> JSON_Object("type" -> "string"),
         "description" -> "Origins (session-qualified theory names or file paths) to unload.")
     ), "required" -> List("origins"))
 
-  override def annotations: Option[JSON.Object.T] = Some(JSON.Object("destructiveHint" -> true))
+  override def annotations: Option[JSON.Object.T] = Some(JSON_Object("destructiveHint" -> true))
 
   def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
     val origins = JSON.strings(params, "origins").getOrElse(error("Missing origins"))
     val node_names = origins.map { s => Exn.release(session.node_name(s)) }
     val unloaded = Exn.release(session.unload(node_names))
     if (unloaded.nonEmpty) session.await_stable_snapshot()
-    JSON.Object("unloaded" -> unloaded.map(session.origin))
+    JSON_Object("unloaded" -> unloaded.map(session.origin))
   }
 }
 
