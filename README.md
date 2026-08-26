@@ -121,7 +121,7 @@ Alternatively, contact Kevin Kappelmann by email.
 
 ## Acknowledgments
 
-We thank Maximilian Schäffeler, Lukas Stevens, Mohammad Abdulaziz, Andrei Popescu, Dmitriy Traytel, and Tobias Nipkow 
+We thank Maximilian Schäffeler, Lukas Stevens, Mohammad Abdulaziz, Andrei Popescu, Dmitriy Traytel, Tobias Nipkow, Yong Kiam Tan, and Diego Marmsoler
 for their helpful feedback and testing.
 
 ## Citation
