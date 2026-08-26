@@ -4,8 +4,8 @@ This repository contains:
 1. A Model Context Protocol (MCP) server to **let AI agents interactively work with Isabelle** theories and ML files via an Isabelle/PIDE session.
    The MCP server is **headless** and **editor-agnostic**: you can let the agent work on its own or run it alongside Isabelle/jEdit or Isabelle/VSCode.
    The MCP server is also **customizable** and **extensible**: you can freely add and remove MCP tools offered to the agents.
-2. A curated set of MCP tools for typical Isabelle workflows (auto-formalization, state inspection, entity lookups, etc.).
-3. A set of agent skills on how to effectively use the MCP and provided tools and general guidance for formalization tasks and Isabelle.
+1. A curated set of MCP tools for typical Isabelle workflows (auto-formalization, state inspection, entity lookups, etc.).
+1. A set of agent skills on how to effectively use the MCP and provided tools and general guidance for formalization tasks and Isabelle.
 
 **Find the preprint here: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21519364.svg)](https://doi.org/10.5281/zenodo.21519364)**
 
@@ -35,36 +35,42 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
 
 ## Installing the MCP Server
 
-1. Install the supported Isabelle version. The supported version is stored in [ISABELLE\_VERSION](./ISABELLE_VERSION). Newer versions may also work (without guarantee). If you use a version compatible with an Isabelle release, [download it](https://isabelle.in.tum.de/). If you use a development version, insert the version number into the command below:
+**Hint:** If you have trouble installing or configuring this project, ask your coding agent for help and point it to this README.
+
+1. Clone and navigate into this repository. **For Windows users:** make sure that `etc/settings` uses `LF` line breaks.
+2. Install the supported Isabelle version. The supported version is stored in [ISABELLE\_VERSION](./ISABELLE_VERSION). Newer versions may also work (without guarantee). If you use a version compatible with an Isabelle release, [download it](https://isabelle.in.tum.de/). If you use a development version, insert the version number into the command below:
 ```bash
 hg clone https://isabelle.in.tum.de/repos/isabelle
 isabelle/Admin/init -r <VERSION_NUMBER>
 ```
-2. Install the component. Insert the file path to this directory into the command below:
+3. Register this project as an Isabelle component by inserting the file path to this project into the command below:
 ```bash
 isabelle/bin/isabelle components -u <PATH_TO_THIS_DIRECTORY>
 ```
 
 ## Running the MCP Server
 
-You can register the server to your MCP client (e.g., OpenCode, Claude Code, Codex,...) or start the server manually:
-
+You can start a PIDE MCP server manually using:
 ```bash
 isabelle/bin/isabelle pide_mcp -l HOL
 ```
 
 As usual, all options are displayed using `pide_mcp -?` (they follow the typical Isabelle conventions, e.g. `-d`, `-v`, `-L`).
+Very likely, you want to register the server to your MCP client (e.g., OpenCode, Claude Code, Codex,...), however:
 
 ### Connecting Coding Agents to the MCP Server
 
-- For **OpenCode**, copy/adjust folder `.opencode` and start OpenCode in the same base directory.
-  - **You have to adjust the path to isabelle in `.opencode/opencode.json`** and possibly the options you want to pass to the MCP server (e.g. base session and included session directories).
-- For **Claude Code**, copy/adjust `.claude` and `.mcp.json` and start Claude Code in the same base directory. 
-  - **You have to adjust the path to isabelle in `.mcp.json`** and possibly the options you want to pass to the MCP server (e.g. base session and included session directories).
+**Note that the configuration instructions below are project-local:**
+your coding agent will only start PIDE MCP when started in the directory containing the configuration files/folders.
 
-**Note for Windows users:**
-1. Make sure that `etc/settings` uses `LF` line breaks.
-2. Your coding agent needs to open Isabelle via cygwin. For example, in Claude Code, you can use the following MCP configuration (with adjusted paths and options):
+- For **OpenCode**, copy/adjust `.opencode` and start OpenCode in the same directory.
+  - **You have to adjust the path to isabelle in `.opencode/opencode.json`** and possibly the options you want to pass to the MCP server (e.g. base session and included session directories).
+- For **Claude Code**, copy/adjust `.claude` and `.mcp.json` and start Claude Code in the same directory.
+  - **You have to adjust the path to isabelle in `.mcp.json`** and possibly the options you want to pass to the MCP server (e.g. base session and included session directories).
+- For **Codex**, copy/adjust `.agents` and `.codex` and start Codex in the same directory.
+  - **You have to adjust the path to isabelle in `.codex/config.toml`** and possibly the options you want to pass to the MCP server (e.g. base session and included session directories).
+
+**Note for Windows users:** Your coding agent has to open Isabelle via cygwin. For example, in Claude Code, you can use the following MCP configuration (with adjusted paths and options):
 ```
       "command": "C:\\Users\\kevin\\Isabelle\\contrib\\cygwin\\bin\\bash.exe",
       "args": ["--login", "-c", "\"C:/Users/kevin/Isabelle/bin/isabelle\" pide_mcp -v -l HOL"]
@@ -86,7 +92,7 @@ or use a different Scala component:
 
 ## Agent Skills
 
-The `skills` folders (in `.opencode/` and `.claude/`) contain the following guidance for AI agents:
+The `skills` folders (in `.agents/`, `.claude/`, and `.opencode/`) contain the following guidance for AI agents.
 - `isabelle-formalization`: Guidance and best practices for formalization.
 - `isabelle-proof-development`: Guidance on proof search, automation, and concept search.
 - `pide-mcp`: Guidance on using the provided MCP tools effectively.
