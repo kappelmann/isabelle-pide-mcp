@@ -38,17 +38,17 @@ class Tool_Find_Entities extends PIDE_MCP_Tool("find_entities") {
 
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
-  def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
-    val node_name = Exn.release(PIDE_MCP_Tool_Util.origin_param(session, params))
+  def handle(args: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
+    val node_name = Exn.release(PIDE_MCP_Tool_Util.origin_param(session, args))
     val snapshot = PIDE_MCP_Tool_Util.require_loaded_origin_snapshot(session, node_name)
-    val opt_start_line = JSON.int(params, "start_line")
+    val opt_start_line = JSON.int(args, "start_line")
     if (opt_start_line.isEmpty) error("Missing or invalid start_line")
-    val opt_end_line = JSON.int(params, "end_line")
-    val snippet_lines = JSON.int(params, "snippet_lines").getOrElse(snippet_preview_lines)
+    val opt_end_line = JSON.int(args, "end_line")
+    val snippet_lines = JSON.int(args, "snippet_lines").getOrElse(snippet_preview_lines)
     val doc = Line.Document(snapshot.node.source)
     val (start_line, end_line) =
       Exn.release(PIDE_MCP_Tool_Util.resolve_lines(opt_start_line, opt_end_line, doc.lines.length))
-    val filter_origins = JSON.strings(params, "filter_origins").getOrElse(Nil)
+    val filter_origins = JSON.strings(args, "filter_origins").getOrElse(Nil)
       .map(s => session.origin(Exn.release(session.node_name(s)))).toSet
     val range = PIDE_MCP_Util.text_range(doc, start_line, end_line).get
     Exn.release(PIDE_MCP_Name_Space_Entry.definitions_json(session, snapshot, Some(range),

@@ -132,16 +132,16 @@ class Tool_Edit extends PIDE_MCP_Tool("edit") {
 
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("destructiveHint" -> true))
 
-  def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
-    val node_name = Exn.release(PIDE_MCP_Tool_Util.origin_param(session, params))
+  def handle(args: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
+    val node_name = Exn.release(PIDE_MCP_Tool_Util.origin_param(session, args))
     val mode = Exn.release(Tool_Edit.Edit_Mode.parse(
-      JSON.string(params, "mode").getOrElse("replace")))
-    val text = Line.normalize(JSON.string(params, "text").getOrElse(error("Missing text parameter")))
+      JSON.string(args, "mode").getOrElse("replace")))
+    val text = Line.normalize(JSON.string(args, "text").getOrElse(error("Missing text parameter")))
     val old_text = Line.normalize(
-      JSON.string(params, "old_text").getOrElse(error("Missing old_text parameter")))
-    val edit_all = JSON.bool(params, "edit_all").getOrElse(false)
-    val opt_start_line = JSON.int(params, "start_line")
-    val opt_end_line = JSON.int(params, "end_line")
+      JSON.string(args, "old_text").getOrElse(error("Missing old_text parameter")))
+    val edit_all = JSON.bool(args, "edit_all").getOrElse(false)
+    val opt_start_line = JSON.int(args, "start_line")
+    val opt_end_line = JSON.int(args, "end_line")
     val (new_text, count) = Exn.release(Tool_Edit.read_update_edit(
       session, mode, node_name, text, opt_start_line, opt_end_line, old_text, edit_all = edit_all))
     val (status, description) = if (count > 0) ("written", s"Edited $count occurrence(s)")

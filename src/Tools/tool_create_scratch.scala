@@ -53,9 +53,9 @@ class Tool_Create_Scratch extends PIDE_MCP_Tool("create_scratch") {
     }
   }
 
-  def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
-    val name_suffix = JSON.string(params, "name_suffix")
-    val extension = JSON.string(params, "extension")
+  def handle(args: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
+    val name_suffix = JSON.string(args, "name_suffix")
+    val extension = JSON.string(args, "extension")
     val path = Exn.release(create_scratch(name_suffix, extension))
     JSON_Object("path" -> path.implode)
   }

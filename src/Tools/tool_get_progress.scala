@@ -77,8 +77,8 @@ class Tool_Get_Progress extends PIDE_MCP_Tool("get_progress") {
 
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
-  def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
-    val origins = JSON.strings(params, "origins").getOrElse(Nil)
+  def handle(args: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
+    val origins = JSON.strings(args, "origins").getOrElse(Nil)
       .map(s => session.origin(Exn.release(session.node_name(s)))).toSet
 
     val snapshot = session.snapshot()

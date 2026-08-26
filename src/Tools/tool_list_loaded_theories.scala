@@ -23,7 +23,7 @@ class Tool_List_Loaded_Theories extends PIDE_MCP_Tool("list_loaded_theories") {
 
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
-  def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
+  def handle(args: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
     val (base_session, dynamic) =
       Tool_List_Loaded_Theories.loaded_theories(session, Exn.release(session.tip_version()).nodes)
     def to_entry(node_name: Document.Node.Name) = JSON_Object("origin" -> session.origin(node_name))

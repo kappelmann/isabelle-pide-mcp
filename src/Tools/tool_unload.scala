@@ -18,8 +18,8 @@ class Tool_Unload extends PIDE_MCP_Tool("unload") {
 
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("destructiveHint" -> true))
 
-  def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
-    val origins = JSON.strings(params, "origins").getOrElse(error("Missing origins"))
+  def handle(args: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
+    val origins = JSON.strings(args, "origins").getOrElse(error("Missing origins"))
     val node_names = origins.map { s => Exn.release(session.node_name(s)) }
     val unloaded = Exn.release(session.unload(node_names))
     if (unloaded.nonEmpty) session.await_stable_snapshot()
