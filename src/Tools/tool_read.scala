@@ -23,10 +23,10 @@ class Tool_Read extends PIDE_MCP_Tool("read") {
 
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
-  def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
-    val node_name = Exn.release(PIDE_MCP_Tool_Util.origin_param(session, params))
-    val opt_start_line = JSON.int(params, "start_line")
-    val opt_end_line = JSON.int(params, "end_line")
+  def handle(args: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
+    val node_name = Exn.release(PIDE_MCP_Tool_Util.origin_param(session, args))
+    val opt_start_line = JSON.int(args, "start_line")
+    val opt_end_line = JSON.int(args, "end_line")
     Exn.release(PIDE_MCP_Tool_Util.require_ordered_lines(opt_start_line, opt_end_line))
     val text = Exn.release(session.read_update_resolve(
       node_name, List((opt_start_line.getOrElse(1), opt_end_line)),

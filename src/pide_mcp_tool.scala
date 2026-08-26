@@ -14,7 +14,7 @@ abstract class PIDE_MCP_Tool(val name: String) {
   def annotations: Option[JSON.Object.T] = None
 
   def init(session: PIDE_MCP_Session): Unit = { this.session = session }
-  def handle(params: JSON.Object.T): Exn.Result[JSON.T]
+  def handle(args : JSON.Object.T): Exn.Result[JSON.T]
   def stop(): Unit = ()
 }
 

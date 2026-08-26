@@ -28,8 +28,8 @@ class Tool_Create_File extends PIDE_MCP_Tool("create_file") {
         "description" -> "File path to create (e.g. \"./Algebra/algebra_simp.ML\" or \"/path/to/My_Theory.thy\")")
     ), "required" -> List("path"))
 
-  def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
-    val file_path = JSON.string(params, "path").getOrElse(error("Missing path parameter"))
+  def handle(args: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
+    val file_path = JSON.string(args, "path").getOrElse(error("Missing path parameter"))
     val created = Exn.release(Tool_Create_File.create_file(Path.explode(file_path)))
     if (created) "File created" else "File already exists"
   }

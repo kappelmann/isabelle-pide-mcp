@@ -40,19 +40,19 @@ class Tool_Get_State extends PIDE_MCP_Tool("get_state") {
 
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
-  def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
-    val node_name = Exn.release(PIDE_MCP_Tool_Util.origin_param(session, params))
+  def handle(args: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
+    val node_name = Exn.release(PIDE_MCP_Tool_Util.origin_param(session, args))
     val snapshot = PIDE_MCP_Tool_Util.require_loaded_origin_snapshot(session, node_name)
-    val opt_start_line = JSON.int(params, "start_line")
-    val opt_end_line = JSON.int(params, "end_line")
+    val opt_start_line = JSON.int(args, "start_line")
+    val opt_end_line = JSON.int(args, "end_line")
     val doc = Line.Document(snapshot.node.source)
     val (start_line, end_line) =
       Exn.release(PIDE_MCP_Tool_Util.resolve_lines(opt_start_line, opt_end_line, doc.lines.length))
-    val include_types = JSON.bool(params, "include_types").getOrElse(false)
-    val include_facts = JSON.bool(params, "include_facts").getOrElse(false)
-    val include_infos = JSON.bool(params, "include_infos").getOrElse(false)
-    val include_full_markup = JSON.bool(params, "include_full_markup").getOrElse(false)
-    val opt_limit = JSON.int(params, "commands_limit")
+    val include_types = JSON.bool(args, "include_types").getOrElse(false)
+    val include_facts = JSON.bool(args, "include_facts").getOrElse(false)
+    val include_infos = JSON.bool(args, "include_infos").getOrElse(false)
+    val include_full_markup = JSON.bool(args, "include_full_markup").getOrElse(false)
+    val opt_limit = JSON.int(args, "commands_limit")
 
     val range = PIDE_MCP_Util.text_range(doc, start_line, end_line).get
     val entries = PIDE_MCP_Commands.state_entries(snapshot, Some(range))

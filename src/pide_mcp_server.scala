@@ -20,6 +20,7 @@ object Config {
 object RPC_Error {
   /* JSON-RPC 2.0 reserved error codes (https://www.jsonrpc.org/specification#error_object) */
   val PARSE_ERROR: Int = -32700
+  val INVALID_REQUEST: Int = -32600
   val METHOD_NOT_FOUND: Int = -32601
   val INVALID_PARAMS: Int = -32602
   val INTERNAL_ERROR: Int = -32603
@@ -39,12 +40,18 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session, log: Logger, verbose: Boolean =
       out.flush()
     }
 
-  private def rpc_result(id: Option[Any], result: JSON.Object.T): JSON.Object.T =
-    JSON_Object("jsonrpc" -> "2.0", "id" -> id.getOrElse(null), "result" -> result)
+  private def rpc_result(id: String | Long, result: JSON.Object.T): JSON.Object.T =
+    JSON_Object("jsonrpc" -> "2.0", "id" -> id, "result" -> result)
 
-  private def rpc_error(id: Option[Any], code: Int, msg: String): JSON.Object.T =
-    JSON_Object("jsonrpc" -> "2.0", "id" -> id.getOrElse(null),
-      "error" -> JSON_Object("code" -> code, "message" -> msg))
+  private def rpc_error(id: String | Long | Null, code: Int, msg: String): JSON.Object.T =
+    JSON_Object("jsonrpc" -> "2.0", "id" -> id, "error" -> JSON_Object("code" -> code, "message" -> msg))
+
+  private def request_id(request: JSON.Object.T): Option[String | Long] =
+    request.get("id") match {
+      case Some(id: String) => Some(id)
+      case Some(JSON.Value.Long(id)) => Some(id)
+      case _ => None
+    }
 
   private def negotiate_protocol_version(client_version: String): String =
     if (client_version < Config.protocol_version) client_version
@@ -59,47 +66,53 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session, log: Logger, verbose: Boolean =
         if (verbose) log("<<< " + line)
         val request = JSON.Object.parse(line)
         val method = JSON.string(request, "method")
-        val id = request.get("id")
-
-        method match {
-          case Some("initialize") =>
-            val client_version = request.get("params") match {
-              case Some(JSON.Object(params)) =>
-                JSON.string(params, "protocolVersion").getOrElse(Config.protocol_version)
-              case _ => Config.protocol_version
+        /* messages without id are notifications, requiring a method but no response */
+        if (!request.contains("id")) {
+          if (method.isEmpty)
+            respond(out, rpc_error(null, RPC_Error.INVALID_REQUEST, "Bad request: no method"))
+        }
+        else request_id(request) match {
+          case None => respond(out, rpc_error(null, RPC_Error.INVALID_REQUEST,
+            "Bad id: requests require a string or integer id, but got " + JSON.Format(request("id"))))
+          case Some(id) =>
+            method match {
+              case Some("initialize") =>
+                val client_version = request.get("params") match {
+                  case Some(JSON.Object(params)) =>
+                    JSON.string(params, "protocolVersion").getOrElse(Config.protocol_version)
+                  case _ => Config.protocol_version
+                }
+                respond(out, rpc_result(id, JSON_Object(
+                  "protocolVersion" -> negotiate_protocol_version(client_version),
+                  "capabilities" -> JSON_Object("tools" -> JSON_Object()),
+                  "serverInfo" -> JSON_Object("name" -> Config.name, "version" -> Config.version),
+                  "instructions" -> ("Interactive proof development with Isabelle PIDE MCP. " +
+                    "Add material incrementally - large edits make errors and nontermination hard to isolate. " +
+                    "If a command takes longer than a few seconds, be suspicious and restructure rather than wait."))))
+              case Some("tools/list") =>
+                val tools = session.tool_table.values.toList.sortBy(_.name).map { tool =>
+                  val entry = JSON_Object("name" -> tool.name, "description" -> tool.description,
+                    "inputSchema" -> tool.input_schema)
+                  tool.annotations match {
+                    case Some(a) => entry + ("annotations" -> a)
+                    case None => entry
+                  }
+                }
+                respond(out, rpc_result(id, JSON_Object("tools" -> tools)))
+              case Some("tools/call") =>
+                Isabelle_Thread.fork(name = "pide_mcp_tool_" + id, daemon = true) {
+                  handle_tool_call(id, request, out)
+                }
+              case Some(m) =>
+                respond(out, rpc_error(id, RPC_Error.METHOD_NOT_FOUND, "Method not found: " + m))
+              case None =>
+                respond(out, rpc_error(id, RPC_Error.INVALID_REQUEST, "Bad request: no method"))
             }
-            respond(out, rpc_result(id, JSON_Object(
-              "protocolVersion" -> negotiate_protocol_version(client_version),
-              "capabilities" -> JSON_Object("tools" -> JSON_Object()),
-              "serverInfo" -> JSON_Object("name" -> Config.name, "version" -> Config.version),
-              "instructions" -> ("Interactive proof development with Isabelle PIDE MCP. " +
-                "Add material incrementally - large edits make errors and nontermination hard to isolate. " +
-                "If a command takes longer than a few seconds, be suspicious and restructure rather than wait."))))
-
-          case Some("tools/list") =>
-            val tools = session.tool_table.values.toList.sortBy(_.name).map { tool =>
-              val entry = JSON_Object("name" -> tool.name, "description" -> tool.description,
-                "inputSchema" -> tool.input_schema)
-              tool.annotations match {
-                case Some(a) => entry + ("annotations" -> a)
-                case None => entry
-              }
-            }
-            respond(out, rpc_result(id, JSON_Object("tools" -> tools)))
-
-          case Some("tools/call") =>
-            Isabelle_Thread.pool.submit(new Runnable {
-              def run(): Unit = handle_tool_call(id, request, out)
-            })
-
-          case Some(m) if m.startsWith("notifications/") => ()
-
-          case _ => respond(out, rpc_error(id, RPC_Error.METHOD_NOT_FOUND, s"Method not found: $method"))
         }
       } catch {
         case ex: Exception =>
           log.error_message("Server loop error: " + Exn.print(ex))
-          respond(out, rpc_error(None, RPC_Error.PARSE_ERROR, s"Server loop error: ${Exn.message(ex)}"))
+          respond(out, rpc_error(null, RPC_Error.PARSE_ERROR, s"Server loop error: ${Exn.message(ex)}"))
       }
     }
   }
@@ -116,7 +129,7 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session, log: Logger, verbose: Boolean =
     }
 
   private def handle_tool_call(
-    id: Option[Any],
+    id: String | Long,
     request: JSON.Object.T,
     out: PrintWriter
   ): Unit = {
@@ -131,9 +144,7 @@ class PIDE_MCP_Server(session: PIDE_MCP_Session, log: Logger, verbose: Boolean =
                   respond(out, rpc_result(id, JSON_Object(
                     "content" -> List(JSON_Object(
                       "type" -> "text",
-                      "text" -> content_text
-                    ))
-                  )))
+                      "text" -> content_text)))))
                 case Exn.Exn(e) =>
                   log.error_message("Tool call error: " + Exn.message(e))
                   respond(out, rpc_error(id, RPC_Error.SERVER_ERROR, Exn.message(e)))

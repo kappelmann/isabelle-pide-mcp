@@ -22,7 +22,7 @@ class Tool_List_Session_Directories extends PIDE_MCP_Tool("list_session_director
 
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
-  def handle(params: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
+  def handle(args: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
     Tool_List_Session_Directories.session_directories(session).map(_.implode)
   }
 }
