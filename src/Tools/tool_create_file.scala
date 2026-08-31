@@ -7,32 +7,38 @@ package isabelle.pide.mcp
 import isabelle._
 
 object Tool_Create_File {
-  def create_file(path: Path): Exn.Result[Boolean] = Exn.capture {
-    val abs_path = PIDE_MCP_Util.canonical_path(path)
-    if (abs_path.file.isDirectory) error("Path " + abs_path.implode + " is an existing directory.")
+  def create_file(path: Path): Unit = {
+    val abs_path = path.canonical
     Isabelle_System.make_directory(abs_path.dir)
-    if (!abs_path.file.exists) { File.write(abs_path, ""); true }
-    else false
+    if (!abs_path.file.createNewFile()) {
+      val kind = if (abs_path.file.isDirectory) "directory" else "path"
+      error(s"Path ${quote(abs_path.implode)} is an existing $kind")
+    }
   }
 }
 
 class Tool_Create_File extends PIDE_MCP_Tool("create_file") {
   def description: String =
-    "Create an empty file at the given path. "
-      + "Creates missing parent directories if necessary. "
-      + "If the file already exists, it does nothing."
+    "Create an empty file at the given path. " +
+      "Creates missing parent directories if necessary. " +
+      "Fails if the path already exists."
 
-  def input_schema: JSON.Object.T =
-    JSON_Object("type" -> "object", "properties" -> JSON_Object(
-      "path" -> JSON_Object("type" -> "string",
-        "description" -> "File path to create (e.g. \"./Algebra/algebra_simp.ML\" or \"/path/to/My_Theory.thy\")")
-    ), "required" -> List("path"))
+  private val path_arg = PIDE_MCP_Tool_Arg.string(
+    "path",
+    "File path to create (e.g. \"./Algebra/algebra_simp.ML\" or \"/path/to/My_Theory.thy\")")
 
-  def handle(args: JSON.Object.T): Exn.Result[JSON.T] = Exn.capture {
-    val file_path = JSON.string(args, "path").getOrElse(error("Missing path parameter"))
-    val created = Exn.release(Tool_Create_File.create_file(Path.explode(file_path)))
-    if (created) "File created" else "File already exists"
-  }
+  def input_schema: JSON.Object.T = PIDE_MCP_Tool_Schema.input_schema(List(path_arg))
+
+  def handle(
+    sessions: PIDE_MCP_Sessions,
+    args: JSON.Object.T,
+    progress: Progress
+  ): PIDE_MCP_Tool_Result =
+    PIDE_MCP_Tool_Result.result {
+      val file_path = path_arg.get(args)
+      Tool_Create_File.create_file(PIDE_MCP_Util.path(file_path))
+      "File created"
+    }
 }
 
 class Tools_Create_File extends PIDE_MCP_Tools(new Tool_Create_File)

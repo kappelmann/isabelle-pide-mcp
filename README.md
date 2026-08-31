@@ -1,13 +1,16 @@
 # Isabelle PIDE MCP Server
 
 This repository contains:
-1. A Model Context Protocol (MCP) server to **let AI agents interactively work with Isabelle** theories and ML files via an Isabelle/PIDE session.
+1. A Model Context Protocol (MCP) server to **let AI agents interactively work with Isabelle** sessions, theories, and ML files via Isabelle/PIDE.
    The MCP server is **headless** and **editor-agnostic**: you can let the agent work on its own or run it alongside Isabelle/jEdit or Isabelle/VSCode.
    The MCP server is also **customizable** and **extensible**: you can freely add and remove MCP tools offered to the agents.
-1. A curated set of MCP tools for typical Isabelle workflows (auto-formalization, state inspection, entity lookups, etc.).
+1. A curated set of MCP tools for typical Isabelle workflows (auto-formalization, state inspection, entity lookups, session management, etc.).
 1. A set of agent skills on how to effectively use the MCP and provided tools and general guidance for formalization tasks and Isabelle.
 
 **Find the preprint here: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21519364.svg)](https://doi.org/10.5281/zenodo.21519364)**
+
+**Hint:** If you have trouble installing, configuring, or running this project, 
+ask your coding agent for help and point it to this README.
 
 ## Supported Isabelle Versions
 
@@ -24,8 +27,8 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
 <img width="2048" height="1242" alt="Isabelle/jEdit and coding agent side by side" src="./docs/jedit_and_coding_agent.png" />
 
 **Take note of the following when using the MCP server:**
-- The server manages its own PIDE session. In particular, this means that your editor's session and the MCP server's session are independent of each other.
-  For example, commands will be processed by the MCP server's session AND the editor's session,
+- The server manages its own PIDE sessions. In particular, this means that your editor's session and the MCP server's sessions are independent of each other.
+  For example, commands will be processed by the MCP server's sessions AND the editor's session,
   and Isabelle options passed to the editor session (e.g. base session and included session directories) also have to be passed to the MCP server.
 - If you edit the same files as the MCP server, it will only see your changes once they are written to disk.
   The provided MCP tools automatically synchronize with disk on every read and write.
@@ -34,8 +37,6 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
 - If you want the agent to see proof states in pre-built base sessions, you have to build them with `-o show_states`.
 
 ## Installing the MCP Server
-
-**Hint:** If you have trouble installing or configuring this project, ask your coding agent for help and point it to this README.
 
 1. Clone and navigate into this repository. **For Windows users:** make sure that `etc/settings` uses `LF` line breaks.
 2. Install the supported Isabelle version. The supported version is stored in [ISABELLE\_VERSION](./ISABELLE_VERSION). Newer versions may also work (without guarantee). If you use a version compatible with an Isabelle release, [download it](https://isabelle.in.tum.de/). If you use a development version, insert the version number into the command below:
@@ -50,38 +51,88 @@ isabelle/bin/isabelle components -u <PATH_TO_THIS_DIRECTORY>
 
 ## Running the MCP Server
 
-You can start a PIDE MCP server manually using:
+**Note for Windows users:** You have to run below commands through Isabelle's cygwin (`isabelle/contrib/cygwin/bin/bash.exe`).
+
+You can start a PIDE MCP server manually, either without any session
 ```bash
-isabelle/bin/isabelle pide_mcp -l HOL
+isabelle/bin/isabelle pide_mcp
 ```
+or with one or more sessions started automatically (use `-S` if using more than one session):
+```bash
+# start one HOL-based session
+isabelle/bin/isabelle pide_mcp -l HOL
+# start one HOL-based, one Pure-based, and one HOL-Analysis-based session
+isabelle/bin/isabelle pide_mcp -l HOL -S "-l Pure" -S "-l HOL-Analysis"
+```
+As usual, all options are displayed using `pide_mcp -?`.
 
-As usual, all options are displayed using `pide_mcp -?` (they follow the typical Isabelle conventions, e.g. `-d`, `-v`, `-L`).
-Very likely, you want to register the server to your MCP client (e.g., OpenCode, Claude Code, Codex,...), however:
+Very likely, you want to register the server to your MCP client (e.g. OpenCode, Claude Code, Codex,...):
 
-### Connecting Coding Agents to the MCP Server
+## Connecting Coding Agents to the MCP Server
 
-**Note that the configuration instructions below are project-local:**
-your coding agent will only start PIDE MCP when started in the directory containing the configuration files/folders.
+You have to set up two things for your coding agent: 
+1. the **MCP configuration**, which tell the agent how to start PIDE MCP, and
+2. the **agent skills**, which tell the agent how to use PIDE MCP and Isabelle.
+
+Most coding agents support global and local configurations:
+- *Global configurations* apply every time you start the coding agent.
+- *Local configurations* (typically) override global ones and only apply when you start the agent in the folder containing the local configuration.
+
+We recommend the following:
+1. A global configuration of PIDE MCP and its skills, without automatic session startups. This way, a light-weight PIDE MCP server starts with every coding agent. The agent has the option to start Isabelle sessions on demand/instruction.
+2. A local MCP configuration whenever a project should automatically start a set of sessions or include a special set of project options.
+
+### Global Configuration
+
+Copy the MCP entry of this repository's MCP configuration into your coding agent's global configuration file 
+and the agent skills into its global skills folder. 
+When doing so, **drop all session options (e.g. `-l HOL`)** so that the server starts without a session and 
+**adjust the path to Isabelle** in the MCP configuration.
+
+- For **OpenCode**, copy the `mcp` entry of `.opencode/opencode.json` into
+  `~/.config/opencode/opencode.json` and the folders in `.opencode/skills` into `~/.config/opencode/skills`.
+- For **Claude Code**, copy the `mcpServers` entry of `.mcp.json` into `~/.claude.json` and the folders
+  in `.claude/skills` into `~/.claude/skills`.
+- For **Codex**, copy the `mcp_servers` entry of `.codex/config.toml` into `~/.codex/config.toml` and
+  the folders in `.agents/skills` into `~/.agents/skills`.
+
+**Note for Windows users:** You may have to adapt the paths accordingly. 
+Consult your coding agent's documentation for its configuration and skill locations on Windows.
+
+### Local Configuration
+
+Copy the configuration folders and files of this repository into your project.
+You have to **adjust the path to Isabelle** and possibly the options you want to pass to the MCP server (e.g. base sessions and included session directories).
+Optionally remove the `skills` folder if you have already configured them globally.
 
 - For **OpenCode**, copy/adjust `.opencode` and start OpenCode in the same directory.
-  - **You have to adjust the path to isabelle in `.opencode/opencode.json`** and possibly the options you want to pass to the MCP server (e.g. base session and included session directories).
 - For **Claude Code**, copy/adjust `.claude` and `.mcp.json` and start Claude Code in the same directory.
-  - **You have to adjust the path to isabelle in `.mcp.json`** and possibly the options you want to pass to the MCP server (e.g. base session and included session directories).
 - For **Codex**, copy/adjust `.agents` and `.codex` and start Codex in the same directory.
-  - **You have to adjust the path to isabelle in `.codex/config.toml`** and possibly the options you want to pass to the MCP server (e.g. base session and included session directories).
 
-**Note for Windows users:** Your coding agent has to open Isabelle via cygwin. For example, in Claude Code, you can use the following MCP configuration (with adjusted paths and options):
+### Note for Windows Users 
+
+**Your coding agent has to open Isabelle via cygwin**. 
+For example, in Claude Code, you can use the following MCP configuration (with adjusted paths and options):
 ```
-      "command": "C:\\Users\\kevin\\Isabelle\\contrib\\cygwin\\bin\\bash.exe",
-      "args": ["--login", "-c", "\"C:/Users/kevin/Isabelle/bin/isabelle\" pide_mcp -v -l HOL"]
+      "command": "C:\\Users\\kevin\\isabelle\\contrib\\cygwin\\bin\\bash.exe",
+      "args": ["--login", "-c", "\"C:/Users/kevin/isabelle/bin/isabelle\" pide_mcp -l HOL"]
 ```
+
+### Agent Skills
+
+The `skills` folders (identical copies in `.agents/`, `.claude/`, and `.opencode/`) contain the following guidance for AI agents.
+- `isabelle-formalization`: Guidance and best practices for formalization.
+- `isabelle-proof-development`: Guidance on proof search, automation, and concept search.
+- `pide-mcp`: Guidance on using the provided MCP tools effectively.
+
+You may adjust these guidances as you wish.
 
 ## Customizing the MCP Server's Tools
 
-Tools that should be offered by the server must extend `PIDE_MCP_Tools` and be registered via the `services` field in `build.props`.
-- Disable tools by removing them from `services`.
-- Add tools by adding the relevant source files to `sources` and the relevant class to `services`.
-- Restart the MCP server after editing the services.
+Tools that should be offered by the server must extend `PIDE_MCP_Tools`, be registered via the `services` field in `build.props`, and be enabled in the Isabelle option `pide_mcp_tools`.
+- Disable tools at compilation time by removing them from `services` in `build.props` or exclude them at startup using the Isabelle option `pide_mcp_tools` (see [`etc/options`](./etc/options)).
+- Add tools by adding the relevant source files to `sources` and the relevant class to `services` in `build.props` and include them in the Isabelle option `pide_mcp_tools`.
+- Restart the MCP server after editing the services or option.
 
 You can either use the PIDE MCP's `build.props` (modify [`etc/build.props`](./etc/build.props))
 or use a different Scala component:
@@ -89,15 +140,7 @@ or use a different Scala component:
 1. Add `env:ISABELLE_PIDE_MCP_JAR` to the component's `requirements` in `build.props`.
 1. Add your tools' `sources` and `services`.
 1. Register the component: `isabelle components -u <PATH_TO_THE_COMPONENT>`.
-
-## Agent Skills
-
-The `skills` folders (in `.agents/`, `.claude/`, and `.opencode/`) contain the following guidance for AI agents.
-- `isabelle-formalization`: Guidance and best practices for formalization.
-- `isabelle-proof-development`: Guidance on proof search, automation, and concept search.
-- `pide-mcp`: Guidance on using the provided MCP tools effectively.
-
-You may adjust these guidances as you wish.
+1. Add the tool to the Isabelle option `pide_mcp_tools`
 
 ## Known Limitations/Future Work
 

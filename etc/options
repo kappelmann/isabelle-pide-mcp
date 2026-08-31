@@ -1,4 +1,22 @@
 (* :mode=isabelle-options: *)
 
+option pide_mcp_exit_on_failed_option_sessions : bool = true for pide_mcp
+  -- "exit when a session specified in options fails to start"
+
+option pide_mcp_await_option_sessions : bool = true for pide_mcp
+  -- "await sessions specified in options before starting the MCP server"
+
 option pide_mcp_range_context : int = 50 for pide_mcp
   -- "lines around a read or edited range that are marked visible"
+
+option pide_mcp_session_progress_delay : real = 5.0 for pide_mcp
+  -- "delay for progress messages of potentially blocking PIDE session operations (seconds)"
+
+option pide_mcp_progress_threshold : real = 20 for pide_mcp
+  -- "threshold for long-running commands (seconds)"
+
+option pide_mcp_session_statistics_limit : int = 200 for pide_mcp
+  -- "maximum number of buffered runtime statistics samples per session"
+
+option pide_mcp_tools : string = "*" for pide_mcp
+  -- "comma-separated names of tools to serve or \"*\" to serve all"
