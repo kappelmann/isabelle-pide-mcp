@@ -3,23 +3,34 @@ module = $ISABELLE_PIDE_MCP_JAR
 requirements = env:ISABELLE_SCALA_JAR
 sources = \
   src/pide_mcp.scala \
-  src/pide_mcp_commands.scala \
-  src/pide_mcp_name_space_entry.scala \
+  src/pide_mcp_command.scala \
+  src/pide_mcp_json.scala \
+  src/pide_mcp_protocol.scala \
+  src/pide_mcp_definition.scala \
+  src/result.scala \
+  src/queue_lock.scala \
+  src/pide_mcp_progress.scala \
+  src/progress_task.scala \
   src/pide_mcp_server.scala \
   src/pide_mcp_session.scala \
+  src/pide_mcp_sessions.scala \
   src/pide_mcp_tool.scala \
+  src/pide_mcp_tool_arg.scala \
+  src/pide_mcp_tool_result.scala \
   src/pide_mcp_tool_schema.scala \
   src/pide_mcp_tool_util.scala \
+  src/pide_mcp_theory.scala \
   src/pide_mcp_util.scala \
   src/Tools/tool_create_file.scala \
   src/Tools/tool_create_scratch.scala \
   src/Tools/tool_edit.scala \
   src/Tools/tool_find_entities.scala \
-  src/Tools/tool_get_progress.scala \
+  src/Tools/tool_get_session_state.scala \
   src/Tools/tool_get_state.scala \
-  src/Tools/tool_list_loaded_theories.scala \
-  src/Tools/tool_list_session_directories.scala \
+  src/Tools/tool_list_sessions.scala \
   src/Tools/tool_read.scala \
+  src/Tools/tool_start_session.scala \
+  src/Tools/tool_stop_session.scala \
   src/Tools/tool_unload.scala
 services = \
   isabelle.pide.mcp.PIDE_MCP_Application \
@@ -27,9 +38,10 @@ services = \
   isabelle.pide.mcp.Tools_Create_Scratch \
   isabelle.pide.mcp.Tools_Edit \
   isabelle.pide.mcp.Tools_Find_Entities \
-  isabelle.pide.mcp.Tools_Get_Progress \
+  isabelle.pide.mcp.Tools_Get_Session_State \
   isabelle.pide.mcp.Tools_Get_State \
-  isabelle.pide.mcp.Tools_List_Loaded_Theories \
-  isabelle.pide.mcp.Tools_List_Session_Directories \
+  isabelle.pide.mcp.Tools_List_Sessions \
   isabelle.pide.mcp.Tools_Read \
+  isabelle.pide.mcp.Tools_Start_Session \
+  isabelle.pide.mcp.Tools_Stop_Session \
   isabelle.pide.mcp.Tools_Unload

@@ -7,76 +7,186 @@ package isabelle.pide.mcp
 import isabelle._
 
 import scala.annotation.tailrec
+import scala.collection.immutable.Queue
 
 object PIDE_MCP_Session {
-  def apply(
-    session_name: String,
-    tool_table: Map[String, PIDE_MCP_Tool],
-    log: Logger,
-    dirs: List[Path] = Nil,
-    options: Options = Options.init(),
-    session_ancestor: Option[String] = None,
-    session_requirements: Boolean = false,
-    fresh_build: Boolean = false,
-    build_progress: Progress = new Progress,
-  ): Exn.Result[PIDE_MCP_Session] = Exn.capture {
-    val opts = options + "show_states=true" + "show_results=true"
-    val session_background = Sessions.background(opts, session_name, dirs = dirs,
-      session_ancestor = session_ancestor, session_requirements = session_requirements).check_errors
-    Build.build(opts, selection = Sessions.Selection.session(session_background.session_name),
-      build_heap = true, dirs = dirs, infos = session_background.infos,
-      fresh_build = fresh_build, progress = build_progress).check
-    val resources = Headless.Resources(opts, session_background, log)
-    val session = resources.start_session()
-    val mcp_session = new PIDE_MCP_Session(dirs = dirs, session = session, tool_table = tool_table)
-    try {
-      mcp_session.tool_table.values.foreach(_.init(mcp_session))
-      mcp_session
-    } catch {
-      case ex: Exception =>
-        log.error_message("Error initializing tool: " + Exn.message(ex))
-        mcp_session.stop()
-        throw ex
+  object Spec {
+    def default_logic: String = Isabelle_System.default_logic()
+
+    val usage: String = """Session options are:
+
+    -A NAME      ancestor session for option -R (default: parent)
+    -R NAME      build image with requirements from other sessions
+    -d DIR       include session directory
+    -f           fresh build
+    -l NAME      logic session name (default ISABELLE_LOGIC=""" + quote(default_logic) + """)
+    -n           no build of session image on startup
+    -o OPTION    override Isabelle system OPTION (via NAME=VAL or NAME)
+    -z ID        PIDE MCP session id
+"""
+    private object Parsers extends Scan.Parsers {
+      val blanks: Parser[String] = many(character(Symbol.is_ascii_blank))
+      val word: Parser[String] = quoted("\"") ^^ (s => quoted_content("\"", s))
+        | many1(sym => sym != "\"" && !character(Symbol.is_ascii_blank)(sym))
+      val words: Parser[List[String]] = blanks ~> rep(word <~ blanks)
+    }
+
+    def dir(s: String): Path = PIDE_MCP_Util.path(s)
+    def option(s: String): Options.Spec = Options.Spec.make(s)
+
+    class Builder {
+      private var current: Option[Spec] = None
+      private var session_option = false
+      def spec: Option[Spec] = current
+      def has_session_option: Boolean = session_option
+      private def update(f: Spec => Spec): Unit = current = Some(f(current.getOrElse(Spec())))
+      private def update_session(f: Spec => Spec): Unit =
+        { session_option = true; update(f) }
+      val option_specs: List[(String, String => Unit)] =
+        List(
+          "A:" -> (arg => update_session(_.copy(session_ancestor = Some(arg)))),
+          "R:" -> (arg => update_session(_.copy(logic = arg, session_requirements = true))),
+          "d:" -> (arg =>
+            update_session(spec => spec.copy(dirs = spec.dirs ::: List(dir(arg))))),
+          "f" -> (_ => update_session(_.copy(fresh_build = true))),
+          "l:" -> (arg => update_session(_.copy(logic = arg))),
+          "n" -> (_ => update_session(_.copy(no_build = true))),
+          "o:" -> (arg => update(spec => spec.copy(
+            options = spec.options ::: List(option(arg))))),
+          "z:" -> (arg => update_session(_.copy(id = Some(arg)))))
+    }
+
+    def parse(spec: String): Spec = {
+      val words = Parsers.parseAll(Parsers.words, spec) match {
+        case Parsers.Success(res, _) => res
+        case bad => cat_error(bad.toString, usage)
+      }
+      val builder = new Builder
+      val more_args = Getopts(usage, builder.option_specs: _*)(words, true)
+      if (more_args.nonEmpty) cat_error("Bad session options: " + quote(spec), usage)
+      builder.spec.getOrElse(Spec())
     }
   }
+
+  sealed case class Spec(
+    session_ancestor: Option[String] = None,
+    session_requirements: Boolean = false,
+    dirs: List[Path] = Nil,
+    fresh_build: Boolean = false,
+    no_build: Boolean = false,
+    logic: String = Spec.default_logic,
+    options: Options.Update = Nil,
+    id: Option[String] = None
+  )
+
+  def build(
+    spec: Spec,
+    progress: Progress = new Progress
+  ): (Options, Sessions.Background) = {
+    val options = Options.init(update = spec.options) + "show_states=true" + "show_results=true"
+    val session_background = Sessions.background(options, spec.logic,
+      progress = new Silent_Progress(progress),
+      dirs = spec.dirs, session_ancestor = spec.session_ancestor,
+      session_requirements = spec.session_requirements).check_errors
+    Build.build(options, selection = Sessions.Selection.session(session_background.session_name),
+      build_heap = true, dirs = spec.dirs, infos = session_background.infos,
+      fresh_build = spec.fresh_build, no_build = spec.no_build, progress = progress).check
+    (options, session_background)
+  }
+
+  def apply(
+    spec: Spec,
+    options: Options,
+    session_background: Sessions.Background,
+    log: Logger,
+    progress: Progress = new Progress
+  ): Result[PIDE_MCP_Session, Throwable] =
+    Exn.result {
+      val id = spec.id.getOrElse(error("Missing session id"))
+      val resources = Headless.Resources(options, session_background, log)
+      progress.expose_interrupt()
+      val session = resources.start_session(progress = progress)
+      id -> session
+    } match {
+      case Exn.Exn(exn) => Result.Error(exn)
+      case Exn.Res((id, session)) =>
+        Exn.capture {
+          progress.expose_interrupt()
+          new PIDE_MCP_Session(id = id, dirs = spec.dirs, session = session)
+        } match {
+          case Exn.Res(session) => Result.Res(session)
+          case Exn.Exn(exn) =>
+            Exn.capture(session.stop()) match {
+              case Exn.Res(process_result) if process_result.ok =>
+                if (Exn.is_interrupt(exn)) throw exn else Result.Error(exn)
+              case Exn.Res(process_result) => throw ERROR(cat_lines(List(
+                Exn.message(exn),
+                s"Failed to stop partially started PIDE session ${quote(id)}: " +
+                  PIDE_MCP_Util.print_process_result(process_result))))
+              case Exn.Exn(stop_exn) => throw ERROR(cat_lines(List(
+                Exn.message(exn),
+                s"Failed to stop partially started PIDE session ${quote(id)}: " +
+                  Exn.message(stop_exn))))
+            }
+        }
+    }
 }
 
 class PIDE_MCP_Session private(
-  val dirs: List[Path] = Nil,
-  val session: Headless.Session,
-  val tool_table: Map[String, PIDE_MCP_Tool]
+  val id: String,
+  val dirs: List[Path],
+  val session: Headless.Session
 ) {
-
   def resources: Headless.Resources = session.resources
+  def options: Options = resources.options
+  def progress_delay: Time = options.seconds("pide_mcp_session_progress_delay")
+  def range_context: Int = options.int("pide_mcp_range_context")
+  def statistics_limit: Int = options.int("pide_mcp_session_statistics_limit")
+  def base_session: String = resources.session_background.session_name
+  def directories(): List[Path] = Sessions.directories(dirs, Nil).map(_._2)
 
-  def range_context: Int = resources.options.int("pide_mcp_range_context")
+  private def await_message(what: String): String =
+    s"Awaiting $what for session ${quote(id)}"
 
-  def stop(): Unit = {
-    tool_table.values.foreach { tool =>
-      try tool.stop()
-      catch { case ex: Exception =>
-        resources.log.error_message("Error stopping tool " + tool.name + ": " + Exn.message(ex))
-      }
+  private val lock = new Queue_Lock
+  def with_lock[A](progress: Progress)(body: => A): A =
+    lock.with_lock(progress, await_message("session lock"),
+      session.output_delay, progress_delay)(body)
+
+  private val statistics = Synchronized[Queue[Properties.T]](Queue.empty)
+  private val statistics_consumer =
+    Session.Consumer[Session.Runtime_Statistics]("pide_mcp_statistics") {
+      case Session.Runtime_Statistics(props) =>
+        statistics.change { statistics =>
+          val statistics1: Queue[Properties.T] = statistics.appended(props)
+          if (statistics1.length > statistics_limit) statistics1.dequeue._2 else statistics1
+        }
     }
+  session.runtime_statistics += statistics_consumer
+
+  def runtime_statistics(): List[Properties.T] = statistics.value.toList
+
+  def stop(): Process_Result = {
+    session.runtime_statistics -= statistics_consumer
     session.stop()
   }
 
-  private def path_node_name(path: Path): Exn.Result[Document.Node.Name] = Exn.capture {
-    val abs = PIDE_MCP_Util.canonical_path(path)
+  private def path_node_name(path: Path): Document.Node.Name = {
+    val abs = path.canonical
     resources.find_theory(abs.file).getOrElse { // session theories
       val candidate = Document.Node.Name(abs.implode, // full path file
         theory = Thy_Header.theory_name(abs.implode))
       if (candidate.path.is_file) candidate
       else session.store.source_file(path.implode) match { // source_file can return identity for unknown files
-        case Some(file) if Path.explode(file).is_file => Exn.release(node_name(file))
-        case _ => error("Path " + path.implode + " cannot be resolved: it is neither a file on disk nor resolvable by PIDE.")
+        case Some(file) if Path.explode(file).is_file => node_name(file)
+        case _ => error(s"Path ${quote(path.implode)} cannot be resolved: " +
+          "it is neither a file on disk nor resolvable by PIDE")
       }
     }
   }
 
-  def node_name(s: String): Exn.Result[Document.Node.Name] = Exn.capture {
-    resources.find_theory_node(s).getOrElse(Exn.release(path_node_name(Path.explode(s))))
-  }
+  def node_name(s: String): Document.Node.Name =
+    resources.find_theory_node(s).getOrElse(path_node_name(PIDE_MCP_Util.path(s)))
 
   def origin(node_name: Document.Node.Name): String =
     if (node_name.is_theory) {
@@ -91,43 +201,50 @@ class PIDE_MCP_Session private(
 
   def snapshot(): Document.Snapshot = session.snapshot()
 
-  def await_stable_snapshot(): Document.Snapshot = session.await_stable_snapshot()
+  def await_stable_snapshot(progress: Progress = new Progress): Document.Snapshot =
+    PIDE_MCP_Progress.await(progress, await_message("stable snapshot"),
+      session.output_delay, progress_delay) {
+      val snapshot = session.snapshot()
+      Option.when(!snapshot.is_outdated)(snapshot)
+    }
 
-  def node_snapshot(node_name: Document.Node.Name): Exn.Result[Document.Snapshot] =
+  def node_snapshot(node_name: Document.Node.Name): Document.Snapshot =
     switch(session.snapshot(), node_name)
 
   def switch(
     snapshot: => Document.Snapshot,
     node_name: Document.Node.Name
-  ): Exn.Result[Document.Snapshot] = Exn.capture {
-    if (is_base_session_theory(node_name)) session.read_theory(node_name.theory, unicode_symbols = true) // base session
+  ): Document.Snapshot = {
+    if (is_base_session_theory(node_name)) session.read_theory(node_name.theory, unicode_symbols = true)
     else {
       val snapshot1 = snapshot
       val new_snapshot =
         (if (is_base_session_theory(snapshot1.node_name)) session.snapshot() else snapshot1).switch(node_name)
-      if (PIDE_MCP_Util.is_loaded_dynamic(new_snapshot.version.nodes, node_name)) new_snapshot // dynamic theory
-      else error("No PIDE snapshot available for " + origin(node_name))
+      if (PIDE_MCP_Util.is_loaded_dynamic(new_snapshot.version.nodes, node_name)) new_snapshot
+      else error(s"No PIDE snapshot available for ${quote(origin(node_name))}")
     }
   }
 
-  def tip_version(): Exn.Result[Document.Version] =
-    Exn.capture { session.get_state().history.tip.version.join }
+  def tip_version(progress: Progress = new Progress): Document.Version = {
+    progress.expose_interrupt()
+    val version = session.get_state().history.tip.version
+    PIDE_MCP_Progress.await(progress, await_message("current document version"),
+      session.output_delay, progress_delay)(version.peek.map(Exn.release))
+  }
 
-  def read_file_content(node_name: Document.Node.Name): Exn.Result[String] =
-    Exn.capture {
-      resources.make_theory_content(node_name).getOrElse(
-        Symbol.decode(Line.normalize(File.read(node_name.path))))
-    }
+  def read_file_content(node_name: Document.Node.Name): String =
+    resources.make_theory_content(node_name).getOrElse(
+      Symbol.decode(Line.normalize(File.read(node_name.path))))
 
-  def write_file_content(path: Path, text: String): Exn.Result[Unit] =
-    Exn.capture { File.write(path, Symbol.encode(Line.normalize(text))) }
+  def write_file_content(path: Path, text: String): Unit =
+    File.write(path, Symbol.encode(Line.normalize(text)))
 
   def node_source(
     snapshot: Document.Snapshot,
     node_name: Document.Node.Name
-  ): Exn.Result[String] =
-    switch(snapshot, node_name) match {
-      case Exn.Res(new_snapshot) => Exn.Res(new_snapshot.node.source)
+  ): String =
+    Exn.result { switch(snapshot, node_name) } match {
+      case Exn.Res(new_snapshot) => new_snapshot.node.source
       case Exn.Exn(_) => read_file_content(node_name)
     }
 
@@ -191,12 +308,13 @@ class PIDE_MCP_Session private(
   def read_update(
     nodes: List[(Document.Node.Name, List[(Int, Option[Int])])],
     hide_others: Boolean,
-    range_context: Int = range_context
-  ): Exn.Result[Map[Document.Node.Name, String]] = Exn.capture {
-    val models = synchronized {
-      val version = Exn.release(tip_version())
+    range_context: Int = range_context,
+    progress: Progress = new Progress
+  ): Map[Document.Node.Name, String] = {
+    val models = with_lock(progress) {
+      val version = tip_version(progress)
       val models1 = nodes.map { case (name, visible_lines) =>
-        val text = Exn.release(read_file_content(name))
+        val text = read_file_content(name)
         val doc = Line.Document(text)
         val line_ranges = visible_lines.map { case (start_line, opt_end_line) =>
           (start_line, opt_end_line.getOrElse(doc.lines.length)) }
@@ -214,7 +332,8 @@ class PIDE_MCP_Session private(
 
   private def required_nodes(
     version: Document.Version,
-    seen: Set[Document.Node.Name]
+    seen: Set[Document.Node.Name],
+    progress: Progress = new Progress
   ): Set[Document.Node.Name] = {
     def is_required(name: Document.Node.Name): Boolean =
       !seen(name) && !is_base_session_theory(name) &&
@@ -224,17 +343,18 @@ class PIDE_MCP_Session private(
         node.header.imports_no_pos.iterator ++ resources.make_theory_name(name).iterator
       }.distinct.filter(is_required)
     val deps =
-      resources.dependencies(session.session_options, thy_files.map((_, Position.none)).toList)
+      resources.dependencies(session.session_options, thy_files.map((_, Position.none)).toList,
+        progress = progress)
     val dep_files = try deps.loaded_files catch { case ERROR(_) => Nil }
     val aux_files = resources.undefined_blobs(version)
     (deps.theories ++ dep_files ++ aux_files).toSet.filter(is_required)
   }
 
-  def resolve_dependencies(): Unit = {
+  def resolve_dependencies(progress: Progress = new Progress): Unit = {
     @tailrec def loop(seen: Set[Document.Node.Name]): Unit = {
-      val names = required_nodes(Exn.release(tip_version()), seen)
+      val names = required_nodes(tip_version(progress), seen, progress)
       if (names.nonEmpty) {
-        Exn.release(read_update(names.toList.map(_ -> Nil), hide_others = false))
+        read_update(names.toList.map(_ -> Nil), hide_others = false, progress = progress)
         loop(seen ++ names)
       }
     }
@@ -246,14 +366,15 @@ class PIDE_MCP_Session private(
     visible_lines: List[(Int, Option[Int])],
     await_stable_before_resolve: Boolean,
     hide_others: Boolean,
-    range_context: Int = range_context
-  ): Exn.Result[String] = Exn.capture {
-    if (is_base_session_theory(node_name)) Exn.release(node_snapshot(node_name)).node.source
+    range_context: Int = range_context,
+    progress: Progress = new Progress
+  ): String = {
+    if (is_base_session_theory(node_name)) node_snapshot(node_name).node.source
     else {
-      val text = Exn.release(
-        read_update(List(node_name -> visible_lines), hide_others, range_context))(node_name)
-      if (await_stable_before_resolve) await_stable_snapshot()
-      resolve_dependencies()
+      val text = read_update(List(node_name -> visible_lines), hide_others,
+        range_context, progress)(node_name)
+      if (await_stable_before_resolve) await_stable_snapshot(progress)
+      resolve_dependencies(progress)
       text
     }
   }
@@ -267,15 +388,17 @@ class PIDE_MCP_Session private(
       Document.Node.Header.none, model.pending_edits, Document.Node.Perspective_Text.empty)
   }
 
-  def unload(node_names: List[Document.Node.Name]): Exn.Result[List[Document.Node.Name]] =
-    Exn.capture {
-      for (name <- node_names if is_base_session_theory(name))
-        error("Cannot unload base session theory " + origin(name))
-      synchronized {
-        val nodes = Exn.release(tip_version()).nodes
-        val descendants = nodes.descendants(node_names).filter(PIDE_MCP_Util.is_loaded_dynamic(nodes, _))
-        update(descendants.flatMap(name => unload_edits(name, nodes(name))))
-        descendants
-      }
+  def unload(
+    node_names: List[Document.Node.Name],
+    progress: Progress = new Progress
+  ): List[Document.Node.Name] = {
+    for (name <- node_names if is_base_session_theory(name))
+      error(s"Cannot unload base session theory ${quote(origin(name))}")
+    with_lock(progress) {
+      val nodes = tip_version(progress).nodes
+      val descendants = nodes.descendants(node_names).filter(PIDE_MCP_Util.is_loaded_dynamic(nodes, _))
+      update(descendants.flatMap(name => unload_edits(name, nodes(name))))
+      descendants
     }
+  }
 }

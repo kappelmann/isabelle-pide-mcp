@@ -9,75 +9,95 @@ package isabelle.pide.mcp
 import isabelle._
 
 object PIDE_MCP {
+  def progress_threshold(options: Options): Time =
+    options.seconds("pide_mcp_progress_threshold")
+  def tool_names(options: Options): String =
+    options.string("pide_mcp_tools")
+  def await_option_sessions(options: Options): Boolean =
+    options.bool("pide_mcp_await_option_sessions")
+  def exit_on_failed_option_sessions(options: Options): Boolean =
+    options.bool("pide_mcp_exit_on_failed_option_sessions")
+
   val isabelle_tool = Isabelle_Tool("pide_mcp", "Isabelle PIDE MCP server", Scala_Project.here,
     { args =>
-      var session_dirs: List[Path] = Nil
-      var logic = "HOL"
-      var options = Options.init()
       var log_path: Option[Path] = None
+      var session_specs: List[PIDE_MCP_Session.Spec] = Nil
       var verbose = false
-      var session_ancestor: Option[String] = None
-      var session_requirements = false
-      var fresh_build = false
+      var log_messages = false
+      val session_spec = new PIDE_MCP_Session.Spec.Builder
 
       val getopts = Getopts("""
 Usage: isabelle pide_mcp [OPTIONS]
 
   Options are:
-    -A NAME      ancestor session for option -R (default: parent)
-    -R NAME      build image with requirements from other sessions
-    -d DIR       include session directory
-    -f           fresh build
-    -L FILE      logging on FILE (default: console stderr)
-    -l NAME      logic session name (default: HOL)
+    -L FILE                log on FILE (next to console stderr)
+    -S "SESSION_OPTIONS"   start PIDE session with the given options ("" for defaults)
+    -v                     verbose
+    -w                     log MCP requests and responses
+    plus any session options, starting a PIDE session.
+    Passed Isabelle system options are inherited by the sessions given via -S.
 
-    -o OPTION    override Isabelle system OPTION (via NAME=VAL or NAME)
-    -s           system build mode for session image (system_heaps=true)
-    -u           user build mode for session image (system_heaps=false)
-    -v           verbose
-
-  Start an MCP (Model Context Protocol) server over stdin/stdout,
-  backed by an embedded Isabelle PIDE session using the specified
-  logic image.
+  """ + PIDE_MCP_Session.Spec.usage + """
+  Start an MCP (Model Context Protocol) server over stdin/stdout that manages
+  headless PIDE sessions.
 """,
-        "A:" -> (arg => session_ancestor = Some(arg)),
-        "R:" -> (arg => { logic = arg; session_requirements = true }),
-        "d:" -> (arg => session_dirs = session_dirs ::: List(Path.explode(arg))),
-        "f" -> (_ => fresh_build = true),
-        "L:" -> (arg => log_path = Some(Path.explode(File.standard_path(arg)))),
-        "l:" -> (arg => logic = arg),
-
-        "o:" -> (arg => options = options + arg),
-        "s" -> (_ => options = options + "system_heaps=true"),
-        "u" -> (_ => options = options + "system_heaps=false"),
-        "v" -> (_ => verbose = true)
-      )
+        List(
+          "L:" -> (arg => log_path = Some(PIDE_MCP_Util.path(arg))),
+          "S:" -> (arg =>
+            session_specs = session_specs ::: List(PIDE_MCP_Session.Spec.parse(arg))),
+          "v" -> (_ => verbose = true),
+          "w" -> (_ => log_messages = true))
+          ::: session_spec.option_specs: _*)
 
       val more_args = getopts(args)
       if (more_args.nonEmpty) getopts.usage()
 
-      val log = Logger.make_file(log_path, default = Logger.console)
-      val build_progress = new Console_Progress(stderr = true)
-      var opt_session: Option[PIDE_MCP_Session] = None
-      try {
-        log("Starting Isabelle PIDE session...")
-        val session = Exn.release(PIDE_MCP_Session(
-          logic, Exn.release(PIDE_MCP_Tool_Util.make_tool_table), log, session_dirs, options,
-          session_ancestor = session_ancestor, session_requirements = session_requirements,
-          fresh_build = fresh_build, build_progress = build_progress))
-        opt_session = Some(session)
-        log("Session started. Now starting MCP server listening on stdin/stdout.")
-
-        val server = new PIDE_MCP_Server(session, log, verbose)
-        server.run()
-      } catch {
-        case ex: Exception =>
-          log.error_message("PIDE MCP error: " + Exn.print(ex))
-          sys.exit(1)
-      } finally {
-        log("Stopping Isabelle PIDE MCP session...")
-        opt_session.foreach(_.stop())
+      val base_options: Options.Update = session_spec.spec.map(_.options).getOrElse(Nil)
+      val specs =
+        (if (session_spec.has_session_option) session_spec.spec.toList else Nil) :::
+          session_specs.map(spec => spec.copy(options = base_options ::: spec.options))
+      val options = Options.init(update = base_options)
+      val threshold = progress_threshold(options)
+      val progress = log_path match {
+          case None => new Console_Progress(
+            verbose = verbose, threshold = threshold, detailed = false, stderr = true)
+          case Some(path) => new Console_File_Progress(path,
+            verbose = verbose, threshold = threshold, detailed = false, stderr = true)
+        }
+      val log = Logger.make_progress(progress)
+      val tool_table = PIDE_MCP_Tool_Util.make_tool_table(tool_names(options))
+      val sessions = new PIDE_MCP_Sessions(tool_table, log, options)
+      val server = new PIDE_MCP_Server(sessions, log, progress, log_messages)
+      def start_sessions(progress: Progress): Unit = {
+        log("Starting PIDE sessions...")
+        val exit_on_failed = exit_on_failed_option_sessions(options)
+        for (spec <- specs) {
+          Exn.result { Result.release(sessions.start(spec, progress)) } match {
+            case Exn.Res(_) =>
+            case Exn.Exn(exn) =>
+              if (exit_on_failed) throw exn
+              log.error_message(s"Failed to start PIDE session: ${Exn.message(exn)}")
+          }
+        }
       }
+      val await = await_option_sessions(options)
+      val result = Exn.capture {
+        if (await) progress.interrupt_handler { start_sessions(progress) }
+        log("Starting MCP server listening on stdin/stdout...")
+        server.run(if (await) _ => () else start_sessions)
+      }
+      result match {
+        case Exn.Exn(exn) =>
+          Exn.capture { log.error_message(s"PIDE MCP error: ${Exn.print(exn)}") }
+        case _ =>
+      }
+      val stop_log_result = Exn.capture { log("Stopping PIDE sessions...") }
+      val stop_result = Exn.capture {
+        Result.release(sessions.stop_running(
+          progress = new Uncancellable_Progress(progress)))
+        ()
+      }
+      Exn.release_first(List(result, stop_log_result, stop_result))
     })
 }
 
