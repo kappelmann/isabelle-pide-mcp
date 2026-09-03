@@ -1,5 +1,7 @@
 # Isabelle PIDE MCP Server
 
+**Agentic formal proof development with Isabelle: [formalproof.ai](https://formalproof.ai)**
+
 This repository contains:
 1. A Model Context Protocol (MCP) server to **let AI agents interactively work with Isabelle** sessions, theories, and ML files via Isabelle/PIDE.
    The MCP server is **headless** and **editor-agnostic**: you can let the agent work on its own or run it alongside Isabelle/jEdit or Isabelle/VSCode.
