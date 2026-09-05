@@ -18,7 +18,7 @@ ask your coding agent for help and point it to this README.
 
 PIDE MCP releases are aligned with Isabelle releases.
 
-- The latest supported Isabelle release is `Isabelle2025-2`. Use branch `Isabelle2025-2` of this repository for this version.
+- Every supported Isabelle release has a branch of this repository named after it (e.g. `Isabelle2025-2`). Use the branch matching your Isabelle release.
 - Use branch `main` for the PIDE MCP's development version, which possibly requires a development version of Isabelle, documented in [ISABELLE\_VERSION](./ISABELLE_VERSION).
 
 ## Usage Notes
@@ -29,27 +29,36 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
 <img width="2048" height="1242" alt="Isabelle/jEdit and coding agent side by side" src="./docs/jedit_and_coding_agent.png" />
 
 **Take note of the following when using the MCP server:**
-- The server manages its own PIDE sessions. In particular, this means that your editor's session and the MCP server's sessions are independent of each other.
+- The server manages its own PIDE sessions. In particular, this means that **your editor's session and the MCP server's sessions are independent of each other**.
   For example, commands will be processed by the MCP server's sessions AND the editor's session,
   and Isabelle options passed to the editor session (e.g. base session and included session directories) also have to be passed to the MCP server.
-- If you edit the same files as the MCP server, it will only see your changes once they are written to disk.
+- **If you edit the same files as the MCP server, it will only see your changes once they are written to disk.**
   The provided MCP tools automatically synchronize with disk on every read and write.
-  Vice versa, if a file is edited via the MCP server, you may need to manually reload the file in your editor in case the editor does not auto-reload on disk changes.
+  Vice versa, **if a file is edited via the MCP server, you may need to manually reload the file in your editor** in case the editor does not auto-reload on disk changes.
   In Isabelle/jEdit, it is sometimes necessary to reload manually (e.g. by using the F5 key). Isabelle/VSCode supports auto-reload. 
+  Avoid editing a file while the agent works on it. You might have to merge conflicts by hand otherwise.
 - If you want the agent to see proof states in pre-built base sessions, you have to build them with `-o show_states`.
 
 ## Installing the MCP Server
 
-1. Clone and navigate into this repository. **For Windows users:** make sure that `etc/settings` uses `LF` line breaks.
-2. Install the supported Isabelle version. The supported version is stored in [ISABELLE\_VERSION](./ISABELLE_VERSION). Newer versions may also work (without guarantee). If you use a version compatible with an Isabelle release, [download it](https://isabelle.in.tum.de/). If you use a development version, insert the version number into the command below:
+1. Install the supported Isabelle version. The supported version is stored in [ISABELLE\_VERSION](./ISABELLE_VERSION). Newer versions may also work (without guarantee). If you use a version compatible with an Isabelle release, [download it](https://isabelle.in.tum.de/). If you use a development version, insert the version number into the command below:
 ```bash
 hg clone https://isabelle.in.tum.de/repos/isabelle
 isabelle/Admin/init -r <VERSION_NUMBER>
 ```
-3. Register this project as an Isabelle component by inserting the file path to this project into the command below:
+   **Note for  macOS users:** on first start, macOS may block Isabelle. Open it, cancel the security dialog, then allow it in *System Settings → Privacy & Security* ("Allow Apps..."). See the [Isabelle installation notes](https://isabelle.in.tum.de/installation.html).
+2. Clone and navigate into this repository. Then check out the branch matching your Isabelle version, as explained further above:
+```bash
+git clone <THIS_REPOSITORY>
+cd isabelle-pide-mcp
+git checkout <BRANCH>
+```
+   **Note for Windows users:** make sure that `etc/settings` uses `LF` line breaks.
+3. Register this project as an Isabelle component by inserting the file path to this project into the command below.
 ```bash
 isabelle/bin/isabelle components -u <PATH_TO_THIS_DIRECTORY>
 ```
+   Note that this registers the component by path. If you move this directory later, you hence have to amend the registration.
 
 ## Running the MCP Server
 
@@ -67,6 +76,8 @@ isabelle/bin/isabelle pide_mcp -l HOL
 isabelle/bin/isabelle pide_mcp -l HOL -S "-l Pure" -S "-l HOL-Analysis"
 ```
 As usual, all options are displayed using `pide_mcp -?`.
+If everything is set up correctly, PIDE MCP will be built automatically
+and report its successful start.
 
 Very likely, you want to register the server to your MCP client (e.g. OpenCode, Claude Code, Codex,...):
 
@@ -75,6 +86,9 @@ Very likely, you want to register the server to your MCP client (e.g. OpenCode, 
 You have to set up two things for your coding agent: 
 1. the **MCP configuration**, which tell the agent how to start PIDE MCP, and
 2. the **agent skills**, which tell the agent how to use PIDE MCP and Isabelle.
+
+**Note:** many files and folders mentioned below start with a dot (`.mcp.json`, `.opencode`,...).
+Such files are often hidden by default in most file explorers and shells.
 
 Most coding agents support global and local configurations:
 - *Global configurations* apply every time you start the coding agent.
@@ -111,6 +125,15 @@ Optionally remove the `skills` folder if you have already configured them global
 - For **Claude Code**, copy/adjust `.claude` and `.mcp.json` and start Claude Code in the same directory.
 - For **Codex**, copy/adjust `.agents` and `.codex` and start Codex in the same directory.
 
+### Checking the Configuration
+
+Start your coding agent and let it list its MCP servers,
+e.g. using `/mcp` in OpenCode, Claude Code, and Codex.
+PIDE MCP should be listed as connected.
+If it is not, ask your agent for help
+or consult your coding agent's documentation on how to inspect its MCP server logs.
+Similarly, use `/skills` to check if this repository's agent skills are found.
+
 ### Note for Windows Users 
 
 **Your coding agent has to open Isabelle via cygwin**. 
@@ -128,6 +151,13 @@ The `skills` folders (identical copies in `.agents/`, `.claude/`, and `.opencode
 - `pide-mcp`: Guidance on using the provided MCP tools effectively.
 
 You may adjust these guidances as you wish.
+
+### Start Prompting
+
+You can now start prompting your coding agent.
+Remember that you can run Isabelle's editors (Isabelle/jEdit, Isabelle/VSCode)
+on the same files at the same time (cf. screenshot above),
+keeping the synchronization caveats from the [Usage Notes](#usage-notes) section in mind.
 
 ## Customizing the MCP Server's Tools
 
