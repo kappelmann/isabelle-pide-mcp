@@ -85,11 +85,22 @@ object PIDE_MCP_Protocol {
     PIDE_MCP_JSON.string(params, "protocolVersion", Some("params"))
   }
 
-  def tool_result(result: JSON.T, is_error: Boolean = false): JSON.Object.T =
-    JSON_Object("content" -> List.empty[JSON.T], "structuredContent" -> (result match {
+  def text_content(text: String): JSON.Object.T =
+    JSON_Object("type" -> "text", "text" -> text)
+
+  def tool_result(result: JSON.T, is_error: Boolean = false): JSON.Object.T = {
+    val structured = result match {
       case JSON.Object(obj) => obj
       case _ => JSON_Object("result" -> result)
-    })) ++ JSON.optional("isError" -> Option.when(is_error)(true))
+    }
+    // MCP spec: needed for errors + should include for non-errors for backwards compatibility
+    val content = List(text_content(result match {
+      case text: String => text
+      case _ => JSON.Format(structured)
+    }))
+    JSON_Object("content" -> content, "structuredContent" -> structured) ++
+      JSON.optional("isError" -> Option.when(is_error)(true))
+  }
 
   sealed case class Cancellation(id: JSON_RPC.Id, reason: Option[String])
 

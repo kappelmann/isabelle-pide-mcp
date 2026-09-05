@@ -83,8 +83,8 @@ This allows you to test proof strategies and alternative developments without ch
 Final results can be written back to the original file.
 
 ### Querying (Proof) Context
-- **`get_state` returns structured information at any command position, including status (check it after edits), subgoals, all prover messages (errors, warnings, writelns, .etc), type information for terms,...**
-- **`get_state` accepts flags to opt into richer data**, like `include_types` (for Isabelle and ML), `include_facts` (theorems used in range), etc.
+- **`get_state` returns structured information at any command position, including status (check it after edits), subgoals, prover messages (errors, warnings, writelns, .etc), type information for terms,...**
+- **`get_state` accepts flags to opt into some of the data**, like `include_types` (for Isabelle and ML), `include_facts` (theorems used in range), etc.
 - **Set the `get_state` commands limit** when you only care about summary information or a limited number of commands - a large number of commands may flood your context.
 - **Restrict by `start_line` / `end_line`** when you only care about a specific lemma or error - it is less verbose than scanning the whole file. But don't forget that local changes may have global effects.
 - **`find_entities` lets you explore defined entities (theorems, definitions, methods, ML terms, etc.)**.
@@ -139,3 +139,4 @@ If you encounter errors or non-termination:
 4. Use `create_scratch` for experimentation and alternatives.
 5. Increase wait for termination if needed, but prefer refactoring over long waits!
 6. If you think the process is unresponsive, use `get_session_state` to find information. If all other means fail, unload the theory and, if that also fails, restart the session.
+
