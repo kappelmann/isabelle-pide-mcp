@@ -205,6 +205,9 @@ Alternatively, contact Kevin Kappelmann by email.
 We thank Maximilian Schäffeler, Lukas Stevens, Mohammad Abdulaziz, Andrei Popescu, Dmitriy Traytel, Tobias Nipkow, Yong Kiam Tan, and Diego Marmsoler
 for their helpful feedback and testing.
 
+PIDE MCP was developed as part of the [Copilots for Isabelle](https://www.renaissancephilanthropy.org/copilots-for-isabelle-learning-logical-structure-for-a-better-proving-experience) project, 
+supported by the AI for Math Fund by Renaissance Philanthropy.
+
 ## Citation
 
 Cite the preprint: 
