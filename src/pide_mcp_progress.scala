@@ -45,6 +45,14 @@ class Silent_Progress(progress: Progress) extends Progress {
   override def nodes_status(status: Progress.Nodes_Status): Unit = ()
 }
 
+class Sub_Progress(progress: Progress) extends Progress {
+  override def verbose: Boolean = progress.verbose
+  override def stopped: Boolean = super.stopped || progress.stopped
+  override def interrupt_handler[A](e: => A): A = progress.interrupt_handler(e)
+  override def output(messages: Progress.Output): Unit = progress.output(messages)
+  override def nodes_status(status: Progress.Nodes_Status): Unit = progress.nodes_status(status)
+}
+
 class Uncancellable_Progress(progress: Progress) extends Progress {
   override def verbose: Boolean = progress.verbose
   override def stopped: Boolean = false

@@ -5,6 +5,7 @@ New in this PIDE MCP version
 ----------------------------
 
 * Update to Isabelle version as specified in [ISABELLE\_VERSION](./ISABELLE_VERSION)
+* More robust session start and stop. Introduce new phase `building`. `stop_session` can now also stop sessions that are not running.
 * Failing tool calls now return a result with `isError` instead of a JSON-RPC error. INCOMPATIBILITY.
 * Tool results are now also returned as `structuredContent`.
 * New options `pide_mcp_await_option_sessions` and `pide_mcp_exit_on_failed_option_sessions` control whether sessions given as command-line options are prepared before the MCP server starts

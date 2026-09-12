@@ -60,7 +60,7 @@ object Tool_Edit {
     opt_end_line: Option[Int],
     old_text: String,
     edit_all: Boolean,
-    progress: Progress = new Progress
+    progress: Progress
   ): (String, Int) = {
     if (session.is_base_session_theory(node_name))
       error(s"Cannot edit base session theory ${quote(session.origin(node_name))}")
