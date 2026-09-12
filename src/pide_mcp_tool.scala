@@ -31,8 +31,8 @@ abstract class PIDE_MCP_Tool(val name: String) {
     args: JSON.Object.T,
     progress: Progress
   ): PIDE_MCP_Tool_Result
-  // called before each session stop
-  // note: the tool's start might not have been called yet
+  // called before each session stop (normal) or after (abrupt stop)
+  // note: the tool's start might not have been finished or called yet
   def stop(
     sessions: PIDE_MCP_Sessions,
     session: PIDE_MCP_Session,

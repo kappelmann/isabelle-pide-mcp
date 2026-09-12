@@ -37,16 +37,12 @@ object PIDE_MCP_Tool_Util {
     sessions: PIDE_MCP_Sessions,
     args: JSON.Object.T
   ): PIDE_MCP_Session = {
-    def available: String = s"Available session(s): ${JSON.Format(sessions.state_json())}"
-    PIDE_MCP_Tool_Schema.running_session_arg.get(args) match {
-      case None =>
-        sessions.all_running() match {
-          case List(session) => session
-          case Nil => error(s"No running session. $available")
-          case _ => error(s"Multiple running sessions: specify ${quote("session")}. $available")
-        }
-      case Some(session_id) =>
-        Result.release(sessions.get_running(Some(List(session_id)))).head
+    def available = s"Available session(s): ${JSON.Format(sessions.state_json())}"
+    val session_ids = PIDE_MCP_Tool_Schema.running_session_arg.get(args).map(List(_))
+    Result.release(sessions.running_sessions(session_ids)) match {
+      case List(session) => session
+      case Nil => error(s"No running session. $available")
+      case _ => error(s"Multiple running sessions: specify ${quote("session")}. $available")
     }
   }
 
@@ -54,7 +50,8 @@ object PIDE_MCP_Tool_Util {
     sessions: PIDE_MCP_Sessions,
     args: JSON.Object.T
   ): List[PIDE_MCP_Session] =
-    Result.release(sessions.get_running(PIDE_MCP_Tool_Schema.running_sessions_arg.get(args)))
+    Result.release(
+      sessions.running_sessions(PIDE_MCP_Tool_Schema.running_sessions_arg.get(args)))
 
   def origin_param(session: PIDE_MCP_Session, args: JSON.Object.T): Document.Node.Name =
     session.node_name(PIDE_MCP_Tool_Schema.origin_arg.get(args))
@@ -62,7 +59,7 @@ object PIDE_MCP_Tool_Util {
   def require_loaded_origin_snapshot(
     session: PIDE_MCP_Session,
     node_name: Document.Node.Name,
-    progress: Progress = new Progress
+    progress: Progress
   ): Document.Snapshot = {
     val snapshot =
       Exn.result { session.node_snapshot(node_name) } match {

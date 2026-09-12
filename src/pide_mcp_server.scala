@@ -298,7 +298,11 @@ class PIDE_MCP_Server(
         respond(out, JSON_RPC.result(id, tool_result(result)))
       case Exn.Res(PIDE_MCP_Tool_Result.Error(result)) =>
         respond(out, JSON_RPC.result(id, tool_result(result, is_error = true)))
-      case Exn.Exn(exn) if task.stopped && Exn.is_interrupt(exn) =>
+      // thread interrupt ends the task, not the server
+      case Exn.Exn(Exn.Interrupt()) =>
+        if (!task.stopped)
+          respond(out, JSON_RPC.result(id, tool_result("Tool call was interrupted",
+            is_error = true)))
       case Exn.Exn(exn) =>
         Exn.capture { respond_internal_error(id, out, exn) }
         throw exn

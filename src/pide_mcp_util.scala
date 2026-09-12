@@ -9,7 +9,7 @@ package isabelle.pide.mcp
 import isabelle._
 
 object PIDE_MCP_Util {
-  def capture_failures[A](args: IterableOnce[A])(run: A => Unit): Iterator[(A, Throwable)] =
+  def capture_failures[A](args: IterableOnce[A], run: A => Unit): Iterator[(A, Throwable)] =
     args.iterator.flatMap(arg =>
       Exn.capture(run(arg)) match {
         case Exn.Res(_) => None
@@ -17,12 +17,15 @@ object PIDE_MCP_Util {
       })
 
   // like Exn.release_first, but reports every error instead of only the first one
-  def check_failures(exns: List[Throwable]): Unit =
-    exns.filterNot(Exn.is_interrupt) match {
-      case Nil => for (exn <- exns.headOption) throw exn
-      case List(exn) => throw exn
-      case failures => throw ERROR(cat_lines(failures.map(Exn.message)))
+  def failure(exn: Throwable, more: List[Throwable]): Throwable =
+    (exn :: more).filterNot(Exn.is_interrupt) match {
+      case Nil => exn
+      case List(exn1) => exn1
+      case failures => ERROR(cat_lines(failures.map(Exn.message)))
     }
+
+  def check_failures(exns: List[Throwable]): Unit =
+    for (exn <- exns.headOption) throw failure(exn, exns.tail)
 
   def text_range(doc: Line.Document, start_line: Int, end_line: Int): Option[Text.Range] =
     if (start_line - 1 > end_line) None

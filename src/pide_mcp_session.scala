@@ -81,7 +81,7 @@ object PIDE_MCP_Session {
 
   def build(
     spec: Spec,
-    progress: Progress = new Progress
+    progress: Progress
   ): (Options, Sessions.Background) = {
     val options = Options.init(specs = spec.options) + "show_states=true" + "show_results=true"
     val session_background = Sessions.background(options, spec.logic,
@@ -99,7 +99,7 @@ object PIDE_MCP_Session {
     options: Options,
     session_background: Sessions.Background,
     log: Logger,
-    progress: Progress = new Progress
+    progress: Progress
   ): Result[PIDE_MCP_Session, Throwable] =
     Exn.result {
       val id = spec.id.getOrElse(error("Missing session id"))
@@ -158,7 +158,7 @@ class PIDE_MCP_Session private(
     Session.Consumer[Session.Runtime_Statistics]("pide_mcp_statistics") {
       case Session.Runtime_Statistics(props) =>
         statistics.change { statistics =>
-          val statistics1: Queue[Properties.T] = statistics.appended(props)
+          val statistics1 = statistics.appended(props)
           if (statistics1.length > statistics_limit) statistics1.dequeue._2 else statistics1
         }
     }
@@ -201,9 +201,16 @@ class PIDE_MCP_Session private(
 
   def snapshot(): Document.Snapshot = session.snapshot()
 
-  def await_stable_snapshot(progress: Progress = new Progress): Document.Snapshot =
-    PIDE_MCP_Progress.await(progress, await_message("stable snapshot"),
-      session.output_delay, progress_delay) {
+  private def await_ready[A](progress: Progress, what: String)(value: => Option[A]): A =
+    PIDE_MCP_Progress.await(progress, await_message(what), session.output_delay, progress_delay) {
+      if (!session.is_ready)
+        error(s"PIDE session ${quote(id)} is not ready. " +
+          s"Its session phase is ${quote(session.phase.print)}")
+      value
+    }
+
+  def await_stable_snapshot(progress: Progress): Document.Snapshot =
+    await_ready(progress, "stable snapshot") {
       val snapshot = session.snapshot()
       Option.when(!snapshot.is_outdated)(snapshot)
     }
@@ -225,11 +232,10 @@ class PIDE_MCP_Session private(
     }
   }
 
-  def tip_version(progress: Progress = new Progress): Document.Version = {
+  def tip_version(progress: Progress): Document.Version = {
     progress.expose_interrupt()
     val version = session.get_state().history.tip.version
-    PIDE_MCP_Progress.await(progress, await_message("current document version"),
-      session.output_delay, progress_delay)(version.peek.map(Exn.release))
+    await_ready(progress, "current document version")(version.peek.map(Exn.release))
   }
 
   def read_file_content(node_name: Document.Node.Name): String =
@@ -309,7 +315,7 @@ class PIDE_MCP_Session private(
     nodes: List[(Document.Node.Name, List[(Int, Option[Int])])],
     hide_others: Boolean,
     range_context: Int = range_context,
-    progress: Progress = new Progress
+    progress: Progress
   ): Map[Document.Node.Name, String] = {
     val models = with_lock(progress) {
       val version = tip_version(progress)
@@ -333,7 +339,7 @@ class PIDE_MCP_Session private(
   private def required_nodes(
     version: Document.Version,
     seen: Set[Document.Node.Name],
-    progress: Progress = new Progress
+    progress: Progress
   ): Set[Document.Node.Name] = {
     def is_required(name: Document.Node.Name): Boolean =
       !seen(name) && !is_base_session_theory(name) &&
@@ -349,7 +355,7 @@ class PIDE_MCP_Session private(
     (deps.theories ++ dep_files ++ aux_files).toSet.filter(is_required)
   }
 
-  def resolve_dependencies(progress: Progress = new Progress): Unit = {
+  def resolve_dependencies(progress: Progress): Unit = {
     @tailrec def loop(seen: Set[Document.Node.Name]): Unit = {
       val names = required_nodes(tip_version(progress), seen, progress)
       if (names.nonEmpty) {
@@ -366,7 +372,7 @@ class PIDE_MCP_Session private(
     await_stable_before_resolve: Boolean,
     hide_others: Boolean,
     range_context: Int = range_context,
-    progress: Progress = new Progress
+    progress: Progress
   ): String = {
     if (is_base_session_theory(node_name)) node_snapshot(node_name).node.source
     else {
@@ -389,7 +395,7 @@ class PIDE_MCP_Session private(
 
   def unload(
     node_names: List[Document.Node.Name],
-    progress: Progress = new Progress
+    progress: Progress
   ): List[Document.Node.Name] = {
     for (name <- node_names if is_base_session_theory(name))
       error(s"Cannot unload base session theory ${quote(origin(name))}")

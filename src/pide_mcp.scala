@@ -66,13 +66,16 @@ Usage: isabelle pide_mcp [OPTIONS]
         }
       val log = Logger.make_progress(progress)
       val tool_table = PIDE_MCP_Tool_Util.make_tool_table(tool_names(options))
-      val sessions = new PIDE_MCP_Sessions(tool_table, log, options)
+      val sessions = new PIDE_MCP_Sessions(tool_table, log, progress, options)
       val server = new PIDE_MCP_Server(sessions, log, progress, log_messages)
       def start_sessions(progress: Progress): Unit = {
         log("Starting PIDE sessions...")
         val exit_on_failed = exit_on_failed_option_sessions(options)
         for (spec <- specs) {
-          Exn.result { Result.release(sessions.start(spec, progress)) } match {
+          progress.expose_interrupt()
+          Exn.capture {
+            Result.release(sessions.start_session(spec, progress))
+          } match {
             case Exn.Res(_) =>
             case Exn.Exn(exn) =>
               if (exit_on_failed) throw exn
@@ -93,8 +96,7 @@ Usage: isabelle pide_mcp [OPTIONS]
       }
       val stop_log_result = Exn.capture { log("Stopping PIDE sessions...") }
       val stop_result = Exn.capture {
-        Result.release(sessions.stop_running(
-          progress = new Uncancellable_Progress(progress)))
+        Result.release(sessions.stop_sessions(None, progress))
         ()
       }
       Exn.release_first(List(result, stop_log_result, stop_result))
