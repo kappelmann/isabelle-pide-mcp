@@ -223,8 +223,8 @@ Cite the preprint:
 }
 ```
 
-Cite this release (PIDE MCP `2025-2`): 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21298851.svg)](https://doi.org/10.5281/zenodo.21298851)
+Cite this release (PIDE MCP `2025-2-updated`): 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22726529.svg)](https://doi.org/10.5281/zenodo.22726529)
 ```
 @software{pide_mcp_code_release,
   author     = {Kappelmann, Kevin},
@@ -232,9 +232,9 @@ Cite this release (PIDE MCP `2025-2`):
   license    = {LGPL-3.0},
   year       = 2026,
   publisher  = {Zenodo},
-  version    = {2025-2},
-  doi        = {10.5281/zenodo.21298851},
-  url        = {https://doi.org/10.5281/zenodo.21298851}
+  version    = {2025-2-updated},
+  doi        = {10.5281/zenodo.22726529},
+  url        = {https://doi.org/10.5281/zenodo.22726529}
 }
 ```
 
