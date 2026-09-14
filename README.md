@@ -53,6 +53,7 @@ hg clone https://isabelle.in.tum.de/repos/isabelle
 isabelle/Admin/init -r <VERSION_NUMBER>
 ```
    **Note for  macOS users:** on first start, macOS may block Isabelle. Open it, cancel the security dialog, then allow it in *System Settings → Privacy & Security* ("Allow Apps..."). See the [Isabelle installation notes](https://isabelle.in.tum.de/installation.html).
+
 2. Clone and navigate into this repository. Then check out the branch matching your Isabelle version, as explained further above:
 ```bash
 git clone <THIS_REPOSITORY>
@@ -60,6 +61,7 @@ cd isabelle-pide-mcp
 git checkout <BRANCH>
 ```
    **Note for Windows users:** make sure that `etc/settings` uses `LF` line breaks.
+
 3. Register this project as an Isabelle component by inserting the file path to this project into the command below.
 ```bash
 isabelle/bin/isabelle components -u <PATH_TO_THIS_DIRECTORY>
