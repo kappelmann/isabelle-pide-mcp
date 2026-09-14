@@ -1,3 +1,5 @@
+<img height="60" alt="PIDE MCP logo" align="right" src="./docs/pide_mcp.png" />
+
 # Isabelle PIDE MCP Server
 
 **Agentic formal proof development with Isabelle: [formalproof.ai](https://formalproof.ai)**
