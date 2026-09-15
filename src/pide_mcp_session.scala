@@ -83,7 +83,7 @@ object PIDE_MCP_Session {
     spec: Spec,
     progress: Progress
   ): (Options, Sessions.Background) = {
-    val options = Options.init(update = spec.options) + "show_states=true" + "show_results=true"
+    val options = Options.init(update = spec.options)
     val session_background = Sessions.background(options, spec.logic,
       progress = new Silent_Progress(progress),
       dirs = spec.dirs, session_ancestor = spec.session_ancestor,

@@ -45,7 +45,7 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
   Vice versa, **if a file is edited via the MCP server, you may need to manually reload the file in your editor** in case the editor does not auto-reload on disk changes.
   In Isabelle/jEdit, it is sometimes necessary to reload manually (e.g. by using the F5 key). Isabelle/VSCode supports auto-reload. 
   Avoid editing a file while the agent works on it. You might have to merge conflicts by hand otherwise.
-- If you want the agent to see proof states in pre-built base sessions, you have to build them with `-o show_states`.
+- If you want the agent to see proof states in pre-built base sessions, you have to build them with `-o show_states`. Note that such builds take significantly longer!
 
 ## Installing the MCP Server
 
