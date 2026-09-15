@@ -167,7 +167,8 @@ You may adjust these guidances as you wish.
 You can now start prompting your coding agent.
 Remember that you can run Isabelle's editors (Isabelle/jEdit, Isabelle/VSCode)
 on the same files at the same time (cf. screenshot above),
-keeping the synchronization caveats from the [Usage Notes](#usage-notes) section in mind.
+keeping the synchronization caveats from the [usage notes](#usage-notes) section in mind.
+Check out the [quick start tutorial](https://formalproof.ai/quick-start/) to learn how to write your first agentic proof.
 
 ## Customizing the MCP Server's Tools
 
