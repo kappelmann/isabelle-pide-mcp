@@ -142,7 +142,7 @@ class PIDE_MCP_Session private(
   def progress_delay: Time = options.seconds("pide_mcp_session_progress_delay")
   def range_context: Int = options.int("pide_mcp_range_context")
   def statistics_limit: Int = options.int("pide_mcp_session_statistics_limit")
-  def base_session: String = resources.session_background.session_name
+  def base_session: String = resources.current_background.session_name
   def directories(): List[Path] = Sessions.directories(dirs, Nil).map(_._2)
 
   private def await_message(what: String): String =
@@ -287,9 +287,12 @@ class PIDE_MCP_Session private(
       else Some(Document.Blobs.Item(
         Bytes(Symbol.encode(text)), text, Symbol.Text_Chunk(text), changed = !is_stable))
 
-    def node_header: Document.Node.Header =
-      resources.special_header(node_name).getOrElse(
-        resources.check_thy(session.session_options, node_name, Scan.char_reader(text)))
+    def get_thy(): Resources.Thy = {
+      val thy0 =
+        resources.special_thy(node_name).getOrElse(
+          resources.check_thy(node_name, Scan.char_reader(text)))
+      thy0.eval_conditions(session.conditions)
+    }
 
     def node_perspective: Document.Node.Perspective_Text.T =
       if (is_theory)
@@ -298,7 +301,7 @@ class PIDE_MCP_Session private(
 
     def edits: List[Document.Edit_Text] =
       if (is_stable && node.edit_perspective == node_perspective) Nil
-      else node_edits(node_header, pending_edits, node_perspective)
+      else node_edits(get_thy(), pending_edits, node_perspective)
   }
 
   private def hide_edits(
@@ -346,10 +349,10 @@ class PIDE_MCP_Session private(
       !PIDE_MCP_Util.is_loaded_dynamic(version.nodes, name) &&
       (name.path.is_file || resources.make_theory_content(name).isDefined)
     val thy_files = version.nodes.iterator.flatMap { case (name, node) =>
-        node.header.imports_no_pos.iterator ++ resources.make_theory_name(name).iterator
+        node.thy.imports_no_pos.iterator ++ resources.make_theory_name(name).iterator
       }.distinct.filter(is_required)
     val deps =
-      resources.dependencies(session.session_options, thy_files.map((_, Position.none)).toList,
+      resources.dependencies(session.conditions, thy_files.map((_, Position.none)).toList,
         progress = progress)
     val dep_files = try deps.loaded_files catch { case ERROR(_) => Nil }
     val aux_files = resources.undefined_blobs(version)
@@ -391,7 +394,7 @@ class PIDE_MCP_Session private(
   ): List[Document.Edit_Text] = {
     val model = Node_Model(node_name, node, "", Text.Perspective.empty)
     model.node_edits(
-      Document.Node.Header.none, model.pending_edits, Document.Node.Perspective_Text.empty)
+      Resources.Thy.empty, model.pending_edits, Document.Node.Perspective_Text.empty)
   }
 
   def unload(
