@@ -65,7 +65,7 @@ object PIDE_MCP_Tool_Util {
       Exn.result { session.node_snapshot(node_name) } match {
         case Exn.Res(snapshot) => snapshot
         case Exn.Exn(_) =>
-          if (PIDE_MCP_Util.is_loaded_dynamic(session.tip_version(progress).nodes, node_name))
+          if (PIDE_MCP_Util.is_loaded_dynamic(session.tip_version(progress).nodes(node_name)))
             error(s"The origin ${quote(session.origin(node_name))} is loaded but has not been " +
               "processed yet. " + retry_soon_message)
           else {

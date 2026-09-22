@@ -5,6 +5,8 @@ New in this PIDE MCP version
 ----------------------------
 
 * Update to Isabelle version as specified in [ISABELLE\_VERSION](./ISABELLE_VERSION)
+* Add [tool\_extensions](./tool_extensions) with experimental sledgehammer tool as an example user-level tool extension.
+* Add overlay and query operations support.
 * Remove `show_states` and `show_results` default values. Set options manually if required. INCOMPATIBILITY.
 * More robust session start and stop. Introduce new phase `building`. `stop_session` can now also stop sessions that are not running.
 * Failing tool calls now return a result with `isError` instead of a JSON-RPC error. INCOMPATIBILITY.

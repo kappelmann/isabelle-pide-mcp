@@ -166,9 +166,14 @@ class PIDE_MCP_Session private(
 
   def runtime_statistics(): List[Properties.T] = statistics.value.toList
 
+  private val overlay_updates = Consumer_Thread.fork[() => Unit](s"pide_mcp_overlays_$id",
+    { e => e(); true }, daemon = true, log = resources.log)
+
   def stop(): Process_Result = {
     session.runtime_statistics -= statistics_consumer
-    session.stop()
+    val result = session.stop()
+    overlay_updates.shutdown()
+    result
   }
 
   private def path_node_name(path: Path): Document.Node.Name = {
@@ -201,11 +206,14 @@ class PIDE_MCP_Session private(
 
   def snapshot(): Document.Snapshot = session.snapshot()
 
+  def require_ready(): Unit =
+    if (!session.is_ready)
+      error(s"PIDE session ${quote(id)} is not ready. " +
+        s"Its session phase is ${quote(session.phase.print)}")
+
   private def await_ready[A](progress: Progress, what: String)(value: => Option[A]): A =
     PIDE_MCP_Progress.await(progress, await_message(what), session.output_delay, progress_delay) {
-      if (!session.is_ready)
-        error(s"PIDE session ${quote(id)} is not ready. " +
-          s"Its session phase is ${quote(session.phase.print)}")
+      require_ready()
       value
     }
 
@@ -227,7 +235,7 @@ class PIDE_MCP_Session private(
       val snapshot1 = snapshot
       val new_snapshot =
         (if (is_base_session_theory(snapshot1.node_name)) session.snapshot() else snapshot1).switch(node_name)
-      if (PIDE_MCP_Util.is_loaded_dynamic(new_snapshot.version.nodes, node_name)) new_snapshot
+      if (PIDE_MCP_Util.is_loaded_dynamic(new_snapshot.version.nodes(node_name))) new_snapshot
       else error(s"No PIDE snapshot available for ${quote(origin(node_name))}")
     }
   }
@@ -259,6 +267,60 @@ class PIDE_MCP_Session private(
       val blobs = edits.collect { case (name, Document.Node.Blob(blob)) => name -> blob }
       session.update(Document.Blobs(blobs.toMap), edits)
     }
+
+  private def node_perspective(node: Document.Node): Document.Node.Perspective_Text.T =
+    Document.Node.Perspective(
+      node.perspective.required, node.text_perspective, node.perspective.overlays)
+
+  private def edit_overlays(
+    node_name: Document.Node.Name,
+    change: Document.Node.Overlays => Document.Node.Overlays,
+    require_theory: Boolean,
+    progress: Progress
+  ): Future[Unit] = {
+    def edit(): Unit = {
+      require_ready()
+      with_lock(progress) {
+        val node = tip_version(progress).nodes(node_name)
+        if (PIDE_MCP_Util.is_loaded_dynamic(node))
+          update(List(node_name ->
+            node_perspective(node).copy(overlays = change(node.perspective.overlays))))
+        else if (require_theory)
+          error(s"${quote(origin(node_name))} is not a dynamically loaded theory")
+      }
+    }
+    val result = Future.promise[Unit]
+    def done(res: Exn.Result[Unit]): Unit = {
+      res match {
+        case Exn.Exn(exn) if !Exn.is_interrupt(exn) => progress.echo_error_message(Exn.message(exn))
+        case _ =>
+      }
+      result.fulfill_result(res)
+    }
+    Exn.capture { require_ready(); overlay_updates.send(() => done(Exn.capture(edit()))) } match {
+      case failure @ Exn.Exn(_) => done(failure)
+      case Exn.Res(_) =>
+    }
+    result
+  }
+
+  def insert_overlay(
+    command: Command,
+    fn: String,
+    args: List[String],
+    progress: Progress
+  ): Future[Unit] =
+    edit_overlays(command.node_name, _.insert(command, fn, args), require_theory = true, progress)
+
+  def remove_overlay(
+    command: Command,
+    fn: String,
+    args: List[String],
+    progress: Progress
+  ): Future[Unit] =
+    edit_overlays(command.node_name, _.remove(command, fn, args), require_theory = false, progress)
+
+  def editor(progress: Progress): PIDE_MCP_Editor = new PIDE_MCP_Editor(this, progress)
 
   private def replace_edits(old_text: String, new_text: String): List[Text.Edit] = {
     val prefix = old_text.iterator.zip(new_text.iterator).takeWhile(_ == _).length
@@ -296,7 +358,8 @@ class PIDE_MCP_Session private(
 
     def node_perspective: Document.Node.Perspective_Text.T =
       if (is_theory)
-        Document.Node.Perspective(node_required, text_perspective, node.perspective.overlays)
+        PIDE_MCP_Session.this.node_perspective(node).copy(
+          required = node_required, visible = text_perspective)
       else Document.Node.Perspective_Text.empty
 
     def edits: List[Document.Edit_Text] =
@@ -310,8 +373,7 @@ class PIDE_MCP_Session private(
   ): Iterator[Document.Edit_Text] =
     nodes.iterator.collect {
       case (name, node) if !keep(name) && !node.text_perspective.is_empty =>
-        name -> Document.Node.Perspective(
-          node.perspective.required, Text.Perspective.empty, node.perspective.overlays)
+        name -> node_perspective(node).copy(visible = Text.Perspective.empty)
     }
 
   def read_update(
@@ -346,7 +408,7 @@ class PIDE_MCP_Session private(
   ): Set[Document.Node.Name] = {
     def is_required(name: Document.Node.Name): Boolean =
       !seen(name) && !is_base_session_theory(name) &&
-      !PIDE_MCP_Util.is_loaded_dynamic(version.nodes, name) &&
+      !PIDE_MCP_Util.is_loaded_dynamic(version.nodes(name)) &&
       (name.path.is_file || resources.make_theory_content(name).isDefined)
     val thy_files = version.nodes.iterator.flatMap { case (name, node) =>
         node.thy.imports_no_pos.iterator ++ resources.make_theory_name(name).iterator
@@ -405,7 +467,8 @@ class PIDE_MCP_Session private(
       error(s"Cannot unload base session theory ${quote(origin(name))}")
     with_lock(progress) {
       val nodes = tip_version(progress).nodes
-      val descendants = nodes.descendants(node_names).filter(PIDE_MCP_Util.is_loaded_dynamic(nodes, _))
+      val descendants =
+        nodes.descendants(node_names).filter(name => PIDE_MCP_Util.is_loaded_dynamic(nodes(name)))
       update(descendants.flatMap(name => unload_edits(name, nodes(name))))
       descendants
     }

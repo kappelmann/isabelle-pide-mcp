@@ -13,6 +13,8 @@ sources = \
   src/progress_task.scala \
   src/pide_mcp_server.scala \
   src/pide_mcp_session.scala \
+  src/pide_mcp_editor.scala \
+  src/pide_mcp_query.scala \
   src/pide_mcp_sessions.scala \
   src/pide_mcp_tool.scala \
   src/pide_mcp_tool_arg.scala \
