@@ -13,7 +13,7 @@ object PIDE_MCP_Theory {
     def apply(session: PIDE_MCP_Session, nodes: Document.Nodes): Loaded = {
       val all_nodes = nodes.topological_order.filter(_.is_theory)
       val (base_session, dynamic) = all_nodes.partition(session.is_base_session_theory)
-      Loaded(session, base_session, dynamic.filter(PIDE_MCP_Util.is_loaded_dynamic(nodes, _)))
+      Loaded(session, base_session, dynamic.filter(name => PIDE_MCP_Util.is_loaded_dynamic(nodes(name))))
     }
   }
 

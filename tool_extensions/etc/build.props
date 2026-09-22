@@ -1,0 +1,9 @@
+title = PIDE MCP Tool Extensions
+module = $PIDE_MCP_TOOL_EXTENSIONS_JAR
+requirements = \
+  env:ISABELLE_SCALA_JAR \
+  env:ISABELLE_PIDE_MCP_JAR
+sources = \
+  src/tool_sledgehammer.scala
+services = \
+  isabelle.pide.mcp.extensions.Tools_Sledgehammer

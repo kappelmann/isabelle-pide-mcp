@@ -136,6 +136,20 @@ object PIDE_MCP_Command {
     cmd.chunks.get(chunk_name).fold(elems)(chunk => elems.filter(in_range(chunk)))
   }
 
+  object Message_Kind {
+    val important: List[String] = List("goal", "error", "warning")
+    val info: List[String] = List("writeln", "information", "tracing")
+    val all: List[String] = important ::: info
+  }
+
+  def message_entries(
+    elements: Iterator[XML.Elem],
+    kinds: List[String]
+  ): List[Option[JSON.Object.Entry]] = {
+    val texts = classify_results(elements)
+    kinds.map(kind => texts.get(kind).map(kind -> _))
+  }
+
   private def classify_results(elements: Iterator[XML.Elem]): Map[String, List[String]] =
     elements.flatMap { elem =>
       val text = PIDE_MCP_Util.elem_body_plain_text(elem)
@@ -261,26 +275,24 @@ object PIDE_MCP_Command {
     lazy val bad: List[JSON.Object.T] = bad_json(snapshot, range)
 
     def json(doc: Line.Document, opts: State.Options): JSON.Object.T = {
-      val texts_by_kind = classify_results(results.iterator)
       val source_line = doc.position(range.start).line1
       val source = range.substring(snapshot.node.source).stripLineEnd
-      val entries: List[Option[(String, JSON.T)]] = List(
-        Some("status" -> status),
-        Some("timing_ms" -> timing_ms),
-        Some("source" -> PIDE_MCP_Util.numbered_lines(source, source_line)),
-        proper_list(bad).map("bad" -> _),
-        texts_by_kind.get("goal").map("goal" -> _),
-        texts_by_kind.get("error").map("error" -> _),
-        texts_by_kind.get("warning").map("warning" -> _),
-        Option.when(opts.include_types)(
-          proper_list(types_json(snapshot, range)).map("types" -> _)).flatten,
-        Option.when(opts.include_facts)(
-          proper_list(facts_json(snapshot, range)).map("facts" -> _)).flatten,
-        Option.when(opts.include_infos)(texts_by_kind.get("writeln").map("writeln" -> _)).flatten,
-        Option.when(opts.include_infos)(texts_by_kind.get("information").map("information" -> _)).flatten,
-        Option.when(opts.include_infos)(texts_by_kind.get("tracing").map("tracing" -> _)).flatten,
-        Option.when(opts.include_full_markup)(
-          "markup" -> markup_json(snapshot, range, Markup.Elements.full)))
+      val entries: List[Option[JSON.Object.Entry]] =
+        List(
+          Some("status" -> status),
+          Some("timing_ms" -> timing_ms),
+          Some("source" -> PIDE_MCP_Util.numbered_lines(source, source_line)),
+          proper_list(bad).map("bad" -> _)) :::
+        message_entries(results.iterator, Message_Kind.important) :::
+        List(
+          Option.when(opts.include_types)(
+            proper_list(types_json(snapshot, range)).map("types" -> _)).flatten,
+          Option.when(opts.include_facts)(
+            proper_list(facts_json(snapshot, range)).map("facts" -> _)).flatten) :::
+        (if (opts.include_infos) message_entries(results.iterator, Message_Kind.info) else Nil) :::
+        List(
+          Option.when(opts.include_full_markup)(
+            "markup" -> markup_json(snapshot, range, Markup.Elements.full)))
       JSON_Object.flatten(entries)
     }
   }

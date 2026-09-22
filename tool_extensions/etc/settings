@@ -1,0 +1,3 @@
+# -*- shell-script -*- :mode=shellscript:
+PIDE_MCP_TOOL_EXTENSIONS_HOME="$COMPONENT"
+PIDE_MCP_TOOL_EXTENSIONS_JAR="$PIDE_MCP_TOOL_EXTENSIONS_HOME/lib/pide_mcp_tool_extensions.jar"

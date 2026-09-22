@@ -66,13 +66,11 @@ object PIDE_MCP_Util {
     entry.map(_.name).filter(_.nonEmpty).getOrElse(range.substring(source))
 
   // a cleaned node remains in version.nodes but with empty source
-  def is_loaded_dynamic(nodes: Document.Nodes, node_name: Document.Node.Name): Boolean = {
-    val node = nodes(node_name)
+  def is_loaded_dynamic(node: Document.Node): Boolean =
     node.get_blob match {
       case Some(blob) => blob.source.nonEmpty
       case None => !node.is_empty
     }
-  }
 
   def intersect_range(full: Text.Range, range: Option[Text.Range]): Text.Range =
     range.fold(full)(r => full.try_restrict(r).getOrElse(Text.Range.zero))

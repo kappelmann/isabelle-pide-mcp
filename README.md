@@ -185,6 +185,8 @@ or use a different Scala component:
 1. Register the component: `isabelle components -u <PATH_TO_THE_COMPONENT>`.
 1. Add the tool to the Isabelle option `pide_mcp_tools`
 
+See [tool\_extensions](./tool_extensions) for such a component with experimental tool extensions.
+
 ## Known Limitations/Future Work
 
 - Command timings for pre-built sessions are currently returned as 0.
