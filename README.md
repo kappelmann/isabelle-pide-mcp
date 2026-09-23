@@ -217,6 +217,18 @@ supported by the AI for Math Fund by Renaissance Philanthropy.
 
 ## Citation
 
+Cite the [abstract](https://cicm-conference.org/2026/ai4math/03-kappelmann.pdf):
+```
+@inproceedings{pide_mcp_cicm,
+  author    = {Kappelmann, Kevin},
+  title     = {{PIDE MCP}: Connecting {AI} Agents to {Isabelle}},
+  booktitle = {Workshop on Artificial Intelligence for Mathematics (AI4Math), CICM 2026},
+  year      = {2026},
+  address   = {Ljubljana, Slovenia},
+  url       = {https://cicm-conference.org/2026/ai4math/03-kappelmann.pdf}
+}
+```
+
 Cite the preprint: 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21519364.svg)](https://doi.org/10.5281/zenodo.21519364)
 ```
