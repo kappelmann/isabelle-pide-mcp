@@ -13,9 +13,10 @@ class Tool_Sledgehammer extends PIDE_MCP_Tool("sledgehammer") {
       "Returns the suggested proof snippets. " +
       PIDE_MCP_Tool_Schema.implicit_load_file
 
-  private val provers_arg = PIDE_MCP_Tool_Arg.string_default(
+  private val provers_arg = PIDE_MCP_Tool_Arg.opt_string(
     "provers",
-    "Space-separated provers to run. Empty for the default Isabelle option.", "")
+    "Space-separated provers to run. Empty for Sledgehammer's default provers. " +
+      "Defaults to the session's sledgehammer_provers option.")
   private val isar_proofs_arg = PIDE_MCP_Tool_Arg.bool_default(
     "isar_proofs", "Also generate structured Isar proofs.", false)
   private val try0_arg = PIDE_MCP_Tool_Arg.bool_default(
@@ -71,7 +72,9 @@ class Tool_Sledgehammer extends PIDE_MCP_Tool("sledgehammer") {
       val line = PIDE_MCP_Tool_Schema.start_line_arg.get(args)
       val context =
         PIDE_MCP_Editor.Context(node_name, caret_offset(snapshot, line, prefix_arg.get(args)))
-      val query_args = List(provers_arg.get(args),
+      val provers =
+        provers_arg.get(args).getOrElse(session.options.string("sledgehammer_provers"))
+      val query_args = List(provers,
         isar_proofs_arg.get(args).toString, try0_arg.get(args).toString)
       val proofs_limit = proofs_limit_arg.get(args)
       new PIDE_MCP_Query(session, context, "sledgehammer", progress)
