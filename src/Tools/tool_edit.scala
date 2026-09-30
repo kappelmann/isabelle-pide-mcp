@@ -101,7 +101,7 @@ object Tool_Edit {
         // avoid disk <--> PIDE disagreement
         progress = new Uncancellable_Progress(progress))(node_name)
       session.await_stable_snapshot(progress)
-      session.resolve_dependencies(progress)
+      session.resolve_dependencies(List(node_name), progress)
       (text, if (changed) offsets.length else 0)
     }
   }
