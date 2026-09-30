@@ -401,31 +401,47 @@ class PIDE_MCP_Session private(
   private def required_nodes(
     version: Document.Version,
     seen: Set[Document.Node.Name],
+    loaded_origins: List[Document.Node.Name],
     progress: Progress
   ): Set[Document.Node.Name] = {
     def is_required(name: Document.Node.Name): Boolean =
       !seen(name) && !is_base_session_theory(name) &&
       !PIDE_MCP_Util.is_loaded_dynamic(version.nodes(name)) &&
       (name.path.is_file || resources.make_theory_content(name).isDefined)
-    val thy_files = version.nodes.iterator.flatMap { case (name, node) =>
-        node.header.imports.iterator ++ resources.make_theory_name(name).iterator
-      }.distinct.filter(is_required)
+    val thy_files =
+      version.nodes.iterator.flatMap(_._2.header.imports).distinct.filter(is_required)
     val deps =
       resources.dependencies(thy_files.map((_, Position.none)).toList, progress = progress)
     val dep_files = try deps.loaded_files catch { case ERROR(_) => Nil }
+    val loaded_origin_files = for {
+        name <- loaded_origins.iterator
+        cmd <- version.nodes(name).load_commands.iterator
+        file <- cmd.blobs_names.iterator
+      } yield file
+    val file_theories = for {
+        (name, node) <- version.nodes.iterator if PIDE_MCP_Util.is_loaded_dynamic(node)
+        thy_name <- resources.make_theory_name(name)
+      } yield thy_name
     val aux_files = resources.undefined_blobs(version)
-    (deps.theories ++ dep_files ++ aux_files).toSet.filter(is_required)
+    (deps.theories ++ dep_files ++ loaded_origin_files ++ file_theories ++ aux_files)
+      .toSet.filter(is_required)
   }
 
-  def resolve_dependencies(progress: Progress): Unit = {
-    @tailrec def loop(seen: Set[Document.Node.Name]): Unit = {
-      val names = required_nodes(tip_version(progress), seen, progress)
+  def resolve_dependencies(
+    loaded_origins: List[Document.Node.Name],
+    progress: Progress
+  ): Unit = {
+    @tailrec def loop(
+      seen: Set[Document.Node.Name],
+      loaded_origins: List[Document.Node.Name]
+    ): Unit = {
+      val names = required_nodes(tip_version(progress), seen, loaded_origins, progress)
       if (names.nonEmpty) {
         read_update(names.toList.map(_ -> Nil), hide_others = false, progress = progress)
-        loop(seen ++ names)
+        loop(seen ++ names, Nil)
       }
     }
-    loop(Set.empty)
+    loop(Set.empty, loaded_origins)
   }
 
   def read_update_resolve(
@@ -441,7 +457,7 @@ class PIDE_MCP_Session private(
       val text = read_update(List(node_name -> visible_lines), hide_others,
         range_context, progress)(node_name)
       if (await_stable_before_resolve) await_stable_snapshot(progress)
-      resolve_dependencies(progress)
+      resolve_dependencies(List(node_name), progress)
       text
     }
   }
@@ -463,10 +479,19 @@ class PIDE_MCP_Session private(
       error(s"Cannot unload base session theory ${quote(origin(name))}")
     with_lock(progress) {
       val nodes = tip_version(progress).nodes
-      val descendants =
-        nodes.descendants(node_names).filter(name => PIDE_MCP_Util.is_loaded_dynamic(nodes(name)))
-      update(descendants.flatMap(name => unload_edits(name, nodes(name))))
-      descendants
+      def is_loaded(name: Document.Node.Name) = PIDE_MCP_Util.is_loaded_dynamic(nodes(name))
+      def blobs_names(name: Document.Node.Name) = nodes(name).load_commands.flatMap(_.blobs_names)
+      val descendants = nodes.descendants(node_names).filter(is_loaded)
+      val blobs = descendants.flatMap(blobs_names).distinct.filter(is_loaded).map(blob_name =>
+        blob_name -> resources.make_theory_name(blob_name).filter(is_loaded))
+      val removed = descendants.toSet ++ blobs.flatMap(_._2)
+      lazy val retained_blobs = nodes.names_iterator.filterNot(removed).flatMap(blobs_names).toSet
+      val unloaded = descendants ::: (for {
+          (blob_name, opt_thy) <- blobs if !retained_blobs(blob_name)
+          name <- blob_name :: opt_thy.toList
+        } yield name)
+      update(unloaded.flatMap(name => unload_edits(name, nodes(name))))
+      unloaded
     }
   }
 }
