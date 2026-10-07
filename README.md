@@ -191,6 +191,7 @@ See [tool\_extensions](./tool_extensions) for such a component with experimental
 
 - Command timings for pre-built sessions are currently returned as 0.
 - Node sources of base session blobs should be loaded from database. They are currently read from disk.
+- There's a memory leak problem in PIDE that affects Isabelle/ML programming applications with PIDE MCP, cf. this [email by Kevin Kappelmann](https://isabelle.zulipchat.com/#narrow/channel/247541-Mirror.3A-Isabelle-Users-Mailing-List/topic/.5Bisabelle.5D.20memory.20leak.28.3F.29.3A.20GC.20not.20reclaiming.20memory.20when.20.2E.2E.2E/with/629549584).
 - It would be desirable to have the option to share a PIDE session among the MCP server and editors (Isabelle/jEdit, Isabelle/VSCode).
   This requires changes in the Isabelle distribution sources.
 - It would be desirable to explore changes with PIDE without altering the affected document's state, 
