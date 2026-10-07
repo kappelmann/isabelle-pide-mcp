@@ -11,7 +11,7 @@ This repository contains:
 1. A curated set of MCP tools for typical Isabelle workflows (auto-formalization, state inspection, entity lookups, session management, etc.), supporting cancellation and progress reports.
 1. A set of agent skills on how to effectively use the MCP and provided tools and general guidance for formalization tasks and Isabelle.
 
-**Find the preprint here: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21519364.svg)](https://doi.org/10.5281/zenodo.21519364)**
+**Find the [preprint here](https://hal.science/hal-05748384).**
 
 **Hint:** If you have trouble installing, configuring, or running this project, 
 ask your coding agent for help and point it to this README.
@@ -217,32 +217,20 @@ supported by the AI for Math Fund by Renaissance Philanthropy.
 
 ## Citation
 
-Cite the [abstract](https://cicm-conference.org/2026/ai4math/03-kappelmann.pdf):
-```
-@inproceedings{pide_mcp_cicm,
-  author    = {Kappelmann, Kevin},
-  title     = {{PIDE MCP}: Connecting {AI} Agents to {Isabelle}},
-  booktitle = {Workshop on Artificial Intelligence for Mathematics (AI4Math), CICM 2026},
-  year      = {2026},
-  address   = {Ljubljana, Slovenia},
-  url       = {https://cicm-conference.org/2026/ai4math/03-kappelmann.pdf}
-}
-```
-
-Cite the preprint: 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21519364.svg)](https://doi.org/10.5281/zenodo.21519364)
+Cite the [preprint](https://hal.science/hal-05748384): 
 ```
 @misc{pide_mcp,
-  author     = {Kappelmann, Kevin},
-  title      = {{PIDE MCP}: Connecting {AI} Agents to {Isabelle}},
-  year       = 2026,
-  publisher  = {Zenodo},
-  doi        = {10.5281/zenodo.21519364},
-  url        = {https://doi.org/10.5281/zenodo.21519364}
+  title = {{PIDE MCP}: Connecting {AI} Agents to {Isabelle}},
+  author = {Kappelmann, Kevin},
+  year = {2026},
+  doi = {10.5281/zenodo.21519364},
+  url = {https://hal.science/hal-05748384},
+  note = {Extended preprint of paper accepted at Workshop on Artificial Intelligence for Mathematics at the 19th Conference on Intelligent Computer Mathematics},
+  hal_id = {hal-05748384}
 }
 ```
 
-Cite this release (PIDE MCP `2025-2-updated`): 
+Cite this code release (PIDE MCP `2025-2-updated`): 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22726529.svg)](https://doi.org/10.5281/zenodo.22726529)
 ```
 @software{pide_mcp_code_release,
