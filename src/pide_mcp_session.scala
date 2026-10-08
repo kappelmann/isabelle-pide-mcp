@@ -83,7 +83,8 @@ object PIDE_MCP_Session {
     spec: Spec,
     progress: Progress
   ): (Options, Sessions.Background) = {
-    val options = Options.init(update = spec.options)
+    val base_options = Options.init()
+    val options = base_options ++ spec.options
     val session_background = Sessions.background(options, spec.logic,
       progress = new Silent_Progress(progress),
       dirs = spec.dirs, session_ancestor = spec.session_ancestor,
@@ -91,7 +92,9 @@ object PIDE_MCP_Session {
     Build.build(options, selection = Sessions.Selection.session(session_background.session_name),
       build_heap = true, dirs = spec.dirs, infos = session_background.infos,
       fresh_build = spec.fresh_build, no_build = spec.no_build, progress = progress).check
-    (options, session_background)
+    val session_options = base_options ++ (Options.Spec.eq("show_states", "true") ::
+      Options.Spec.eq("editor_output_state", "false") :: spec.options)
+    (session_options, session_background)
   }
 
   def apply(

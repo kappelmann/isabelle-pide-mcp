@@ -9,7 +9,8 @@ New in this PIDE MCP version
 * `unload` now also unloads files of unloaded theories unless a remaining theory still loads them.
 * Add [tool\_extensions](./tool_extensions) with experimental sledgehammer tool as an example user-level tool extension.
 * Add overlay and query operations support.
-* Remove `show_states` and `show_results` default values. Set options manually if required. INCOMPATIBILITY.
+* Remove `show_results` default value. Set options manually if required. INCOMPATIBILITY.
+* Enable `show_states` only for live sessions, not for base session builds. Disable `editor_output_state` to avoid duplicate states. INCOMPATIBILITY.
 * More robust session start and stop. Introduce new phase `building`. `stop_session` can now also stop sessions that are not running.
 * Failing tool calls now return a result with `isError` instead of a JSON-RPC error. INCOMPATIBILITY.
 * Tool results are now also returned as `structuredContent`.
