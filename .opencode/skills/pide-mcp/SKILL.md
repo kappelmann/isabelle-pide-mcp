@@ -22,7 +22,7 @@ Important rules (further elaborated in the sections below):
 
 - PIDE MCP can manage several Isabelle PIDE sessions. **Some sessions might have already been started.**
 - **Most tools take the id of a running session as input. Use `list_sessions` to get the ids and status of all sessions.**
-- **After every edit, call `get_state`** to see status, errors, warnings.
+- **After edits, use `get_state`** to see status, errors, warnings.
 - **Restrict by `start_line` / `end_line`** when querying to avoid analysing data for hundreds of finished commands in large theories.
 - **`sorry` is reported as `bad`, not as an `error`.** A clean theory has 0 bad commands AND 0 errors AND 0 failures.
 - **If `> 0` commands are running for more than ~30s, suspect a loop** - restructure rather than wait.
@@ -45,8 +45,8 @@ Important rules (further elaborated in the sections below):
 
 ### State Synchronization
 - **All changes are immediately checked** by PIDE after edits.
-- **Do not edit files via other means** (shell, other editors) - always use MCP tools to keep PIDE state synchronized. Reading via other tools (e.g. grep) for unloaded theories for exploration (e.g. grepping the AFP) is OK.
-- **If you experience discrepancies between the PIDE state and the file's disk content, use read on the affected file to re-synchronise the content.** Such discrepancies might happen, for example, when a human user is working on the same file as you or when you didn't edit a file via PIDE but with primitive file operations.
+- **If you experience discrepancies between the PIDE state and the file's disk content, use read on the affected file to re-synchronise the content.** This might happen, for example, when a human user is working on the same file as you or when you didn't edit via PIDE MCP but with other means.
+- **Prefer to use the `edit` tool.** It keeps file and PIDE state synchronized. If you had to use external tools (sed, Python, etc.) use `read` to re-synchronise.
 - **Avoid absolute file path imports for theories. Use session-qualified theory names for sessions available to you.** See `get_session_state` on how to find session qualifiers.
 - When you are told to synchronise, just re-read the file.
 - **Edits require `old_text` (the text to be searched for in the target range). If the file changed since you last read it (e.g., a human edited it concurrently), old_text might not be found and the edit be rejected. Re-synchronise in this case.**
@@ -59,7 +59,7 @@ Important rules (further elaborated in the sections below):
 - **Avoid adding large amounts of new material at once, as it makes it hard to identify the source of errors and nontermination.**
 - **Proof methods typically terminate in less than 5 seconds.**
 - If commands take longer, be suspicious! Only if you are very confident that a proof legitimately needs more time wait a bit longer. Short waits typically let you move faster!
-- **If `get_state` shows `> 0` running commands for more than ~30 seconds, suspect non-termination** (a loop or overly expensive computation). Restructure rather than wait.
+- **If `get_state` shows `> 0` running commands for more than ~20 seconds, suspect non-termination** (a loop or overly expensive computation). Restructure rather than wait.
 - **Use `get_session_state` to show the progress and currently running commands across all theories.**
 
 ### Scratch Theories
