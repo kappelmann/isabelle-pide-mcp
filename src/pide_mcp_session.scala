@@ -194,7 +194,8 @@ class PIDE_MCP_Session private(
   }
 
   def node_name(s: String): Document.Node.Name =
-    resources.find_theory_node(s).getOrElse(path_node_name(PIDE_MCP_Util.path(s)))
+    Some(s).filter(Url.is_base_name(_)).flatMap(resources.find_theory_node)
+      .getOrElse(path_node_name(PIDE_MCP_Util.path(s)))
 
   def origin(node_name: Document.Node.Name): String =
     if (node_name.is_theory) {
@@ -249,12 +250,19 @@ class PIDE_MCP_Session private(
     await_ready(progress, "current document version")(version.peek.map(Exn.release))
   }
 
-  def read_file_content(node_name: Document.Node.Name): String =
-    resources.make_theory_content(node_name).getOrElse(
-      Symbol.decode(Line.normalize(File.read(node_name.path))))
+  def uses_isabelle_encoding(path: Path): Boolean =
+    File.is_thy(path.file_name) || File.is_ML(path.file_name)
 
-  def write_file_content(path: Path, text: String): Unit =
-    File.write(path, Symbol.encode(Line.normalize(text)))
+  def read_file_content(node_name: Document.Node.Name): String =
+    resources.make_theory_content(node_name).getOrElse {
+      val text = Line.normalize(File.read(node_name.path))
+      if (uses_isabelle_encoding(node_name.path)) Symbol.decode(text) else text
+    }
+
+  def write_file_content(path: Path, text: String): Unit = {
+    val text1 = Line.normalize(text)
+    File.write(path, if (uses_isabelle_encoding(path)) Symbol.encode(text1) else text1)
+  }
 
   def node_source(
     snapshot: Document.Snapshot,
