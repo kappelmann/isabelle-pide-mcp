@@ -5,6 +5,7 @@ New in this PIDE MCP version
 ----------------------------
 
 * Update to Isabelle version as specified in [ISABELLE\_VERSION](./ISABELLE_VERSION)
+* More compact `get_state` results: problematic command details are now only returned once.
 * Add Isabelle/ML skill file.
 * Reading or editing a theory loads its unloaded files.
 * `unload` now also unloads files of unloaded theories unless a remaining theory still loads them.

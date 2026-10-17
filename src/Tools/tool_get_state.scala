@@ -9,7 +9,7 @@ import isabelle._
 class Tool_Get_State extends PIDE_MCP_Tool("get_state") {
   def description: String =
     "Inspect the state of a (range in a) file: goals, variables, errors, warnings, etc. " +
-      "Returns a summary (errors, warnings, commands still running, total timing,...) and details for all commands in range. " +
+      "Returns a summary (errors, warnings, commands still running,... with excerpts; total timing,...) and details for commands in range. " +
       "**Use this frequently to check if you are making progress, what is left to be done, and importantly, if certain commands are still processing, potentially even looping.** " +
       "For non-theory files, the response has a single command entry derived from the command that loaded it in the respective theory. " +
       PIDE_MCP_Tool_Schema.implicit_load_file
@@ -30,7 +30,7 @@ class Tool_Get_State extends PIDE_MCP_Tool("get_state") {
     false)
   private val commands_limit_arg = PIDE_MCP_Tool_Arg.opt_int(
     "commands_limit",
-    "Maximum number of unproblematic commands to return. Omit to return all commands. " +
+    "Maximum number of unproblematic commands to return. Omit to return all commands. Problematic commands are always returned. " +
       "**Set to 0 whenever you only want to get summary information (e.g. to see if there are any errors, warnings, etc.).** " +
       "Note that the returned summary will count all commands, even the truncated ones. " +
       "Warning: for large ranges, there are thousands of commands that may flood your context. Set the commands limit to 0 if you do not need details.",
