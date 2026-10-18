@@ -44,6 +44,9 @@ object PIDE_MCP_Util {
   def numbered_line(line: Int, text: String): String =
     s"${line}: ${text}"
 
+  def line_range(start_line: Int, end_line: Int): String =
+    if (start_line == end_line) start_line.toString else s"$start_line-$end_line"
+
   def numbered_lines(lines: IterableOnce[String], start_line: Int): String =
     lines.iterator.zipWithIndex.map { case (l, i) =>
       numbered_line(start_line + i, l) }.mkString("\n")

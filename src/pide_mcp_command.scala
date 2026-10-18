@@ -195,19 +195,24 @@ object PIDE_MCP_Command {
       states: Iterator[State],
       doc: Line.Document,
       opts: Options,
-      limit: Option[Int]
+      problematic_limit: Option[Int],
+      unproblematic_limit: Option[Int]
     ): JSON.Object.T = {
-      def excerpt(ranges: List[Text.Range]): List[String] =
+      def snippet(ranges: List[Text.Range]): List[String] =
         ranges.map { range =>
-          val start = doc.position(range.start)
-          PIDE_MCP_Util.numbered_line(start.line1,
-            doc.lines(start.line).text.slice(start.column, start.column + range.length))
+          val start = doc.position(range.start).line1
+          val (shown, rest) =
+            Line.logical_lines(range.substring(doc.text).stripLineEnd).splitAt(opts.snippet_lines)
+          val omitted = Option.when(rest.nonEmpty)(
+            PIDE_MCP_Util.line_range(start + shown.length, start + shown.length + rest.length - 1) + ": ...")
+          cat_lines(proper_string(PIDE_MCP_Util.numbered_lines(shown, start)).toList ::: omitted.toList)
         }
       val cmd_counts = mutable.Map[String, Int]().withDefaultValue(0)
-      val excerpts = mutable.Map[String, mutable.ListBuffer[List[String]]]()
+      val snippets = mutable.Map[String, mutable.ListBuffer[List[String]]]()
       val returned_commands = new mutable.ListBuffer[JSON.Object.T]
       var total_timing_ms = 0L
       var count = 0
+      var count_problematic = 0
       var count_unproblematic = 0
       for (state <- states) {
         count += 1
@@ -217,23 +222,28 @@ object PIDE_MCP_Command {
         cmd_counts("errors") += state.errors.length
         cmd_counts("warnings") += state.warnings.length
         for ((key, ranges) <- state.problems)
-          excerpts.getOrElseUpdate(key, new mutable.ListBuffer[List[String]]) += excerpt(ranges)
-        if (state.problems.nonEmpty || limit.forall(count_unproblematic < _))
-          returned_commands += state.json(doc, opts)
-        if (state.problems.isEmpty) count_unproblematic += 1
+          snippets.getOrElseUpdate(key, new mutable.ListBuffer[List[String]]) += snippet(ranges)
+        if (state.problems.nonEmpty) {
+          if (problematic_limit.forall(count_problematic < _)) returned_commands += state.json(doc, opts)
+          count_problematic += 1
+        }
+        else if (!state.is_empty) {
+          if (unproblematic_limit.forall(count_unproblematic < _)) returned_commands += state.json(doc, opts)
+          count_unproblematic += 1
+        }
       }
-      def excerpt_entry(key: String): (String, JSON.T) = key -> JSON_Object(
+      def snippet_entry(key: String): (String, JSON.T) = key -> JSON_Object(
         "count" -> cmd_counts(key),
-        "excerpts" -> excerpts.get(key).map(_.toList).getOrElse(Nil))
+        "source_snippets" -> snippets.get(key).map(_.toList).getOrElse(Nil))
       Status.prefix_keys(JSON_Object(
         "total_timing_ms" -> total_timing_ms,
-        excerpt_entry(Status.running),
-        excerpt_entry(Status.warned),
-        excerpt_entry(Status.failed),
-        excerpt_entry(Status.canceled),
-        excerpt_entry("bad"),
-        excerpt_entry("errors"),
-        excerpt_entry("warnings"),
+        snippet_entry(Status.running),
+        snippet_entry(Status.warned),
+        snippet_entry(Status.failed),
+        snippet_entry(Status.canceled),
+        snippet_entry("bad"),
+        snippet_entry("errors"),
+        snippet_entry("warnings"),
         Status.unprocessed -> cmd_counts(Status.unprocessed),
         Status.finished -> cmd_counts(Status.finished))) +
         ("commands" -> JSON_Object("count" -> count,
@@ -244,7 +254,8 @@ object PIDE_MCP_Command {
       include_types: Boolean = false,
       include_facts: Boolean = false,
       include_infos: Boolean = false,
-      include_full_markup: Boolean = false
+      include_full_markup: Boolean = false,
+      snippet_lines: Int = 1
     )
   }
 
@@ -269,10 +280,10 @@ object PIDE_MCP_Command {
     lazy val timing_ms: Long = cmd_status.timings.sum(Date.now()).ms
     lazy val bad: List[Text.Markup] =
       snapshot.select(range, Markup.Elements(Markup.BAD), _ => Some(_)).map(_.info)
-    private def bad_json: List[JSON.Object.T] = bad.map { case Text.Info(r, elem) =>
+    private def bad_json(doc: Line.Document): List[JSON.Object.T] = bad.map { case Text.Info(r, elem) =>
         JSON_Object(
           "message" -> PIDE_MCP_Util.elem_body_plain_text(elem),
-          "source" -> r.substring(snapshot.node.source))
+          "source" -> PIDE_MCP_Util.numbered_lines(r.substring(snapshot.node.source), doc.position(r.start).line1))
       }
     lazy val errors: List[(XML.Elem, List[Text.Range])] = results.filter(r => Protocol.is_error(r._1))
     lazy val warnings: List[(XML.Elem, List[Text.Range])] =
@@ -282,6 +293,7 @@ object PIDE_MCP_Command {
         bad.map(info => "bad" -> List(info.range)) :::
         errors.map("errors" -> _._2) :::
         warnings.map("warnings" -> _._2)
+    def is_empty: Boolean = cmd.span.content.forall(_.is_space) && results.isEmpty && problems.isEmpty
 
     def json(doc: Line.Document, opts: State.Options): JSON.Object.T = {
       val source_line = doc.position(range.start).line1
@@ -291,7 +303,7 @@ object PIDE_MCP_Command {
           Some("status" -> status),
           Some("timing_ms" -> timing_ms),
           Some("source" -> PIDE_MCP_Util.numbered_lines(source, source_line)),
-          proper_list(bad_json).map("bad" -> _)) :::
+          proper_list(bad_json(doc)).map("bad" -> _)) :::
         message_entries(results.iterator.map(_._1), Message_Kind.important) :::
         List(
           Option.when(opts.include_types)(
