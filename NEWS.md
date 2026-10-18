@@ -4,6 +4,7 @@ PIDE MCP NEWS -- history of user-relevant changes
 New in this PIDE MCP version
 ----------------------------
 
+* Edits now decode automatically.
 * More compact `get_state`: by default, only a summary is returned instead of full commands.
   Empty commands are not returned but still counted. New `include_details` and `problematic_commands_limit`.
   `commands_limit` is renamed to `unproblematic_commands_limit`. INCOMPATIBILITY.

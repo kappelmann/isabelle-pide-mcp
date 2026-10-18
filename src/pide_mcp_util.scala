@@ -65,6 +65,15 @@ object PIDE_MCP_Util {
 
   def path(s: String): Path = Path.explode(File.standard_path(s))
 
+  def uses_isabelle_encoding(path: Path): Boolean =
+    File.is_thy(path.file_name) || File.is_ML(path.file_name)
+
+  def decode_file_text(path: Path, text: String): String =
+    if (uses_isabelle_encoding(path)) Symbol.decode(text) else text
+
+  def encode_file_text(path: Path, text: String): String =
+    if (uses_isabelle_encoding(path)) Symbol.encode(text) else text
+
   def display_name(entry: Option[Name_Space.Entry], range: Text.Range, source: String): String =
     entry.map(_.name).filter(_.nonEmpty).getOrElse(range.substring(source))
 
