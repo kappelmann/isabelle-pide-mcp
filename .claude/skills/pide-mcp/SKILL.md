@@ -25,7 +25,7 @@ Important rules (further elaborated in the sections below):
 - **After edits, use `get_state`** to see status, errors, warnings.
 - **Restrict by `start_line` / `end_line`** when querying to avoid analysing data for hundreds of finished commands in large theories.
 - **`sorry` is reported as `bad`, not as an `error`.** A clean theory has 0 bad commands AND 0 errors AND 0 failures.
-- **If `> 0` commands are running for more than ~30s, suspect a loop** - restructure rather than wait.
+- **If `> 0` commands are running for more than ~20s, suspect a loop** - restructure rather than wait.
 - **Use `get_session_state` whenever you think the process is stuck** - it shows progress of theories and lists currently running commands and resource statistics.
 - **Use `get_session_state` for a global overview and `get_state` for theory-local information.**
 - **The PIDE perspective** is set by some tools and marks the commands for which print functions are run, which return extra output e.g. automatic `quickcheck` and `solve_direct` information.
@@ -83,9 +83,9 @@ This allows you to test proof strategies and alternative developments without ch
 Final results can be written back to the original file.
 
 ### Querying (Proof) Context
-- **`get_state` returns structured information at any command position, including status (check it after edits), subgoals, prover messages (errors, warnings, writelns, .etc), type information for terms,...**
-- **`get_state` accepts flags to opt into some of the data**, like `include_types` (for Isabelle and ML), `include_facts` (theorems used in range), etc.
-- **Set the `get_state` command limits** when you only care about summary information or a limited number of commands - a large number of commands may flood your context.
+- **`get_state` returns structured information at any command position:** a summary with status counts, errors, warnings, and their messages (check it after edits) and, optionally, the commands' subgoals, type information for terms,...
+- **`get_state` accepts flags to opt into some of the data**, like `include_details`, `include_types` (for Isabelle and ML), `include_facts` (theorems used in range), etc.
+- **Set the `get_state` command limits** when you include details - a large number of commands may flood your context.
 - **Restrict by `start_line` / `end_line`** when you only care about a specific lemma or error - it is less verbose than scanning the whole file. But don't forget that local changes may have global effects.
 - **`find_entities` lets you explore defined entities (theorems, definitions, methods, ML terms, etc.)**.
 Moreover, you can use Isar commands if necessary, for example:

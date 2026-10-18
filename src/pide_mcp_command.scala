@@ -198,7 +198,7 @@ object PIDE_MCP_Command {
       problematic_limit: Option[Int],
       unproblematic_limit: Option[Int]
     ): JSON.Object.T = {
-      def snippet(ranges: List[Text.Range]): List[String] =
+      def snippets(ranges: List[Text.Range]): List[String] =
         ranges.map { range =>
           val start = doc.position(range.start).line1
           val (shown, rest) =
@@ -207,8 +207,18 @@ object PIDE_MCP_Command {
             PIDE_MCP_Util.line_range(start + shown.length, start + shown.length + rest.length - 1) + ": ...")
           cat_lines(proper_string(PIDE_MCP_Util.numbered_lines(shown, start)).toList ::: omitted.toList)
         }
+      def occurrence(
+        state: State,
+        key: String,
+        ranges: List[Text.Range],
+        opt_elem: Option[XML.Elem]
+      ): JSON.Object.T =
+        JSON_Object("source_snippets" -> snippets(ranges)) ++
+          JSON.optional("message" ->
+            opt_elem.flatMap(elem => proper_string(PIDE_MCP_Util.elem_body_plain_text(elem)))) ++
+          JSON_Object.if_proper(key == Status.running, JSON_Object("timing_ms" -> state.timing_ms))
       val cmd_counts = mutable.Map[String, Int]().withDefaultValue(0)
-      val snippets = mutable.Map[String, mutable.ListBuffer[List[String]]]()
+      val occurrences = mutable.Map[String, mutable.ListBuffer[JSON.Object.T]]()
       val returned_commands = new mutable.ListBuffer[JSON.Object.T]
       var total_timing_ms = 0L
       var count = 0
@@ -221,33 +231,38 @@ object PIDE_MCP_Command {
         cmd_counts("bad") += state.bad.length
         cmd_counts("errors") += state.errors.length
         cmd_counts("warnings") += state.warnings.length
-        for ((key, ranges) <- state.problems)
-          snippets.getOrElseUpdate(key, new mutable.ListBuffer[List[String]]) += snippet(ranges)
-        if (state.problems.nonEmpty) {
-          if (problematic_limit.forall(count_problematic < _)) returned_commands += state.json(doc, opts)
-          count_problematic += 1
+        for ((key, ranges, opt_elem) <- state.problems) {
+          occurrences.getOrElseUpdate(key, new mutable.ListBuffer[JSON.Object.T]) +=
+            occurrence(state, key, ranges, opt_elem)
         }
-        else if (!state.is_empty) {
-          if (unproblematic_limit.forall(count_unproblematic < _)) returned_commands += state.json(doc, opts)
-          count_unproblematic += 1
+        if (opts.include_details) {
+          if (state.problems.nonEmpty) {
+            if (problematic_limit.forall(count_problematic < _)) returned_commands += state.json(doc, opts)
+            count_problematic += 1
+          }
+          else if (!state.is_empty) {
+            if (unproblematic_limit.forall(count_unproblematic < _)) returned_commands += state.json(doc, opts)
+            count_unproblematic += 1
+          }
         }
       }
-      def snippet_entry(key: String): (String, JSON.T) = key -> JSON_Object(
+      def occurrences_entry(key: String): (String, JSON.T) = key -> JSON_Object(
         "count" -> cmd_counts(key),
-        "source_snippets" -> snippets.get(key).map(_.toList).getOrElse(Nil))
+        "occurrences" -> occurrences.get(key).map(_.toList).getOrElse(Nil))
       Status.prefix_keys(JSON_Object(
         "total_timing_ms" -> total_timing_ms,
-        snippet_entry(Status.running),
-        snippet_entry(Status.warned),
-        snippet_entry(Status.failed),
-        snippet_entry(Status.canceled),
-        snippet_entry("bad"),
-        snippet_entry("errors"),
-        snippet_entry("warnings"),
+        occurrences_entry(Status.running),
+        occurrences_entry(Status.warned),
+        occurrences_entry(Status.failed),
+        occurrences_entry(Status.canceled),
+        occurrences_entry("bad"),
+        occurrences_entry("errors"),
+        occurrences_entry("warnings"),
         Status.unprocessed -> cmd_counts(Status.unprocessed),
         Status.finished -> cmd_counts(Status.finished))) +
-        ("commands" -> JSON_Object("count" -> count,
-          "count_returned" -> returned_commands.length, "commands" -> returned_commands.toList))
+        ("commands" -> (JSON_Object("count" -> count) ++
+          JSON_Object.if_proper(opts.include_details, JSON_Object(
+            "count_returned" -> returned_commands.length, "commands" -> returned_commands.toList))))
     }
 
     sealed case class Options(
@@ -255,7 +270,8 @@ object PIDE_MCP_Command {
       include_facts: Boolean = false,
       include_infos: Boolean = false,
       include_full_markup: Boolean = false,
-      snippet_lines: Int = 1
+      snippet_lines: Int = 1,
+      include_details: Boolean = false
     )
   }
 
@@ -288,11 +304,11 @@ object PIDE_MCP_Command {
     lazy val errors: List[(XML.Elem, List[Text.Range])] = results.filter(r => Protocol.is_error(r._1))
     lazy val warnings: List[(XML.Elem, List[Text.Range])] =
       results.filter(r => Protocol.is_warning_or_legacy(r._1))
-    lazy val problems: List[(String, List[Text.Range])] =
-      status.filterNot(Set(Status.unprocessed, Status.finished)).map(_ -> List(range)) :::
-        bad.map(info => "bad" -> List(info.range)) :::
-        errors.map("errors" -> _._2) :::
-        warnings.map("warnings" -> _._2)
+    lazy val problems: List[(String, List[Text.Range], Option[XML.Elem])] =
+      status.filterNot(Set(Status.unprocessed, Status.finished)).map((_, List(range), None)) :::
+        bad.map(info => ("bad", List(info.range), Some(info.info))) :::
+        errors.map((elem, ranges) => ("errors", ranges, Some(elem))) :::
+        warnings.map((elem, ranges) => ("warnings", ranges, Some(elem)))
     def is_empty: Boolean = cmd.span.content.forall(_.is_space) && results.isEmpty && problems.isEmpty
 
     def json(doc: Line.Document, opts: State.Options): JSON.Object.T = {
