@@ -143,7 +143,7 @@ class Tool_Edit extends PIDE_MCP_Tool("edit") {
       val node_name = PIDE_MCP_Tool_Util.origin_param(session, args)
       val mode = mode_arg.get(args)
       val text = Line.normalize(text_arg.get(args))
-      val old_text = Line.normalize(old_text_arg.get(args))
+      val old_text = PIDE_MCP_Util.decode_file_text(node_name.path, Line.normalize(old_text_arg.get(args)))
       val edit_all = edit_all_arg.get(args)
       val opt_start_line = PIDE_MCP_Tool_Schema.opt_start_line_arg.get(args)
       val opt_end_line = PIDE_MCP_Tool_Schema.opt_end_line_arg.get(args)

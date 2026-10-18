@@ -250,18 +250,12 @@ class PIDE_MCP_Session private(
     await_ready(progress, "current document version")(version.peek.map(Exn.release))
   }
 
-  def uses_isabelle_encoding(path: Path): Boolean = File.is_thy(path) || File.is_ML(path)
-
   def read_file_content(node_name: Document.Node.Name): String =
-    resources.make_theory_content(node_name).getOrElse {
-      val text = Line.normalize(File.read(node_name.path))
-      if (uses_isabelle_encoding(node_name.path)) Symbol.decode(text) else text
-    }
+    resources.make_theory_content(node_name).getOrElse(
+      PIDE_MCP_Util.decode_file_text(node_name.path, Line.normalize(File.read(node_name.path))))
 
-  def write_file_content(path: Path, text: String): Unit = {
-    val text1 = Line.normalize(text)
-    File.write(path, if (uses_isabelle_encoding(path)) Symbol.encode(text1) else text1)
-  }
+  def write_file_content(path: Path, text: String): Unit =
+    File.write(path, PIDE_MCP_Util.encode_file_text(path, Line.normalize(text)))
 
   def node_source(
     snapshot: Document.Snapshot,
