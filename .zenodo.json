@@ -1,0 +1,11 @@
+{
+  "title": "Isabelle PIDE MCP",
+  "upload_type": "software",
+  "creators": [
+    {
+      "name": "Kappelmann, Kevin",
+      "orcid": "0000-0003-1421-6497"
+    }
+  ],
+  "keywords": ["Isabelle", "MCP", "Agentic Theorem Proving"]
+}
