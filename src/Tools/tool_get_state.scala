@@ -11,8 +11,8 @@ class Tool_Get_State extends PIDE_MCP_Tool("get_state") {
     "Inspect the state of a (range in a) file: errors, warnings, goals, variables, etc. " +
       "Returns a summary (errors, warnings, commands still running,...) and, optionally, details (subgoals, types, markup,...) for commands in range. " +
       "The summary includes all commands, even the ones beyond the passed command limits. " +
-      "**Use this frequently to check if you are making progress, what is left to be done, and importantly, if commands are still processing, potentially even looping.** " +
-      "For non-theory files, the response has a single command entry derived from the command that loaded it in the respective theory. " +
+      "**Use this frequently to check if you are making progress, what is left to be done, and if commands are still processing, potentially even looping.** " +
+      "For non-theory files, the response has a single command derived from the command that loaded it in the respective theory. " +
       PIDE_MCP_Tool_Schema.implicit_load_file
 
   private val include_details_arg = PIDE_MCP_Tool_Arg.bool_default(
