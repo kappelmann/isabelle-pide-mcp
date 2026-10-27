@@ -82,11 +82,11 @@ object PIDE_MCP_Definition {
     def_entry_not_loaded: String
   ): List[PIDE_MCP_Definition] = {
     val restricted = PIDE_MCP_Util.restrict_text_range(snapshot.node.source, range)
+    val context = new Context(session, snapshot)
     snapshot.select(restricted, Markup.Elements(Markup.ENTITY), _ => {
       case Text.Info(r, XML.Elem(Markup.Entity(name_space_entry), _))
       if kinds.contains(name_space_entry.kind) =>
         val name = PIDE_MCP_Util.display_name(Some(name_space_entry), r, snapshot.node.source)
-        val context = new Context(session, snapshot)
         PIDE_MCP_Definition(context, name_space_entry, name, snippet_lines,
           filter_origins, def_entry_not_loaded)
       case _ => None

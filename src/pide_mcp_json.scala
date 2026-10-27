@@ -30,11 +30,7 @@ object PIDE_MCP_JSON {
     name: String,
     unapply: JSON.T => Option[A],
     where: Option[String] = None
-  ): A = obj.get(name) match {
-    case None => error("Missing " + field_text(name, where))
-    case Some(json) => unapply(json).getOrElse(
-      error("Malformed " + field_text(name, where) + ": " + JSON.Format(json)))
-  }
+  ): A = value_default(obj, name, unapply, error("Missing " + field_text(name, where)), where)
 
   def value_default[A](
     obj: JSON.Object.T,

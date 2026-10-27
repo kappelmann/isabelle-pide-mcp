@@ -11,8 +11,8 @@ import java.io.{File => JFile}
 class Tool_Create_Scratch extends PIDE_MCP_Tool("create_scratch") {
   def description: String =
     "Create a temporary file for experimentation that does not interfere with user accessible files. " +
-      "Use this whenever you think you need to do iterative developments or when you want to find and explore theorems, syntax, concepts, commands, ML code, etc. Write back final results to files accessible to the user. " +
-      "Temporary files are cleaned up when the session stops."
+    "Use this whenever you think you need to do iterative developments or when you want to find and explore theorems, syntax, concepts, commands, ML code, etc. Write back final results to files accessible to the user. " +
+    "Temporary files are cleaned up when the session stops."
 
   private val name_suffix_arg = PIDE_MCP_Tool_Arg.opt_string(
     "name_suffix",
@@ -54,7 +54,7 @@ class Tool_Create_Scratch extends PIDE_MCP_Tool("create_scratch") {
   ): (Path, Boolean) = {
     val suffix = name_suffix.getOrElse(Date.now().format(Date.Format("yyyy_MM_dd_HH_mm_ss_SSS")))
     val base_name = scratch_prefix + suffix
-    val file_name = extension match { case Some(ext) => base_name + ext case None => base_name }
+    val file_name = base_name + extension.getOrElse("")
     val file_path =
       (File.path(get_scratch_dir(session_id)) + Path.basic(file_name)).canonical
     (file_path, file_path.file.createNewFile())

@@ -99,7 +99,7 @@ object PIDE_MCP_Protocol {
       case _ => JSON.Format(structured)
     }))
     JSON_Object("content" -> content, "structuredContent" -> structured) ++
-      JSON.optional("isError" -> Option.when(is_error)(true))
+    JSON.optional("isError" -> Option.when(is_error)(true))
   }
 
   sealed case class Cancellation(id: JSON_RPC.Id, reason: Option[String])

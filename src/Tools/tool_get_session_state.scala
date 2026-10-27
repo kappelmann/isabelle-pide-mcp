@@ -135,15 +135,15 @@ object Tool_Get_Session_State {
 class Tool_Get_Session_State extends PIDE_MCP_Tool("get_session_state") {
   def description: String =
     "Inspect the state of running PIDE sessions, their theories (including status and progress), their resource statistics, and the currently running commands. " +
-      "**Use this for a global overview, e.g. when you think the prover is stuck or you want to know what is being processed.** " +
-      "Note that sorrys are not listed."
+    "**Use this for a global overview, e.g. when you think the prover is stuck or you want to know what is being processed.** " +
+    "Note that sorrys are not listed."
 
   private val filter_origins_arg = PIDE_MCP_Tool_Arg.dictionary_default(
     "filter_origins",
     "Mapping from session id to dynamic origins (session-qualified theory names or file paths). " +
-      "If provided for a session, only returns theory information and running commands for those origins. " +
-      "Sessions without an entry include all their dynamic theories. " +
-      "Does not affect resource statistics.",
+    "If provided for a session, only returns theory information and running commands for those origins. " +
+    "Sessions without an entry include all their dynamic theories. " +
+    "Does not affect resource statistics.",
     PIDE_MCP_Tool_Arg.Format.list(PIDE_MCP_Tool_Arg.Format.string),
     VectorMap.empty)
   private val include_commands_running_arg = PIDE_MCP_Tool_Arg.bool_default(
@@ -155,19 +155,19 @@ class Tool_Get_Session_State extends PIDE_MCP_Tool("get_session_state") {
   private val include_session_dirs_arg = PIDE_MCP_Tool_Arg.bool_default(
     "include_session_dirs",
     "List directories from which the session attempts to load files. " +
-      "Use this when you want to learn what libraries you have access to and where they are located. " +
-      "Note that session names, which you have to use for session-qualified loading of (library) theories, are stored in the ROOT files of these directories.",
+    "Use this when you want to learn what libraries you have access to and where they are located. " +
+    "Note that session names, which you have to use for session-qualified loading of (library) theories, are stored in the ROOT files of these directories.",
     false)
   private val include_options_arg = PIDE_MCP_Tool_Arg.default(
     "include_options",
     "List Isabelle session options. " +
-      s"Use ${quote("changed")} to only show options that differ from their default value and " +
-      s"${quote("true")} to show all options.",
+    s"Use ${quote("changed")} to only show options that differ from their default value and " +
+    s"${quote("true")} to show all options.",
     Tool_Get_Session_State.Options_Mode.format, Tool_Get_Session_State.Options_Mode.default)
   private val include_statistics_arg = PIDE_MCP_Tool_Arg.bool_default(
     "include_statistics",
     "Include each session's recent Isabelle/ML statistics (heap, threads,...), their summary, and the MCP server's JVM statistics (heap, threads,...). " +
-      "Use this to check memory consumption and when you think the server is stuck.",
+    "Use this to check memory consumption and when you think the server is stuck.",
     false)
 
   def input_schema: JSON.Object.T = PIDE_MCP_Tool_Schema.input_schema(
@@ -206,35 +206,34 @@ class Tool_Get_Session_State extends PIDE_MCP_Tool("get_session_state") {
       val session_states = selected_sessions.map { session =>
         lazy val snapshot = session.snapshot()
         lazy val theories = PIDE_MCP_Theory.Loaded(session, snapshot.version.nodes)
-        lazy val names =
-          filter_origins.get(session.id) match {
-            case None => theories.dynamic
-            case Some(session_origins) =>
-              val origins = session_origins.map(origin =>
-                session.origin(session.node_name(origin))).toSet
-              theories.dynamic.filter(name => origins.contains(session.origin(name)))
-          }
+        lazy val names = filter_origins.get(session.id) match {
+          case None => theories.dynamic
+          case Some(session_origins) =>
+            val origins = session_origins.map(origin =>
+              session.origin(session.node_name(origin))).toSet
+            theories.dynamic.filter(name => origins.contains(session.origin(name)))
+        }
         JSON_Object("session" -> session.id, "base_session" -> session.base_session) ++
-          JSON.optional(PIDE_MCP_Command.Status.key(PIDE_MCP_Command.Status.running) ->
-            Option.when(include_commands_running) {
-              PIDE_MCP_Theory.commands_running_json(session, snapshot, names)
-            }) ++
-          JSON_Object.if_proper(include_theory_status,
-            PIDE_MCP_Theory.Status.statuses_json(
-              PIDE_MCP_Theory.Status.statuses(session, snapshot, names))) ++
-          JSON.optional("loaded_theories" ->
-            Option.when(include_loaded_theories)(theories.json)) ++
-          JSON.optional("session_directories" ->
-            Option.when(include_session_dirs)(session.directories().map(_.implode))) ++
-          Tool_Get_Session_State.options_json(session.options, include_options) ++
-          JSON_Object.if_proper(include_statistics, session_statistics.get(session.id)
-            .map(stats => Tool_Get_Session_State.ml_stats_json(List(stats)))
-            .getOrElse(JSON_Object("note" -> "no ML statistics reported yet")))
+        JSON.optional(PIDE_MCP_Command.Status.key(PIDE_MCP_Command.Status.running) ->
+          Option.when(include_commands_running) {
+            PIDE_MCP_Theory.commands_running_json(session, snapshot, names)
+          }) ++
+        JSON_Object.if_proper(include_theory_status,
+          PIDE_MCP_Theory.Status.statuses_json(
+            PIDE_MCP_Theory.Status.statuses(session, snapshot, names))) ++
+        JSON.optional("loaded_theories" ->
+          Option.when(include_loaded_theories)(theories.json)) ++
+        JSON.optional("session_directories" ->
+          Option.when(include_session_dirs)(session.directories().map(_.implode))) ++
+        Tool_Get_Session_State.options_json(session.options, include_options) ++
+        JSON_Object.if_proper(include_statistics, session_statistics.get(session.id)
+          .map(stats => Tool_Get_Session_State.ml_stats_json(List(stats)))
+          .getOrElse(JSON_Object("note" -> "no ML statistics reported yet")))
       }
       JSON_Object("sessions" -> session_states) ++
-        JSON_Object.if_proper(include_statistics,
-          Tool_Get_Session_State.ml_stats_json(session_statistics.values.toList) ++
-            Tool_Get_Session_State.jvm_stats_json())
+      JSON_Object.if_proper(include_statistics,
+        Tool_Get_Session_State.ml_stats_json(session_statistics.values.toList) ++
+        Tool_Get_Session_State.jvm_stats_json())
     }
 }
 

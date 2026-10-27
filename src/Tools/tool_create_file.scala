@@ -20,8 +20,8 @@ object Tool_Create_File {
 class Tool_Create_File extends PIDE_MCP_Tool("create_file") {
   def description: String =
     "Create an empty file at the given path. " +
-      "Creates missing parent directories if necessary. " +
-      "Fails if the path already exists."
+    "Creates missing parent directories if necessary. " +
+    "Fails if the path already exists."
 
   private val path_arg = PIDE_MCP_Tool_Arg.string(
     "path",

@@ -22,9 +22,9 @@ Important rules (further elaborated in the sections below):
 
 - PIDE MCP can manage several Isabelle PIDE sessions. **Some sessions might have already been started.**
 - **Most tools take the id of a running session as input. Use `list_sessions` to get the ids and status of all sessions.**
-- **After edits, use `get_state`** to see status, errors, warnings.
+- **After edits, use `get_state`** to see status, errors, warnings, timing,...
 - **Restrict by `start_line` / `end_line`** when querying to avoid analysing data for hundreds of finished commands in large theories.
-- **`sorry` is reported as `bad`, not as an `error`.** A clean theory has 0 bad commands AND 0 errors AND 0 failures.
+- **`sorry` is reported as `bad`, not as an `error`.** A clean theory has no bad commands, no errors, no failures.
 - **If `> 0` commands are running for more than ~20s, suspect a loop** - restructure rather than wait.
 - **Use `get_session_state` whenever you think the process is stuck** - it shows progress of theories and lists currently running commands and resource statistics.
 - **Use `get_session_state` for a global overview and `get_state` for theory-local information.**
@@ -53,7 +53,7 @@ Important rules (further elaborated in the sections below):
 
 ### After Every Edit
 1. **Check for errors/unfinished/successful commands after edits with `get_state`**.
-2. **`sorry`s are included as `bad` commands. `errors` counts actual failures. A "clean" state requires both to be 0.**
+2. **`sorry`s are included as `bad` commands. `errors` counts actual failures.**
 
 ### Time Management
 - **Avoid adding large amounts of new material at once, as it makes it hard to identify the source of errors and nontermination.**
@@ -84,7 +84,7 @@ Final results can be written back to the original file.
 
 ### Querying (Proof) Context
 - **`get_state` returns structured information at any command position:** a summary with status counts, errors, warnings, and their messages (check it after edits) and, optionally, the commands' subgoals, type information for terms,...
-- **`get_state` accepts flags to opt into some of the data**, like `include_details`, `include_types` (for Isabelle and ML), `include_facts` (theorems used in range), etc.
+- **`get_state` accepts flags to opt into some of the data**.
 - **Set the `get_state` command limits** when you include details - a large number of commands may flood your context.
 - **Restrict by `start_line` / `end_line`** when you only care about a specific lemma or error - it is less verbose than scanning the whole file. But don't forget that local changes may have global effects.
 - **`find_entities` lets you explore defined entities (theorems, definitions, methods, ML terms, etc.)**.

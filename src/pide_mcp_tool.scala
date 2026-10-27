@@ -10,7 +10,7 @@ object PIDE_MCP_Tool {
   val max_name_length: Int = 128
   def valid_name(name: String): Boolean =
     name.nonEmpty && name.length <= max_name_length &&
-      name.forall(c => Symbol.is_ascii_letter(c) || Symbol.is_ascii_digit(c) || "_-.".contains(c))
+    name.forall(c => Symbol.is_ascii_letter(c) || Symbol.is_ascii_digit(c) || "_-.".contains(c))
 }
 
 abstract class PIDE_MCP_Tool(val name: String) {

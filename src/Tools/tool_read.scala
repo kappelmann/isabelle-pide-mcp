@@ -9,10 +9,10 @@ import isabelle._
 class Tool_Read extends PIDE_MCP_Tool("read") {
   def description: String =
     "Read line-numbered content for a given range. Use this to get the file's content. " +
-      "Also use it to re-synchronise the file's disk content with the PIDE session if you experience discrepancies between the PIDE state and the external disk state (e.g. due to external edits). " +
-      "Returns once Isabelle has processed the read, which takes longer if the origin's dependencies were not loaded yet. " +
-      PIDE_MCP_Tool_Schema.range_visibility + " " +
-      PIDE_MCP_Tool_Schema.implicit_reload_file
+    "Also use it to re-synchronise the file's disk content with the PIDE session if you experience discrepancies between the PIDE state and the external disk state (e.g. due to external edits). " +
+    "Returns once Isabelle has processed the read, which takes longer if the origin's dependencies were not loaded yet. " +
+    PIDE_MCP_Tool_Schema.range_visibility + " " +
+    PIDE_MCP_Tool_Schema.implicit_reload_file
 
   def input_schema: JSON.Object.T = PIDE_MCP_Tool_Schema.input_schema(
     List(PIDE_MCP_Tool_Schema.running_session_arg, PIDE_MCP_Tool_Schema.origin_arg,

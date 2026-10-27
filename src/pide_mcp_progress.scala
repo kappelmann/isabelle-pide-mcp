@@ -85,7 +85,7 @@ extends Progress with Progress.Global_Interrupts with Progress.Status {
 
 class PIDE_MCP_Task_Progress(
   base_progress: Progress.Status,
-  opt_notify: Option[(Long, String) => Unit]
+  notify_progress: Option[(Long, String) => Unit]
 ) extends Progress with Progress.Local_Interrupts {
   private var serial: Long = 0L
 
@@ -93,7 +93,7 @@ class PIDE_MCP_Task_Progress(
 
   private def notify_messages(messages: Progress.Output): Unit =
     for {
-      notify <- opt_notify
+      notify <- notify_progress
       message <- messages if do_output(message)
     } {
       serial += 1
@@ -113,8 +113,8 @@ class PIDE_MCP_Task_Progress(
         yield theory + " " + st.percentage + "%"
       Progress.Message(Output.Kind.writeln,
         if_proper(status.session, status.session + ": ") +
-          s"${finished}/${theories.length} theories finished" +
-          if_proper(running, ", running: " + commas(running)), verbose = false)
+        s"${finished}/${theories.length} theories finished" +
+        if_proper(running, ", running: " + commas(running)), verbose = false)
     }
   }
 

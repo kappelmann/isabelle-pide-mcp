@@ -119,17 +119,16 @@ object PIDE_MCP_Session {
         } match {
           case Exn.Res(session) => Result.Res(session)
           case Exn.Exn(exn) =>
-            Exn.capture(session.stop()) match {
-              case Exn.Res(process_result) if process_result.ok =>
-                if (Exn.is_interrupt(exn)) throw exn else Result.Error(exn)
-              case Exn.Res(process_result) => throw ERROR(cat_lines(List(
+            val stop_failure = Exn.capture(session.stop()) match {
+              case Exn.Res(process_result) =>
+                Option.when(!process_result.ok)(PIDE_MCP_Util.print_process_result(process_result))
+              case Exn.Exn(stop_exn) => Some(Exn.message(stop_exn))
+            }
+            stop_failure match {
+              case None => if (Exn.is_interrupt(exn)) throw exn else Result.Error(exn)
+              case Some(message) => throw ERROR(cat_lines(List(
                 Exn.message(exn),
-                s"Failed to stop partially started PIDE session ${quote(id)}: " +
-                  PIDE_MCP_Util.print_process_result(process_result))))
-              case Exn.Exn(stop_exn) => throw ERROR(cat_lines(List(
-                Exn.message(exn),
-                s"Failed to stop partially started PIDE session ${quote(id)}: " +
-                  Exn.message(stop_exn))))
+                s"Failed to stop partially started PIDE session ${quote(id)}: " + message)))
             }
         }
     }
@@ -198,12 +197,9 @@ class PIDE_MCP_Session private(
       .getOrElse(path_node_name(PIDE_MCP_Util.path(s)))
 
   def origin(node_name: Document.Node.Name): String =
-    if (node_name.is_theory) {
-      resources.find_theory_node(node_name.theory) match {
-        case Some(_) => node_name.theory // session-qualified
-        case None => node_name.node // full path
-      }
-    } else node_name.node // full path
+    if (node_name.is_theory && resources.find_theory_node(node_name.theory).isDefined)
+      node_name.theory // session-qualified
+    else node_name.node // full path
 
   def is_base_session_theory(node_name: Document.Node.Name): Boolean =
     resources.loaded_theory(node_name)
@@ -397,7 +393,7 @@ class PIDE_MCP_Session private(
           PIDE_MCP_Util.text_perspective(doc, line_ranges, range_context))
       }
       val other_edits =
-        if (hide_others) hide_edits(version.nodes, nodes.map { case (name, _) => name }.toSet)
+        if (hide_others) hide_edits(version.nodes, nodes.map(_._1).toSet)
         else Iterator.empty
       update((other_edits ++ models1.iterator.flatMap(_.edits)).toList)
       models1

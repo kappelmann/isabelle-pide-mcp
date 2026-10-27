@@ -54,10 +54,7 @@ class PIDE_MCP_Sessions(
   ): Result[List[PIDE_MCP_Session], Throwable] = {
     val entries = state.value
     val running = entries.toList.flatMap { case (id, entry) => entry.running.map(id -> _) }
-    select(entries, "running", running, session_ids) match {
-      case Result.Error(exn) => Result.Error(exn)
-      case Result.Res(found) => Result.Res(found.map(_._2))
-    }
+    select(entries, "running", running, session_ids).map_res(_.map(_._2))
   }
 
   private def fresh_id(base: String, entries: VectorMap[String, Entry]): String =
@@ -211,7 +208,7 @@ class PIDE_MCP_Sessions(
     spec: PIDE_MCP_Session.Spec,
     progress: Progress
   ): Result[PIDE_MCP_Session, Throwable] =
-    Exn.result {
+    Result.result {
       val entry = state.change_result { entries =>
         val session_id = spec.id.getOrElse(fresh_id(spec.logic, entries))
         if (session_id.isEmpty) error("Session id must not be empty")
@@ -223,9 +220,6 @@ class PIDE_MCP_Sessions(
         }
       }
       entry.start()
-    } match {
-      case Exn.Res(session) => Result.Res(session)
-      case Exn.Exn(exn) => Result.Error(exn)
     }
 
   def stop_sessions(
@@ -243,9 +237,9 @@ class PIDE_MCP_Sessions(
             case Exn.Exn(exn) => List(exn)
           }
         }
-        Exn.result { PIDE_MCP_Util.check_failures(failures) } match {
-          case Exn.Res(_) => Result.Res(selected.map(_._1))
-          case Exn.Exn(exn) => Result.Error(exn)
+        Result.result {
+          PIDE_MCP_Util.check_failures(failures)
+          selected.map(_._1)
         }
     }
   }

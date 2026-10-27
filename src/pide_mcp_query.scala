@@ -9,10 +9,10 @@ import isabelle._
 object PIDE_MCP_Query {
   enum Outcome { case finished, stopped, timeout }
   sealed case class Result(outcome: Outcome, elapsed: Time, output: Editor.Output) {
-    def json(kinds: List[String]): JSON.Object.T =
+    def json(kinds: List[PIDE_MCP_Command.Message_Kind]): JSON.Object.T =
       JSON_Object.flatten(
         List(Some("status" -> outcome.toString), Some("elapsed_ms" -> elapsed.ms)) :::
-        PIDE_MCP_Command.message_entries(output.messages.iterator, kinds))
+        PIDE_MCP_Command.messages_json(output.messages.iterator, kinds))
   }
 }
 

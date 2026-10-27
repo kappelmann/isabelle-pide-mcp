@@ -61,21 +61,20 @@ object PIDE_MCP_Tool_Util {
     node_name: Document.Node.Name,
     progress: Progress
   ): Document.Snapshot = {
-    val snapshot =
-      Exn.result { session.node_snapshot(node_name) } match {
-        case Exn.Res(snapshot) => snapshot
-        case Exn.Exn(_) =>
-          if (PIDE_MCP_Util.is_loaded_dynamic(session.tip_version(progress).nodes(node_name)))
-            error(s"The origin ${quote(session.origin(node_name))} is loaded but has not been " +
-              "processed yet. " + retry_soon_message)
-          else {
-            session.read_update_resolve(node_name, List((1, Some(0))), // pass empty range to load empty nodes
-              await_stable_before_resolve = false, hide_others = false, range_context = 0,
-              progress = progress)
-            error(s"The origin ${quote(session.origin(node_name))} was not loaded and has now " +
-              "been queued for loading. " + retry_soon_message)
-          }
-      }
+    val snapshot = Exn.result { session.node_snapshot(node_name) } match {
+      case Exn.Res(snapshot) => snapshot
+      case Exn.Exn(_) =>
+        if (PIDE_MCP_Util.is_loaded_dynamic(session.tip_version(progress).nodes(node_name)))
+          error(s"The origin ${quote(session.origin(node_name))} is loaded but has not been " +
+            "processed yet. " + retry_soon_message)
+        else {
+          session.read_update_resolve(node_name, List((1, Some(0))), // pass empty range to load empty nodes
+            await_stable_before_resolve = false, hide_others = false, range_context = 0,
+            progress = progress)
+          error(s"The origin ${quote(session.origin(node_name))} was not loaded and has now " +
+            "been queued for loading. " + retry_soon_message)
+        }
+    }
     if (!node_name.is_theory && snapshot.commands_loading.isEmpty)
       error(s"File ${quote(session.origin(node_name))} is not loaded by any theory. " +
         "Load the containing theory first.")
@@ -83,40 +82,39 @@ object PIDE_MCP_Tool_Util {
   }
 
   def require_ordered_lines(
-    opt_start_line: Option[Int],
-    opt_end_line: Option[Int]
+    start_line: Option[Int],
+    end_line: Option[Int]
   ): Unit = {
-    for (start_line <- opt_start_line; end_line <- opt_end_line if end_line < start_line)
-      error(s"end_line $end_line < start_line $start_line")
+    for (start <- start_line; stop <- end_line if stop < start)
+      error(s"end_line $stop < start_line $start")
   }
 
   def require_lines_in_bounds(
-    opt_start_line: Option[Int],
-    opt_end_line: Option[Int],
+    start_line: Option[Int],
+    end_line: Option[Int],
     total_lines: Int
   ): Unit = {
-    for (start_line <- opt_start_line 
-        if start_line < 1 || start_line > (total_lines max default_start_line))
-      error(s"start_line $start_line out of bounds (file has $total_lines lines)")
-    for (end_line <- opt_end_line if end_line < 1 || end_line > total_lines)
-      error(s"end_line $end_line out of bounds (file has $total_lines lines)")
+    for (start <- start_line if start < 1 || start > (total_lines max default_start_line))
+      error(s"start_line $start out of bounds (file has $total_lines lines)")
+    for (stop <- end_line if stop < 1 || stop > total_lines)
+      error(s"end_line $stop out of bounds (file has $total_lines lines)")
   }
 
   def require_valid_lines(
-    opt_start_line: Option[Int],
-    opt_end_line: Option[Int],
+    start_line: Option[Int],
+    end_line: Option[Int],
     total_lines: Int
   ): Unit = {
-    require_ordered_lines(opt_start_line, opt_end_line)
-    require_lines_in_bounds(opt_start_line, opt_end_line, total_lines)
+    require_ordered_lines(start_line, end_line)
+    require_lines_in_bounds(start_line, end_line, total_lines)
   }
 
   def resolve_lines(
-    opt_start_line: Option[Int],
-    opt_end_line: Option[Int],
+    start_line: Option[Int],
+    end_line: Option[Int],
     total_lines: Int
   ): (Int, Int) = {
-    require_valid_lines(opt_start_line, opt_end_line, total_lines)
-    (opt_start_line.getOrElse(default_start_line), opt_end_line.getOrElse(total_lines))
+    require_valid_lines(start_line, end_line, total_lines)
+    (start_line.getOrElse(default_start_line), end_line.getOrElse(total_lines))
   }
 }

@@ -23,15 +23,9 @@ class Tool_Stop_Session extends PIDE_MCP_Tool("stop_session") {
     args: JSON.Object.T,
     progress: Progress
   ): PIDE_MCP_Tool_Result =
-    Exn.result { sessions_arg.get(args) } match {
-      case Exn.Exn(exn) => PIDE_MCP_Tool_Result.exn_error(exn)
-      case Exn.Res(session_ids) =>
-        sessions.stop_sessions(session_ids, progress) match {
-          case Result.Res(stopped) =>
-            PIDE_MCP_Tool_Result.Res(
-              JSON_Object("stopped" -> stopped, "remaining" -> sessions.state_json()))
-          case Result.Error(exn) => PIDE_MCP_Tool_Result.exn_error(exn)
-        }
+    PIDE_MCP_Tool_Result.result {
+      val stopped = Result.release(sessions.stop_sessions(sessions_arg.get(args), progress))
+      JSON_Object("stopped" -> stopped, "remaining" -> sessions.state_json())
     }
 }
 

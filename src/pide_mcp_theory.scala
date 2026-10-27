@@ -51,9 +51,9 @@ object PIDE_MCP_Theory {
     }
 
     def statuses_json(statuses: List[Status]): JSON.Object.T = {
-      val by_status = statuses.groupMapReduce(_.overall_status.toString)(_ => 1)(_ + _)
+      val by_status = statuses.groupMapReduce(_.overall_status)(_ => 1)(_ + _)
       val theory_status_counts = JSON_Object(Document_Status.Overall_Status.values.map(s =>
-        s.toString -> by_status.getOrElse(s.toString, 0)))
+        s.toString -> by_status.getOrElse(s, 0)))
       val theory_statuses = JSON_Object(statuses.map(
         status => status.origin -> status.json))
       prefix_keys(theory_status_counts) + ("theories" -> theory_statuses)
@@ -84,13 +84,13 @@ object PIDE_MCP_Theory {
     snapshot: Document.Snapshot,
     names: List[Document.Node.Name]
   ): List[JSON.Object.T] = {
-    val opts = PIDE_MCP_Command.State.Options()
+    val opts = PIDE_MCP_Command.State.Options(List(PIDE_MCP_Command.Message_Kind.errors))
     names.flatMap { name =>
       val node_snapshot = snapshot.switch(name)
-      PIDE_MCP_Command.State.commands(node_snapshot, None).flatMap { entry =>
+      PIDE_MCP_Command.States.commands(node_snapshot, None).flatMap { entry =>
         Option.when(entry.status.contains(PIDE_MCP_Command.Status.running)) {
           JSON_Object("origin" -> session.origin(name)) ++
-            entry.json(Line.Document(node_snapshot.node.source), opts)
+          entry.json(Line.Document(node_snapshot.node.source), opts)
         }
       }
     }

@@ -9,15 +9,23 @@ import isabelle._
 class Tool_Get_State extends PIDE_MCP_Tool("get_state") {
   def description: String =
     "Inspect the state of a (range in a) file: errors, warnings, goals, variables, etc. " +
-      "Returns a summary (errors, warnings, commands still running,...) and, optionally, details (subgoals, types, markup,...) for commands in range. " +
-      "The summary includes all commands, even the ones beyond the passed command limits. " +
-      "**Use this frequently to check if you are making progress, what is left to be done, and if commands are still processing, potentially even looping.** " +
-      "For non-theory files, the response has a single command derived from the command that loaded it in the respective theory. " +
-      PIDE_MCP_Tool_Schema.implicit_load_file
+    "Returns a summary (errors, warnings, commands still running,...) and, optionally, details (subgoals, types, markup,...) for commands in range. " +
+    "The summary includes all commands, even the ones beyond the passed command limits. " +
+    "**Use this frequently to check if you are making progress, what is left to be done, and if commands are still processing, potentially even looping.** " +
+    "For non-theory files, the response has a single command derived from the command that loaded it in the respective theory. " +
+    PIDE_MCP_Tool_Schema.implicit_load_file
 
   private val include_details_arg = PIDE_MCP_Tool_Arg.bool_default(
     "include_details",
     "Include command details, limited by the command limits.",
+    false)
+  private val include_goals_arg = PIDE_MCP_Tool_Arg.bool_default(
+    "include_goals",
+    "Include goals in details.",
+    false)
+  private val include_warnings_arg = PIDE_MCP_Tool_Arg.bool_default(
+    "include_warnings",
+    "Include warnings in summary and details.",
     false)
   private val include_infos_arg = PIDE_MCP_Tool_Arg.bool_default(
     "include_infos",
@@ -49,9 +57,9 @@ class Tool_Get_State extends PIDE_MCP_Tool("get_state") {
   def input_schema: JSON.Object.T = PIDE_MCP_Tool_Schema.input_schema(
     List(PIDE_MCP_Tool_Schema.running_session_arg, PIDE_MCP_Tool_Schema.origin_arg,
       PIDE_MCP_Tool_Schema.opt_start_line_arg, PIDE_MCP_Tool_Schema.opt_end_line_arg,
-      include_types_arg, include_facts_arg, include_infos_arg, include_full_markup_arg,
-      include_details_arg, problematic_commands_limit_arg, unproblematic_commands_limit_arg,
-      snippet_lines_arg))
+      include_details_arg, include_goals_arg, include_warnings_arg, include_infos_arg,
+      include_types_arg, include_facts_arg, include_full_markup_arg,
+      problematic_commands_limit_arg, unproblematic_commands_limit_arg, snippet_lines_arg))
 
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
@@ -70,14 +78,19 @@ class Tool_Get_State extends PIDE_MCP_Tool("get_state") {
       val doc = Line.Document(snapshot.node.source)
       val (start_line, end_line) =
         PIDE_MCP_Tool_Util.resolve_lines(opt_start_line, opt_end_line, doc.lines.length)
-      val opts = PIDE_MCP_Command.State.Options(
-        include_types_arg.get(args), include_facts_arg.get(args),
-        include_infos_arg.get(args), include_full_markup_arg.get(args), snippet_lines_arg.get(args),
-        include_details_arg.get(args))
+      val message_kinds =
+        Option.when(include_goals_arg.get(args))(PIDE_MCP_Command.Message_Kind.goals).toList :::
+        List(PIDE_MCP_Command.Message_Kind.errors) :::
+        Option.when(include_warnings_arg.get(args))(PIDE_MCP_Command.Message_Kind.warnings).toList :::
+        (if (include_infos_arg.get(args)) PIDE_MCP_Command.Message_Kind.info else Nil)
+      val state_opts = PIDE_MCP_Command.State.Options(message_kinds,
+        include_types_arg.get(args), include_facts_arg.get(args), include_full_markup_arg.get(args))
+      val opts = PIDE_MCP_Command.States.Options(
+        include_details_arg.get(args), problematic_commands_limit_arg.get(args),
+        unproblematic_commands_limit_arg.get(args), snippet_lines_arg.get(args))
       val range = PIDE_MCP_Util.text_range(doc, start_line, end_line).get
-      val states = PIDE_MCP_Command.State.states(snapshot, Some(range))
-      PIDE_MCP_Command.State.states_json(states, doc, opts,
-        problematic_commands_limit_arg.get(args), unproblematic_commands_limit_arg.get(args))
+      val states = PIDE_MCP_Command.States(snapshot, Some(range))
+      PIDE_MCP_Command.States.json(states, doc, state_opts, opts)
     }
 }
 

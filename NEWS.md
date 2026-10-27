@@ -7,7 +7,7 @@ New in this PIDE MCP version
 * Update to Isabelle version as specified in [ISABELLE\_VERSION](./ISABELLE_VERSION)
 * Edits now decode automatically.
 * More compact `get_state`: by default, only a summary is returned instead of full commands.
-  Empty commands are not returned but still counted. New `include_details` and `problematic_commands_limit`.
+  Empty commands are neither returned nor counted. New `include_details`, `problematic_commands_limit`, `include_goals`, and `include_warnings`.
   `commands_limit` is renamed to `unproblematic_commands_limit`. INCOMPATIBILITY.
 * Add Isabelle/ML skill file.
 * Reading or editing a theory loads its unloaded files.

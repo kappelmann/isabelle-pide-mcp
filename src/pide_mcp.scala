@@ -55,7 +55,7 @@ Usage: isabelle pide_mcp [OPTIONS]
       val base_options: Options.Update = session_spec.spec.map(_.options).getOrElse(Nil)
       val specs =
         (if (session_spec.has_session_option) session_spec.spec.toList else Nil) :::
-          session_specs.map(spec => spec.copy(options = base_options ::: spec.options))
+        session_specs.map(spec => spec.copy(options = base_options ::: spec.options))
       val options = Options.init(update = base_options)
       val threshold = progress_threshold(options)
       val progress = log_path match {
