@@ -214,7 +214,7 @@ class Tool_Get_Session_State extends PIDE_MCP_Tool("get_session_state") {
             theories.dynamic.filter(name => origins.contains(session.origin(name)))
         }
         JSON_Object("session" -> session.id, "base_session" -> session.base_session) ++
-        JSON.optional(PIDE_MCP_Command.Status.key(PIDE_MCP_Command.Status.running) ->
+        JSON.optional(PIDE_MCP_Command.Status.key(PIDE_MCP_Command.Status.running.name) ->
           Option.when(include_commands_running) {
             PIDE_MCP_Theory.commands_running_json(session, snapshot, names)
           }) ++
