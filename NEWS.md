@@ -4,11 +4,15 @@ PIDE MCP NEWS -- history of user-relevant changes
 New in this PIDE MCP version
 ----------------------------
 
+
+New in PIDE MCP 2026
+----------------------------
+
 * Update to Isabelle version as specified in [ISABELLE\_VERSION](./ISABELLE_VERSION)
-* Edits now decode automatically.
 * More compact `get_state`: by default, only a summary is returned instead of full commands.
   Empty commands are neither returned nor counted. New `include_details`, `problematic_commands_limit`, `include_goals`, and `include_warnings`.
   `commands_limit` is renamed to `unproblematic_commands_limit`. INCOMPATIBILITY.
+* Edits now decode automatically.
 * Add Isabelle/ML skill file.
 * Reading or editing a theory loads its unloaded files.
 * `unload` now also unloads files of unloaded theories unless a remaining theory still loads them.
@@ -50,7 +54,7 @@ New in PIDE MCP 2025-2
 ----------------------------
 
 * Port of PIDE MCP c13a4bd3c018 compatible with Isabelle2025-2
-* Includes all post PIDE MCP c13a4bd3c018 updates until the release of PIDE MCP 2026
+* Includes all post PIDE MCP c13a4bd3c018 updates until cd672ac6e31 (19.10.2026).
 
 New in PIDE MCP c13a4bd3c018
 ----------------------------

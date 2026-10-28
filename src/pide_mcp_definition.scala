@@ -10,6 +10,10 @@ import scala.collection.mutable
 import scala.collection.immutable.VectorMap
 
 object PIDE_MCP_Definition {
+  def def_label(name_space_entry: Name_Space.Entry): String =
+    if (Long_Name.qualifier(name_space_entry.def_label) == Markup.COMMAND) ""
+    else name_space_entry.def_label
+
   def unresolved(
     name_space_entry: Name_Space.Entry,
     name: String,
@@ -17,7 +21,7 @@ object PIDE_MCP_Definition {
     line: Int,
     exn: Throwable
   ): PIDE_MCP_Definition = PIDE_MCP_Definition(name, name_space_entry.kind,
-    name_space_entry.def_label, origin = Some(origin), line = Some(line),
+    def_label(name_space_entry), origin = Some(origin), line = Some(line),
     note = Some(s"The definition entry's source file ${quote(origin)} " +
       s"could not be resolved: ${Exn.message(exn)}"))
 
@@ -37,7 +41,7 @@ object PIDE_MCP_Definition {
     line: Int,
     snippet_lines: Int
   ): PIDE_MCP_Definition = PIDE_MCP_Definition(name, name_space_entry.kind,
-    name_space_entry.def_label, origin = Some(node_origin), line = Some(line),
+    def_label(name_space_entry), origin = Some(node_origin), line = Some(line),
     source_snippet = Option.when(snippet_lines > 0)(
       PIDE_MCP_Util.numbered_lines_range(context.lines(node_name), line, line + snippet_lines - 1)))
 
@@ -66,7 +70,7 @@ object PIDE_MCP_Definition {
         context.snapshot.find_command_position(def_id, def_range.start) match {
           case Some(pos) => make(pos.name, pos.line1)
           case None => Some(PIDE_MCP_Definition(name, name_space_entry.kind,
-            name_space_entry.def_label, note = Some(def_entry_not_loaded)))
+            def_label(name_space_entry), note = Some(def_entry_not_loaded)))
         }
       case _ => None
     }
@@ -83,14 +87,14 @@ object PIDE_MCP_Definition {
   ): List[PIDE_MCP_Definition] = {
     val restricted = PIDE_MCP_Util.restrict_text_range(snapshot.node.source, range)
     val context = new Context(session, snapshot)
-    snapshot.select(restricted, Markup.Elements(Markup.ENTITY), _ => {
-      case Text.Info(r, XML.Elem(Markup.Entity(name_space_entry), _))
+    snapshot.cumulate(restricted, List.empty[PIDE_MCP_Definition], Markup.Elements(Markup.ENTITY), _ => {
+      case (definitions, Text.Info(r, XML.Elem(Markup.Entity(name_space_entry), _)))
       if kinds.contains(name_space_entry.kind) =>
         val name = PIDE_MCP_Util.display_name(Some(name_space_entry), r, snapshot.node.source)
         PIDE_MCP_Definition(context, name_space_entry, name, snippet_lines,
-          filter_origins, def_entry_not_loaded)
+          filter_origins, def_entry_not_loaded).map(_ :: definitions)
       case _ => None
-    }).map(_.info)
+    }).flatMap(_.info)
   }
 
   def definitions_json(
@@ -103,7 +107,7 @@ object PIDE_MCP_Definition {
     }
     grouped.map { case (origin, entries) =>
       origin -> entries.sortBy(entry => (entry.line, entry.name, entry.kind))
-        .distinctBy(entry => (entry.line, entry.name)).map(_.json)
+        .distinctBy(entry => (entry.line, entry.name)).map(_.json - "origin")
     }
   }
 }
