@@ -8,11 +8,24 @@ import isabelle._
 
 object PIDE_MCP_Query {
   enum Outcome { case finished, stopped, timeout }
-  sealed case class Result(outcome: Outcome, elapsed: Time, output: Editor.Output) {
+  sealed case class Result(
+    outcome: Outcome,
+    elapsed: Time,
+    output: Editor.Output,
+    command: Option[Command]
+  ) {
+    def messages: List[PIDE_MCP_Command.Message] = {
+      val ranges = command.flatMap(cmd => output.snapshot.command_start(cmd).map(cmd.range + _)).toList
+      output.messages.flatMap(elem =>
+        PIDE_MCP_Command.Message_Kind.of(elem).map(kind =>
+          PIDE_MCP_Command.Message(kind,
+            command.fold(elem)(PIDE_MCP_Command.output_positions(output.snapshot, _, elem)), ranges)))
+    }
+
     def json(kinds: List[PIDE_MCP_Command.Message_Kind]): JSON.Object.T =
       JSON_Object.flatten(
         List(Some("status" -> outcome.toString), Some("elapsed_ms" -> elapsed.ms)) :::
-        PIDE_MCP_Command.messages_json(output.messages.iterator, kinds))
+        PIDE_MCP_Command.messages_json(messages.groupBy(_.kind), kinds))
   }
 }
 
@@ -73,7 +86,7 @@ class PIDE_MCP_Query(
             else None
           }
         }
-      PIDE_MCP_Query.Result(outcome, Time.now() - start, output.value)
+      PIDE_MCP_Query.Result(outcome, Time.now() - start, output.value, query.get_location)
     }
     finally {
       if (!finished) Exn.capture { editor.send_wait_dispatcher { query.cancel_query() } }

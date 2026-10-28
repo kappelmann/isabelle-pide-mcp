@@ -69,8 +69,8 @@ object PIDE_MCP_Theory {
       val command_status_counts = JSON_Object(
         PIDE_MCP_Command.Status.unprocessed.name -> node_status.unprocessed,
         PIDE_MCP_Command.Status.running.name -> node_status.running,
-        PIDE_MCP_Command.Status.warned.name -> node_status.warned,
         PIDE_MCP_Command.Status.failed.name -> node_status.failed,
+        PIDE_MCP_Command.Status.warned.name -> node_status.warned,
         PIDE_MCP_Command.Status.finished.name -> node_status.finished)
       JSON_Object(
         "overall_status" -> overall_status.toString,
