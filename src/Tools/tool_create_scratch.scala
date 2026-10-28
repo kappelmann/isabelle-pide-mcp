@@ -70,8 +70,8 @@ class Tool_Create_Scratch extends PIDE_MCP_Tool("create_scratch") {
       val name_suffix = name_suffix_arg.get(args)
       val extension = extension_arg.get(args)
       val (path, created) = create_scratch(session.id, name_suffix, extension)
-      JSON_Object("path" -> path.implode,
-        "message" -> (if (created) "File created" else "Path already existed"))
+      JSON_Object("path" -> path.implode) ++
+      JSON_Object.if_proper(!created, JSON_Object("note" -> "The file already existed."))
     }
 }
 

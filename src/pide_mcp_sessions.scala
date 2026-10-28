@@ -25,8 +25,8 @@ class PIDE_MCP_Sessions(
   private def state_json(entries: VectorMap[String, Entry]): JSON.Object.T = {
     val grouped = entries.toList.groupBy { case (_, entry) => entry.phase }
     JSON_Object(
-      for (phase <- Phase.values.toList) yield Word.lowercase(phase.toString) ->
-        grouped.getOrElse(phase, Nil).map(_._1))
+      for (phase <- Phase.values.toList; ids <- grouped.get(phase))
+        yield Word.lowercase(phase.toString) -> ids.map(_._1))
   }
   def state_json(): JSON.Object.T = state_json(state.value)
 
