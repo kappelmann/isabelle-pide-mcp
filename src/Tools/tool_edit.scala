@@ -31,7 +31,7 @@ object Tool_Edit {
     mode: Edit_Mode,
     node_name: Document.Node.Name,
     new_text: String,
-    start_line: Option[Int],
+    start_line: Int,
     end_line: Option[Int],
     old_text: String,
     edit_all: Boolean,
@@ -55,7 +55,8 @@ object Tool_Edit {
             .findAllMatchIn(range_text).map(_.start + search_range.start).toList
           if (occurrences.isEmpty) error("old_text not found in the given range")
           if (!edit_all && occurrences.length > 1)
-            error(s"Found ${occurrences.length} occurrences of old_text in the given range. Expected exactly 1. " +
+            error(s"Found ${occurrences.length} occurrences of old_text in the given range. " +
+              "Expected exactly 1. " +
               "Provide more context (larger old_text), restrict the range, or use edit_all.")
           if (edit_all) occurrences else List(occurrences.head)
         }
@@ -86,26 +87,22 @@ object Tool_Edit {
 
 class Tool_Edit extends PIDE_MCP_Tool("edit") {
   def description: String =
-    "Edit a file by either replacing, prepending to, or appending to a matching old text in a given range. " +
-    "Returns once Isabelle has processed the edit, which takes longer if the origin's dependencies were not loaded yet. " +
-    "Note: base session files are static and cannot be edited. " +
+    "Edit the text matching old_text in a given range. " +
     PIDE_MCP_Tool_Schema.range_visibility + " " +
+    PIDE_MCP_Tool_Schema.no_processing_wait + " " +
     PIDE_MCP_Tool_Schema.implicit_reload_file
 
   private val mode_arg = PIDE_MCP_Tool_Arg.default(
-    "mode", "Edit mode",
-    Tool_Edit.Edit_Mode.format, Tool_Edit.Edit_Mode.default)
-  private val text_arg = PIDE_MCP_Tool_Arg.string("text", "New text to write")
+    "mode", "", Tool_Edit.Edit_Mode.format, Tool_Edit.Edit_Mode.default)
+  private val text_arg = PIDE_MCP_Tool_Arg.string("text", "Text to write.")
   private val old_text_arg = PIDE_MCP_Tool_Arg.string(
-    "old_text",
-    "Text to find as a substring within the given range. If old_text is empty, the whole text in range is selected instead.")
+    "old_text", "Text to find. On empty old_text, the whole text in range is selected.")
   private val edit_all_arg = PIDE_MCP_Tool_Arg.bool_default(
-    "edit_all",
-    "Edit every match or just a unique occurrence.", false)
+    "edit_all", "Edit every match or a unique occurrence.", false)
 
   def input_schema: JSON.Object.T = PIDE_MCP_Tool_Schema.input_schema(
     List(PIDE_MCP_Tool_Schema.running_session_arg, PIDE_MCP_Tool_Schema.origin_arg, mode_arg,
-      text_arg, PIDE_MCP_Tool_Schema.opt_start_line_arg,
+      text_arg, PIDE_MCP_Tool_Schema.start_line_default_arg,
       PIDE_MCP_Tool_Schema.opt_end_line_arg, old_text_arg, edit_all_arg))
 
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("destructiveHint" -> true))
@@ -120,14 +117,15 @@ class Tool_Edit extends PIDE_MCP_Tool("edit") {
       val node_name = PIDE_MCP_Tool_Util.origin_param(session, args)
       val mode = mode_arg.get(args)
       val text = Line.normalize(text_arg.get(args))
-      val old_text = PIDE_MCP_Util.decode_file_text(node_name.path, Line.normalize(old_text_arg.get(args)))
+      val old_text =
+        PIDE_MCP_Util.decode_file_text(node_name.path, Line.normalize(old_text_arg.get(args)))
       val edit_all = edit_all_arg.get(args)
-      val opt_start_line = PIDE_MCP_Tool_Schema.opt_start_line_arg.get(args)
+      val start_line = PIDE_MCP_Tool_Schema.start_line_default_arg.get(args)
       val opt_end_line = PIDE_MCP_Tool_Schema.opt_end_line_arg.get(args)
       val count = Tool_Edit.read_update_edit(
-        session, mode, node_name, text, opt_start_line, opt_end_line, old_text,
+        session, mode, node_name, text, start_line, opt_end_line, old_text,
         edit_all = edit_all, progress = progress)
-      JSON_Object("edited_occurrences" -> count) ++
+      JSON_Object("edits" -> count) ++
       JSON_Object.if_proper(count == 0, JSON_Object("note" -> "The edit left the text unchanged."))
     }
 }

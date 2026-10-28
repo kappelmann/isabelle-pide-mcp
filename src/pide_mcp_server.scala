@@ -192,7 +192,8 @@ class PIDE_MCP_Server(
       else opt_id match {
         case None => respond(run.out, JSON_RPC.error(null,
           JSON_RPC.Error_Code.INVALID_REQUEST,
-          s"Bad id: requests require a string or integer id, but got ${JSON.Format(request("id"))}"))
+          "Bad id: requests require a string or integer id, " +
+            s"but got ${JSON.Format(request("id"))}"))
         case Some(id) if run.tool_tasks.contains(id) =>
           respond(run.out, JSON_RPC.error(id, JSON_RPC.Error_Code.INVALID_REQUEST,
             s"Request id ${JSON.Format(id)} is already active"))

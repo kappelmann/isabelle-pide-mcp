@@ -22,7 +22,11 @@ object Tool_Get_Session_State {
     val format = PIDE_MCP_Tool_Arg.Format(
       JSON_Object("type" -> List("string", "boolean"),
         "enum" -> (List[JSON.T](false, true) ::: values.toList.map(_.toString))),
-      unapply, _.toString)
+      unapply, {
+        case `false` => false
+        case `true` => true
+        case mode => mode.toString
+      })
   }
 
   def options_json(options: Options, mode: Options_Mode): JSON.Object.T = {
@@ -77,7 +81,7 @@ object Tool_Get_Session_State {
     val latest = statistics.last
     JSON_Object.flatten(List(
       Some("samples" -> statistics.length.toLong),
-      Some("duration" -> Time.seconds(ml.duration).message)) :::
+      Some("duration_ms" -> Time.seconds(ml.duration).ms)) :::
       space_average_maximum(after_gc, "ml_heap_used_after_gc", ML_Heap_Used) :::
       space_average_maximum(ml, "ml_heap", ML_Statistics.Heap_Size) :::
       space_average_maximum(ml, "ml_code", ML_Statistics.Program_Code) :::
@@ -108,46 +112,40 @@ object Tool_Get_Session_State {
 
 class Tool_Get_Session_State extends PIDE_MCP_Tool("get_session_state") {
   def description: String =
-    "Inspect the state of running PIDE sessions, their theories (including status and progress), their resource statistics, and the currently running commands. " +
-    "**Use this for a global overview, e.g. when you think the prover is stuck or you want to know what is being processed.** " +
-    "Note that sorrys are not listed."
+    "State of running sessions, information for their theories " +
+    "(status, commands being processed,...), resource statistics,... " +
+    "Sorrys are not listed."
 
   private val filter_origins_arg = PIDE_MCP_Tool_Arg.dictionary_default(
     "filter_origins",
-    "Mapping from session id to dynamic origins (session-qualified theory names or file paths). " +
-    "If provided for a session, only returns theory information and running commands for those origins. " +
-    "Sessions without an entry include all their dynamic theories. " +
-    "Does not affect resource statistics.",
+    "Session id to theory origins whose information is returned. " +
+    "Default for entry-less session: all dynamic theories.",
     PIDE_MCP_Tool_Arg.Format.list(PIDE_MCP_Tool_Arg.Format.string),
     VectorMap.empty)
-  private val include_commands_running_arg = PIDE_MCP_Tool_Arg.bool_default(
-    "include_commands_running", "Include commands that are currently being processed.", true)
+  private val include_cmds_processing_arg = PIDE_MCP_Tool_Arg.bool_default(
+    "include_cmds_processing", "", true)
   private val include_theory_status_arg = PIDE_MCP_Tool_Arg.bool_default(
-    "include_theory_status", "Include the status and progress of theories.", true)
-  private val include_loaded_theories_arg = PIDE_MCP_Tool_Arg.bool_default(
-    "include_loaded_theories", "List loaded theories per session.", false)
-  private val include_session_dirs_arg = PIDE_MCP_Tool_Arg.bool_default(
-    "include_session_dirs",
-    "List directories from which the session attempts to load files. " +
-    "Use this when you want to learn what libraries you have access to and where they are located. " +
-    "Note that session names, which you have to use for session-qualified loading of (library) theories, are stored in the ROOT files of these directories.",
+    "include_theory_status", "Status, progress, command counts.", true)
+  private val list_loaded_theories_arg = PIDE_MCP_Tool_Arg.bool_default(
+    "list_loaded_theories", "", false)
+  private val list_session_dirs_arg = PIDE_MCP_Tool_Arg.bool_default(
+    "list_session_dirs", "Directories from which a session attempts to resolve files.",
     false)
-  private val include_options_arg = PIDE_MCP_Tool_Arg.default(
-    "include_options",
-    "List Isabelle session options. " +
-    s"Use ${quote("changed")} to only show options that differ from their default value and " +
-    s"${quote("true")} to show all options.",
+  private val list_options_arg = PIDE_MCP_Tool_Arg.default(
+    "list_options",
+    "Isabelle session options. " +
+    s"Use ${quote("changed")} to only show options that differ from their default and " +
+    "true to show all options.",
     Tool_Get_Session_State.Options_Mode.format, Tool_Get_Session_State.Options_Mode.default)
   private val include_statistics_arg = PIDE_MCP_Tool_Arg.bool_default(
     "include_statistics",
-    "Include each session's recent Isabelle/ML statistics (heap, threads,...) and the MCP server's JVM statistics (heap, threads,...). " +
-    "Use this to check memory consumption and when you think the server is stuck.",
+    "Each session's ML and the server's JVM statistics (heap, threads,...).",
     false)
 
   def input_schema: JSON.Object.T = PIDE_MCP_Tool_Schema.input_schema(
     List(PIDE_MCP_Tool_Schema.running_sessions_arg, filter_origins_arg,
-      include_commands_running_arg, include_theory_status_arg, include_loaded_theories_arg,
-      include_session_dirs_arg, include_options_arg, include_statistics_arg))
+      include_cmds_processing_arg, include_theory_status_arg, list_loaded_theories_arg,
+      list_session_dirs_arg, list_options_arg, include_statistics_arg))
 
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
@@ -158,12 +156,12 @@ class Tool_Get_Session_State extends PIDE_MCP_Tool("get_session_state") {
   ): PIDE_MCP_Tool_Result =
     PIDE_MCP_Tool_Result.result {
       val selected_sessions = PIDE_MCP_Tool_Util.running_sessions_param(sessions, args)
-      val include_commands_running = include_commands_running_arg.get(args)
+      val include_cmds_processing = include_cmds_processing_arg.get(args)
       val include_theory_status = include_theory_status_arg.get(args)
-      val include_loaded_theories = include_loaded_theories_arg.get(args)
-      val include_session_dirs = include_session_dirs_arg.get(args)
+      val list_loaded_theories = list_loaded_theories_arg.get(args)
+      val list_session_dirs = list_session_dirs_arg.get(args)
       val include_statistics = include_statistics_arg.get(args)
-      val include_options = include_options_arg.get(args)
+      val list_options = list_options_arg.get(args)
       val filter_origins = filter_origins_arg.get(args)
       val selected_ids = selected_sessions.map(_.id)
       val unknown = filter_origins.keysIterator.filterNot(selected_ids.toSet).toList
@@ -183,17 +181,17 @@ class Tool_Get_Session_State extends PIDE_MCP_Tool("get_session_state") {
         }
         JSON_Object("session" -> session.id, "base_session" -> session.base_session) ++
         JSON.optional(PIDE_MCP_Command.Status.key(PIDE_MCP_Command.Status.running.name) ->
-          Option.when(include_commands_running) {
+          Option.when(include_cmds_processing) {
             PIDE_MCP_Theory.commands_running_json(session, snapshot, names)
           }.filter(_.nonEmpty)) ++
         JSON_Object.if_proper(include_theory_status,
           PIDE_MCP_Theory.Status.statuses_json(
             PIDE_MCP_Theory.Status.statuses(session, snapshot, names))) ++
-        JSON.optional("loaded_theories" ->
-          Option.when(include_loaded_theories)(theories.json)) ++
-        JSON.optional("session_directories" ->
-          Option.when(include_session_dirs)(session.directories().map(_.implode))) ++
-        Tool_Get_Session_State.options_json(session.options, include_options) ++
+        JSON.optional("loaded_thys" ->
+          Option.when(list_loaded_theories)(theories.json)) ++
+        JSON.optional("session_dirs" ->
+          Option.when(list_session_dirs)(session.directories().map(_.implode))) ++
+        Tool_Get_Session_State.options_json(session.options, list_options) ++
         JSON_Object.if_proper(include_statistics, {
           val statistics = session.runtime_statistics()
           if (statistics.isEmpty) JSON_Object("note" -> "no ML statistics reported yet")

@@ -13,7 +13,8 @@ object PIDE_MCP_Theory {
     def apply(session: PIDE_MCP_Session, nodes: Document.Nodes): Loaded = {
       val all_nodes = nodes.topological_order.filter(_.is_theory)
       val (base_session, dynamic) = all_nodes.partition(session.is_base_session_theory)
-      Loaded(session, base_session, dynamic.filter(name => PIDE_MCP_Util.is_loaded_dynamic(nodes(name))))
+      Loaded(session, base_session,
+        dynamic.filter(name => PIDE_MCP_Util.is_loaded_dynamic(nodes(name))))
     }
   }
 
@@ -22,12 +23,9 @@ object PIDE_MCP_Theory {
     base_session: List[Document.Node.Name],
     dynamic: List[Document.Node.Name]
   ) {
-    def json: JSON.Object.T = {
-      def entry(name: Document.Node.Name): JSON.Object.T =
-        JSON_Object("origin" -> session.origin(name))
-      JSON_Object("dynamic" -> dynamic.map(entry),
-        "base_session" -> base_session.map(entry))
-    }
+    def json: JSON.Object.T =
+      JSON_Object("dynamic" -> dynamic.map(session.origin),
+        "base_session" -> base_session.map(session.origin))
   }
 
   object Status {
@@ -43,7 +41,7 @@ object PIDE_MCP_Theory {
         Status(session.origin(name), nodes_status(name), nodes_status.overall_status(name)))
     }
 
-    def key(status: String): String = "theories_" + status
+    def key(status: String): String = "thys_" + status
 
     def prefix_keys(obj: JSON.Object.T): JSON.Object.T = {
       val keys = Document_Status.Overall_Status.values.map(_.toString).toSet
@@ -56,7 +54,7 @@ object PIDE_MCP_Theory {
         by_status.get(s).map(s.toString -> _)))
       prefix_keys(theory_status_counts) ++
       JSON_Object.if_proper(statuses.nonEmpty,
-        JSON_Object("theories" -> JSON_Object(statuses.map(status => status.origin -> status.json))))
+        JSON_Object("thys" -> JSON_Object(statuses.map(status => status.origin -> status.json))))
     }
   }
 
@@ -66,15 +64,16 @@ object PIDE_MCP_Theory {
     overall_status: Document_Status.Overall_Status
   ) {
     def json: JSON.Object.T = {
-      val command_status_counts = JSON_Object(List(
+      val ok = overall_status == Document_Status.Overall_Status.ok
+      val command_status_counts = JSON_Object((List(
         PIDE_MCP_Command.Status.unprocessed.name -> node_status.unprocessed,
         PIDE_MCP_Command.Status.running.name -> node_status.running,
         PIDE_MCP_Command.Status.failed.name -> node_status.failed,
-        PIDE_MCP_Command.Status.warned.name -> node_status.warned,
-        PIDE_MCP_Command.Status.finished.name -> node_status.finished).filter(_._2 > 0))
-      JSON_Object(
-        "overall_status" -> overall_status.toString,
-        "percentage_commands_processed" -> node_status.percentage) ++
+        PIDE_MCP_Command.Status.warned.name -> node_status.warned) :::
+        Option.when(!ok)(PIDE_MCP_Command.Status.finished.name -> node_status.finished).toList)
+        .filter(_._2 > 0))
+      JSON_Object("status" -> overall_status.toString) ++
+      JSON_Object.if_proper(!ok, JSON_Object("percent_processed" -> node_status.percentage)) ++
       PIDE_MCP_Command.Status.prefix_keys(command_status_counts)
     }
   }
@@ -83,17 +82,16 @@ object PIDE_MCP_Theory {
     session: PIDE_MCP_Session,
     snapshot: Document.Snapshot,
     names: List[Document.Node.Name]
-  ): List[JSON.Object.T] = {
-    names.flatMap { name =>
+  ): JSON.Object.T =
+    JSON_Object(names.flatMap { name =>
       val node_snapshot = snapshot.switch(name)
       lazy val doc = Line.Document(node_snapshot.node.source)
-      for {
-        state <- PIDE_MCP_Command.States.commands(node_snapshot, None)
-        problem <- state.problems.collectFirst {
-          case problem @ PIDE_MCP_Command.Problem.status(PIDE_MCP_Command.Status.running, _, _) => problem
-        }
-      } yield JSON_Object("origin" -> session.origin(name)) ++
-        problem.json(doc, PIDE_MCP_Command.States.default_snippet_lines)
-    }
-  }
+      val entries =
+        (for {
+          state <- PIDE_MCP_Command.States.commands(node_snapshot, None)
+          if state.status.contains(PIDE_MCP_Command.Status.running)
+        } yield state.problem(PIDE_MCP_Command.Status.running)
+          .json(doc, PIDE_MCP_Command.States.default_snippet_lines)).toList
+      proper_list(entries).map(session.origin(name) -> _)
+    })
 }

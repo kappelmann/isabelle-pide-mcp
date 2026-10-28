@@ -35,8 +35,8 @@ object PIDE_MCP_Command {
 
   enum Status(val name: String, val message_kind: Option[Message_Kind] = None) {
     case unprocessed extends Status("unprocessed")
-    // experimental verbose name: remind agents of possible non-termination
-    case running extends Status("still_running_possibly_nonterminating")
+    // running confuses agents: "running" = "it worked"
+    case running extends Status("processing")
     case failed extends Status("failed", Some(Message_Kind.errors))
     case warned extends Status("warned", Some(Message_Kind.warnings))
     case finished extends Status("finished")
@@ -44,8 +44,9 @@ object PIDE_MCP_Command {
   }
   object Status {
     val unproblematic: Set[Status] = Set(unprocessed, finished)
+    val problematic: Set[Status] = values.toSet -- unproblematic
 
-    def key(name: String): String = "commands_" + name
+    def key(name: String): String = "cmds_" + name
 
     def prefix_keys(obj: JSON.Object.T): JSON.Object.T = {
       val keys = values.map(_.name).toSet + bad
@@ -53,7 +54,7 @@ object PIDE_MCP_Command {
     }
   }
 
-  val bad = "bad"
+  val bad = Markup.BAD
   val Markup_ML = "ML"
 
   private def statuses(status: Document_Status.Command_Status): List[Status] =
@@ -65,7 +66,10 @@ object PIDE_MCP_Command {
       Option.when(status.is_finished)(Status.finished),
       Option.when(status.is_canceled)(Status.canceled)).flatten
 
-  def iterator(snapshot: Document.Snapshot, range: Option[Text.Range]): Iterator[(Command, Text.Offset)] =
+  def iterator(
+    snapshot: Document.Snapshot,
+    range: Option[Text.Range]
+  ): Iterator[(Command, Text.Offset)] =
     range.fold(snapshot.node.command_iterator())(snapshot.node.command_iterator(_))
 
   // like select, but returns all covering markups (full markup stack) at each sub-range
@@ -141,9 +145,11 @@ object PIDE_MCP_Command {
       "(line " + line + if_proper(!same_file(file), " of " + quote(file)) + ")"
     def output(body: XML.Body): XML.Body =
       body.flatMap {
-        case XML.Elem(Markup(Markup.POSITION, Position.Item_Id(id, range)), List(XML.Text(`here`))) =>
-          (for (pos <- snapshot.find_command_position(id, range.start) if !self_id(snapshot, cmd)(id))
-            yield XML.Text(" " + line_text(pos.line1, pos.name))).toList
+        case XML.Elem(Markup(Markup.POSITION, Position.Item_Id(id, range)), List(XML.Text(text)))
+        if text == here =>
+          if (self_id(snapshot, cmd)(id)) Nil
+          else snapshot.find_command_position(id, range.start)
+            .map(pos => XML.Text(" " + line_text(pos.line1, pos.name))).toList
         case XML.Elem(markup @ Markup(Markup.POSITION, props @ Position.Line(line)), _)
         if Position.File.unapply(props).exists(same_file) =>
           List(XML.Elem(markup, XML.string(line_text(line, snapshot.node_name.node))))
@@ -166,9 +172,11 @@ object PIDE_MCP_Command {
     val chunk = cmd.chunks.get(chunk_name)
     def message_ranges(elem: XML.Elem): List[Text.Range] = {
       val positions =
-        chunk.fold(Set.empty[Text.Range])(cmd.message_positions(self_id(snapshot, cmd), chunk_name, _, elem))
+        chunk.fold(Set.empty[Text.Range])(
+          cmd.message_positions(self_id(snapshot, cmd), chunk_name, _, elem))
       if (positions.isEmpty) List(range)
-      else positions.toList.map(_ + command_start).filter(_.overlaps(range)).sortBy(_.start).map(_.restrict(range))
+      else positions.toList.map(_ + command_start).filter(_.overlaps(range))
+        .sortBy(_.start).map(_.restrict(range))
     }
     def output_message(elem: XML.Elem): XML.Elem = // cf. Editor.output
       elem match {
@@ -222,7 +230,7 @@ object PIDE_MCP_Command {
       }
 
     def json(doc: Line.Document, snippet_lines: Int): JSON.Object.T =
-      JSON_Object("source_snippets" -> ranges.map(PIDE_MCP_Util.snippet(doc, _, snippet_lines))) ++
+      JSON_Object("snippets" -> ranges.map(PIDE_MCP_Util.snippet(doc, _, snippet_lines))) ++
       JSON.optional("message" -> text) ++
       JSON.optional("timing_ms" -> Some(this).collect {
         case Problem.status(Status.running, _, timing_ms) => timing_ms
@@ -230,11 +238,20 @@ object PIDE_MCP_Command {
   }
 
   object State {
-    sealed case class Options(
-      message_kinds: List[Message_Kind],
-      include_types: Boolean = false,
-      include_facts: Boolean = false,
-      include_full_markup: Boolean = false)
+    enum Detail { case errors, warnings, infos, goals, src, types, facts, markup }
+
+    object Detail {
+      def of(kind: Message_Kind): Detail =
+        kind match {
+          case Message_Kind.goals => goals
+          case Message_Kind.errors => errors
+          case Message_Kind.warnings => warnings
+          case Message_Kind.writeln | Message_Kind.information | Message_Kind.tracing => infos
+        }
+      require(
+        Message_Kind.all.forall(kind => Message_Kind.info.contains(kind) == (of(kind) == infos)),
+        "Inconsistent info message kinds")
+    }
   }
 
   sealed case class State private[PIDE_MCP_Command](
@@ -245,8 +262,10 @@ object PIDE_MCP_Command {
   ) {
     lazy val command_status: Document_Status.Command_Status =
       snapshot.state.command_status(snapshot.version, cmd)
-    private lazy val range_status: Document_Status.Command_Status = { // cf. Rendering.overview_color
-      val markups = snapshot.cumulate[List[Markup]](range, Nil, Document_Status.Command_Status.liberal_elements,
+    // cf. Rendering.overview_color
+    private lazy val range_status: Document_Status.Command_Status = {
+      val markups =
+        snapshot.cumulate[List[Markup]](range, Nil, Document_Status.Command_Status.liberal_elements,
           _ => { case (status, Text.Info(_, elem)) => Some(elem.markup :: status) }, status = true)
       Document_Status.Command_Status.make(Date.now(), markups = markups.flatMap(_.info))
     }
@@ -265,34 +284,44 @@ object PIDE_MCP_Command {
       snapshot.select(range, Markup.Elements(Markup.BAD), _ => {
         case Text.Info(r, elem) => Some(Text.Info(r, PIDE_MCP_Util.elem_body_plain_text(elem)))
       }).map(_.info).filterNot(info => errors.nonEmpty && info.info.isEmpty)
-    private def bad_json(doc: Line.Document): List[JSON.Object.T] = bad.map { case Text.Info(r, text) =>
-      JSON_Object.flatten(
-        proper_string(text).map("message" -> _),
-        Some("source" ->
-          PIDE_MCP_Util.numbered_lines(r.substring(snapshot.node.source), doc.position(r.start).line1)))
-    }
+    private def bad_json(doc: Line.Document): List[JSON.Object.T] =
+      bad.map { case Text.Info(r, text) =>
+        JSON_Object.flatten(
+          proper_string(text).map("message" -> _),
+          Some("src" ->
+            PIDE_MCP_Util.numbered_lines(r.substring(snapshot.node.source),
+              doc.position(r.start).line1)))
+      }
+
+    def problem(st: Status): Problem = Problem.status(st, range, timing_ms)
     lazy val problems: List[Problem] =
-      status.filterNot(Status.unproblematic).map(Problem.status(_, range, timing_ms)) :::
+      status.filter(Status.problematic).map(problem) :::
       bad.map(Problem.bad(_)) :::
       (errors ::: warnings).map(Problem.message(_))
+
     def is_ignorable: Boolean = cmd.is_ignored && messages.isEmpty && problems.isEmpty
 
-    def json(doc: Line.Document, opts: State.Options): JSON.Object.T = {
-      val source_line = doc.position(range.start).line1
-      val source = range.substring(snapshot.node.source).stripLineEnd
+    def json(doc: Line.Document, details: Set[State.Detail]): JSON.Object.T = {
+      lazy val source_line = doc.position(range.start).line1
+      lazy val source = range.substring(snapshot.node.source).stripLineEnd
       val entries: List[Option[JSON.Object.Entry]] =
         List(
           proper_list(status.map(_.name)).map("status" -> _),
           Option.when(timing_ms > 0)("timing_ms" -> timing_ms),
-          Some("source" -> PIDE_MCP_Util.numbered_lines(source, source_line)),
+          Some(
+            if (details(State.Detail.src))
+              "src" -> PIDE_MCP_Util.numbered_lines(source, source_line)
+            else "lines" -> PIDE_MCP_Util.line_range(source_line,
+              doc.position(range.start + source.length).line1)),
           proper_list(bad_json(doc)).map(PIDE_MCP_Command.bad -> _)) :::
-        messages_json(messages_by_kind, opts.message_kinds) :::
+        messages_json(messages_by_kind,
+          Message_Kind.all.filter(kind => details(State.Detail.of(kind)))) :::
         List(
-          Option.when(opts.include_types)(
+          Option.when(details(State.Detail.types))(
             proper_list(types_json(snapshot, range)).map("types" -> _)).flatten,
-          Option.when(opts.include_facts)(
+          Option.when(details(State.Detail.facts))(
             proper_list(facts_json(snapshot, range)).map("facts" -> _)).flatten,
-          Option.when(opts.include_full_markup)(
+          Option.when(details(State.Detail.markup))(
             "markup" -> markup_json(snapshot, range, Markup.Elements.full)))
       JSON_Object.flatten(entries)
     }
@@ -336,15 +365,16 @@ object PIDE_MCP_Command {
 
     val default_snippet_lines = 1
     sealed case class Options(
-      include_details: Boolean = false,
+      summary_message_kinds: List[Message_Kind],
       problematic_limit: Option[Int] = None,
       unproblematic_limit: Option[Int] = None,
+      occurrences_limit: Option[Int] = None,
       snippet_lines: Int = default_snippet_lines)
 
     def json(
       states: Iterator[State],
       doc: Line.Document,
-      state_opts: State.Options,
+      details: Set[State.Detail],
       opts: Options
     ): JSON.Object.T = {
       def redundant_problem(state: State, problem: Problem): Boolean =
@@ -356,35 +386,44 @@ object PIDE_MCP_Command {
       var count = 0
       var count_problematic = 0
       var count_unproblematic = 0
+      var count_listed_occurrences = 0
+      val include_details = details.nonEmpty
       for (state <- states if !state.is_ignorable) {
         count += 1
         total_timing_ms += state.timing_ms
         for (status <- state.status if Status.unproblematic(status)) counts(status.name) += 1
-        val problems = state.problems.filter(_.message_kind.forall(state_opts.message_kinds.contains))
+        val problems =
+          state.problems.filter(_.message_kind.forall(opts.summary_message_kinds.contains))
         for (problem <- problems) {
           counts(problem.key) += 1
-          if (!redundant_problem(state, problem)) {
+          if (opts.occurrences_limit.forall(count_listed_occurrences < _) &&
+              !redundant_problem(state, problem)) {
             occurrences.getOrElseUpdate(problem.key, new mutable.ListBuffer[JSON.Object.T]) +=
               problem.json(doc, opts.snippet_lines)
+            count_listed_occurrences += 1
           }
         }
-        if (opts.include_details) {
+        if (include_details) {
           if (problems.nonEmpty) {
             if (opts.problematic_limit.forall(count_problematic < _))
-              returned_commands += state.json(doc, state_opts)
+              returned_commands += state.json(doc, details)
             count_problematic += 1
           }
           else {
             if (opts.unproblematic_limit.forall(count_unproblematic < _))
-              returned_commands += state.json(doc, state_opts)
+              returned_commands += state.json(doc, details)
             count_unproblematic += 1
           }
         }
       }
-      def occurrences_entry(key: String, message_kind: Option[Message_Kind]): Option[JSON.Object.Entry] =
+      def occurrences_entry(
+        key: String,
+        message_kind: Option[Message_Kind]
+      ): Option[JSON.Object.Entry] =
         Option.when(counts(key) > 0) {
-          val name = message_kind.fold("occurrences")("occurrences_without_" + _)
-          key -> (JSON_Object("count" -> counts(key)) ++ JSON.optional(name -> occurrences.get(key).map(_.toList)))
+          val name = message_kind.fold("occurrences")("without_" + _)
+          key -> (JSON_Object("count" -> counts(key)) ++
+            JSON.optional(name -> occurrences.get(key).map(_.toList)))
         }
       def count_entry(key: String): Option[JSON.Object.Entry] =
         Option.when(counts(key) > 0)(key -> counts(key))
@@ -396,9 +435,9 @@ object PIDE_MCP_Command {
         List(bad, Message_Kind.errors.toString, Message_Kind.warnings.toString)
           .map(occurrences_entry(_, None)) :::
         List(Status.unprocessed, Status.finished).map(status => count_entry(status.name)))) +
-      ("commands" -> (JSON_Object("count" -> count) ++
-        JSON_Object.if_proper(opts.include_details, JSON_Object(
-          "count_returned" -> returned_commands.length, "commands" -> returned_commands.toList))))
+      ("cmds" -> (JSON_Object("count" -> count) ++
+        JSON_Object.if_proper(include_details, JSON_Object(
+          "count_returned" -> returned_commands.length, "cmds" -> returned_commands.toList))))
     }
   }
 }

@@ -7,11 +7,9 @@ package isabelle.pide.mcp
 import isabelle._
 
 class Tool_Unload extends PIDE_MCP_Tool("unload") {
-  def description: String = "Unload the given origins and their dependents."
+  def description: String = "Unload origins and their dependents."
 
-  private val origins_arg = PIDE_MCP_Tool_Arg.strings(
-    "origins",
-    "Origins (session-qualified theory names or file paths) to unload.")
+  private val origins_arg = PIDE_MCP_Tool_Arg.strings("origins", "")
 
   def input_schema: JSON.Object.T = PIDE_MCP_Tool_Schema.input_schema(
     List(PIDE_MCP_Tool_Schema.running_session_arg, origins_arg))

@@ -20,13 +20,9 @@ object Tool_Create_File {
 
 class Tool_Create_File extends PIDE_MCP_Tool("create_file") {
   def description: String =
-    "Create an empty file at the given path. " +
-    "Creates missing parent directories if necessary. " +
-    "Fails if the path already exists."
-
+    "Create an empty file (and parent directories) at the given path."
   private val path_arg = PIDE_MCP_Tool_Arg.string(
-    "path",
-    "File path to create (e.g. \"./Algebra/algebra_simp.ML\" or \"/path/to/My_Theory.thy\")")
+    "path", "")
 
   def input_schema: JSON.Object.T = PIDE_MCP_Tool_Schema.input_schema(List(path_arg))
 

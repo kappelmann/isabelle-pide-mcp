@@ -10,21 +10,18 @@ import java.io.{File => JFile}
 
 class Tool_Create_Scratch extends PIDE_MCP_Tool("create_scratch") {
   def description: String =
-    "Create a temporary file for experimentation that does not interfere with user accessible files. " +
-    "Use this whenever you think you need to do iterative developments or when you want to find and explore theorems, syntax, concepts, commands, ML code, etc. Write back final results to files accessible to the user. " +
-    "Temporary files are cleaned up when the session stops."
+    "Create a temporary file for experimentation. " +
+    "Files are cleaned up on session stop."
 
   private val name_suffix_arg = PIDE_MCP_Tool_Arg.opt_string(
-    "name_suffix",
-    "Label to identify the scratch file (auto-generated if omitted)")
-  private val extension_arg = PIDE_MCP_Tool_Arg.opt_string(
-    "extension",
-    "File extension (typically \".thy\" or \".ML\")")
+    "name_suffix", "Label to identify the file. Default: auto-generated.")
+  private val extension_arg = PIDE_MCP_Tool_Arg.string_default(
+    "ext", "File extension.", ".thy")
 
   def input_schema: JSON.Object.T = PIDE_MCP_Tool_Schema.input_schema(
     List(PIDE_MCP_Tool_Schema.running_session_arg, name_suffix_arg, extension_arg))
 
-  private val scratch_prefix: String = "tmp_pide_mcp_scratch_"
+  private val scratch_prefix: String = "Scratch_"
   private val scratch_tmpdir_prefix: String = "tmp_pide_mcp_scratch"
   private val scratch_dirs = Synchronized[Map[String, JFile]](Map.empty)
 
@@ -50,11 +47,11 @@ class Tool_Create_Scratch extends PIDE_MCP_Tool("create_scratch") {
   def create_scratch(
     session_id: String,
     name_suffix: Option[String] = None,
-    extension: Option[String] = None
+    extension: String = ""
   ): (Path, Boolean) = {
     val suffix = name_suffix.getOrElse(Date.now().format(Date.Format("yyyy_MM_dd_HH_mm_ss_SSS")))
     val base_name = scratch_prefix + suffix
-    val file_name = base_name + extension.getOrElse("")
+    val file_name = base_name + extension
     val file_path =
       (File.path(get_scratch_dir(session_id)) + Path.basic(file_name)).canonical
     (file_path, file_path.file.createNewFile())
@@ -71,7 +68,7 @@ class Tool_Create_Scratch extends PIDE_MCP_Tool("create_scratch") {
       val extension = extension_arg.get(args)
       val (path, created) = create_scratch(session.id, name_suffix, extension)
       JSON_Object("path" -> path.implode) ++
-      JSON_Object.if_proper(!created, JSON_Object("note" -> "The file already existed."))
+      JSON_Object.if_proper(!created, JSON_Object("note" -> "File already existed."))
     }
 }
 

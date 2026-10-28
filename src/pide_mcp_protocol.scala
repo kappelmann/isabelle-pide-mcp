@@ -16,8 +16,7 @@ object PIDE_MCP_Protocol {
     val protocol_version = "2025-11-25"
     val instructions: String =
       "Interactive proof development using one or more Isabelle sessions. " +
-      "Some sessions might have already been started. " +
-      "Add material incrementally: large edits make errors and nontermination hard to isolate."
+      "Some sessions might have already been started."
   }
 
   object JSON_RPC {
@@ -54,7 +53,8 @@ object PIDE_MCP_Protocol {
         "params" -> params)
   }
 
-  // MCP negotiation: answer with client version if supported; otherwise return the server's supported version
+  // MCP negotiation: answer with client version if supported;
+  // otherwise return the server's supported version
   // TODO: do we support other versions?
   def decide_protocol_version(client_version: String): String =
     Config.protocol_version

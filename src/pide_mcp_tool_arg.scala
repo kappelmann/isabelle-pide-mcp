@@ -62,7 +62,7 @@ object PIDE_MCP_Tool_Arg {
     format: Format[A],
     description: String,
     default: Option[A]
-  ): JSON.Object.T = format.schema + ("description" -> description) ++
+  ): JSON.Object.T = format.schema ++ JSON.optional("description" -> proper_string(description)) ++
     JSON.optional("default" -> default.map(format.apply))
 
   def required[A](
@@ -76,10 +76,9 @@ object PIDE_MCP_Tool_Arg {
   def optional[A](
     name: String,
     description: String,
-    format: Format[A],
-    schema_default: Option[A] = None
-  ): PIDE_MCP_Tool_Arg[Option[A]] = new PIDE_MCP_Tool_Arg(name, 
-    make_schema(format, description, schema_default), required = false,
+    format: Format[A]
+  ): PIDE_MCP_Tool_Arg[Option[A]] = new PIDE_MCP_Tool_Arg(name,
+    make_schema(format, description, None), required = false,
     args => PIDE_MCP_JSON.opt_value(args, name, format.unapply))
 
   def default[A](
@@ -111,11 +110,10 @@ object PIDE_MCP_Tool_Arg {
   def opt_int(
     name: String,
     description: String,
-    schema_default: Option[Int] = None,
     minimum: Option[Int] = None,
     maximum: Option[Int] = None
   ): PIDE_MCP_Tool_Arg[Option[Int]] =
-    optional(name, description, Format.int(minimum, maximum), schema_default)
+    optional(name, description, Format.int(minimum, maximum))
 
   def opt_strings(name: String, description: String): PIDE_MCP_Tool_Arg[Option[List[String]]] =
     optional(name, description, Format.list(Format.string))

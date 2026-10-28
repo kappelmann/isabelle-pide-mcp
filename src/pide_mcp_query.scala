@@ -15,11 +15,13 @@ object PIDE_MCP_Query {
     command: Option[Command]
   ) {
     def messages: List[PIDE_MCP_Command.Message] = {
-      val ranges = command.flatMap(cmd => output.snapshot.command_start(cmd).map(cmd.range + _)).toList
+      val ranges =
+        command.flatMap(cmd => output.snapshot.command_start(cmd).map(cmd.range + _)).toList
       output.messages.flatMap(elem =>
         PIDE_MCP_Command.Message_Kind.of(elem).map(kind =>
           PIDE_MCP_Command.Message(kind,
-            command.fold(elem)(PIDE_MCP_Command.output_positions(output.snapshot, _, elem)), ranges)))
+            command.fold(elem)(PIDE_MCP_Command.output_positions(output.snapshot, _, elem)),
+            ranges)))
     }
 
     def json(kinds: List[PIDE_MCP_Command.Message_Kind]): JSON.Object.T =

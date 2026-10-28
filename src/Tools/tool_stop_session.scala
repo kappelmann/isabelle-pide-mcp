@@ -7,11 +7,11 @@ package isabelle.pide.mcp
 import isabelle._
 
 class Tool_Stop_Session extends PIDE_MCP_Tool("stop_session") {
-  def description: String = "Stop PIDE sessions. Files on disk are kept, unless some tool decides to cleanup its auxiliary files. " +
+  def description: String = "Stop sessions. " +
     PIDE_MCP_Tool_Schema.session_restart
 
   private val sessions_arg = PIDE_MCP_Tool_Arg.opt_strings(
-    "sessions", "Stoppable session ids (default: all stoppable sessions).")
+    "sessions", "Stoppable session ids. Default: all stoppable sessions.")
 
   def input_schema: JSON.Object.T =
     PIDE_MCP_Tool_Schema.input_schema(List(sessions_arg))

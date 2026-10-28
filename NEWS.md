@@ -9,11 +9,17 @@ New in this PIDE MCP version
 New in PIDE MCP 2026
 ----------------------------
 
-* Tuned tools and skills for more efficient token usage.
+* Improved all tools and skills for more efficient token usage. INCOMPATIBILITY.
 * `get_session_state` no longer reports summary statistics over all sessions. INCOMPATIBILITY.
 * More compact `get_state`: by default, only a summary is returned instead of full commands.
-  Empty commands are neither returned nor counted. New `include_details`, `problematic_commands_limit`, `include_goals`, and `include_warnings`.
-  `commands_limit` is renamed to `unproblematic_commands_limit`. INCOMPATIBILITY.
+  Empty commands are neither returned nor counted. New `details` replacing `include_infos`, `include_types`, `include_facts`, and `include_full_markup`.
+  New `details_problematic_limit`, `summary_problematic_limit`, and `include_summary_warnings`.
+  `commands_limit` and `snippet_lines` are renamed to `details_unproblematic_limit` and `summary_snippet_lines`. INCOMPATIBILITY.
+* Running commands are now reported as `processing`. Shorter output keys (e.g. `cmds_*`, `thys_*`, `src`). INCOMPATIBILITY.
+* `get_session_state`: `include_commands_running` is renamed to `include_cmds_processing`; `include_loaded_theories`, `include_session_dirs`, and `include_options` to `list_*`.
+  Processing commands are grouped by origin. INCOMPATIBILITY.
+* `find_entities`: new `kinds` to select entity kinds. Results are grouped by definition site.
+* `create_scratch`: `extension` is renamed to `ext` with default `.thy`. Files are named `Scratch_<timestamp>`. INCOMPATIBILITY.
 * Edits now decode automatically.
 * Add Isabelle/ML skill file.
 * Reading or editing a theory loads its unloaded files.

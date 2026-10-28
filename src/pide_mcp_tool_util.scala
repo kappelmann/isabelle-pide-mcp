@@ -68,7 +68,8 @@ object PIDE_MCP_Tool_Util {
           error(s"The origin ${quote(session.origin(node_name))} is loaded but has not been " +
             "processed yet. " + retry_soon_message)
         else {
-          session.read_update_resolve(node_name, List((1, Some(0))), // pass empty range to load empty nodes
+          // pass empty range to load empty nodes
+          session.read_update_resolve(node_name, List((1, Some(0))),
             await_stable_before_resolve = false, hide_others = false, range_context = 0,
             progress = progress)
           error(s"The origin ${quote(session.origin(node_name))} was not loaded and has now " +
@@ -82,26 +83,26 @@ object PIDE_MCP_Tool_Util {
   }
 
   def require_ordered_lines(
-    start_line: Option[Int],
+    start_line: Int,
     end_line: Option[Int]
   ): Unit = {
-    for (start <- start_line; stop <- end_line if stop < start)
-      error(s"end_line $stop < start_line $start")
+    for (stop <- end_line if stop < start_line)
+      error(s"end_line $stop < start_line $start_line")
   }
 
   def require_lines_in_bounds(
-    start_line: Option[Int],
+    start_line: Int,
     end_line: Option[Int],
     total_lines: Int
   ): Unit = {
-    for (start <- start_line if start < 1 || start > (total_lines max default_start_line))
-      error(s"start_line $start out of bounds (file has $total_lines lines)")
+    if (start_line < 1 || start_line > (total_lines max default_start_line))
+      error(s"start_line $start_line out of bounds (file has $total_lines lines)")
     for (stop <- end_line if stop < 1 || stop > total_lines)
       error(s"end_line $stop out of bounds (file has $total_lines lines)")
   }
 
   def require_valid_lines(
-    start_line: Option[Int],
+    start_line: Int,
     end_line: Option[Int],
     total_lines: Int
   ): Unit = {
@@ -110,11 +111,11 @@ object PIDE_MCP_Tool_Util {
   }
 
   def resolve_lines(
-    start_line: Option[Int],
+    start_line: Int,
     end_line: Option[Int],
     total_lines: Int
   ): (Int, Int) = {
     require_valid_lines(start_line, end_line, total_lines)
-    (start_line.getOrElse(default_start_line), end_line.getOrElse(total_lines))
+    (start_line, end_line.getOrElse(total_lines))
   }
 }

@@ -62,7 +62,8 @@ object PIDE_MCP_Util {
 
   def snippet(doc: Line.Document, range: Text.Range, snippet_lines: Int): String = {
     val start = doc.position(range.start).line1
-    val (shown, rest) = Line.logical_lines(range.substring(doc.text).stripLineEnd).splitAt(snippet_lines)
+    val (shown, rest) =
+      Line.logical_lines(range.substring(doc.text).stripLineEnd).splitAt(snippet_lines)
     val omitted = Option.when(rest.nonEmpty)(
       line_range(start + shown.length, start + shown.length + rest.length - 1) + ": ...")
     cat_lines(proper_string(numbered_lines(shown, start)).toList ::: omitted.toList)

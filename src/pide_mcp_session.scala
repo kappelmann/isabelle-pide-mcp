@@ -184,7 +184,8 @@ class PIDE_MCP_Session private(
       val candidate = Document.Node.Name(abs.implode, // full path file
         theory = Thy_Header.theory_name(abs.implode))
       if (candidate.path.is_file) candidate
-      else session.store.source_file(path.implode) match { // source_file can return identity for unknown files
+      // source_file can return identity for unknown files
+      else session.store.source_file(path.implode) match {
         case Some(file) if Path.explode(file).is_file => node_name(file)
         case _ => error(s"Path ${quote(path.implode)} cannot be resolved: " +
           "it is neither a file on disk nor resolvable by PIDE")
@@ -230,11 +231,13 @@ class PIDE_MCP_Session private(
     snapshot: => Document.Snapshot,
     node_name: Document.Node.Name
   ): Document.Snapshot = {
-    if (is_base_session_theory(node_name)) session.read_theory(node_name.theory, unicode_symbols = true)
+    if (is_base_session_theory(node_name))
+      session.read_theory(node_name.theory, unicode_symbols = true)
     else {
       val snapshot1 = snapshot
       val new_snapshot =
-        (if (is_base_session_theory(snapshot1.node_name)) session.snapshot() else snapshot1).switch(node_name)
+        (if (is_base_session_theory(snapshot1.node_name)) session.snapshot() else snapshot1)
+          .switch(node_name)
       if (PIDE_MCP_Util.is_loaded_dynamic(new_snapshot.version.nodes(node_name))) new_snapshot
       else error(s"No PIDE snapshot available for ${quote(origin(node_name))}")
     }
