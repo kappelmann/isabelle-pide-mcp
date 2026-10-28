@@ -52,11 +52,11 @@ object PIDE_MCP_Theory {
 
     def statuses_json(statuses: List[Status]): JSON.Object.T = {
       val by_status = statuses.groupMapReduce(_.overall_status)(_ => 1)(_ + _)
-      val theory_status_counts = JSON_Object(Document_Status.Overall_Status.values.map(s =>
-        s.toString -> by_status.getOrElse(s, 0)))
-      val theory_statuses = JSON_Object(statuses.map(
-        status => status.origin -> status.json))
-      prefix_keys(theory_status_counts) + ("theories" -> theory_statuses)
+      val theory_status_counts = JSON_Object(Document_Status.Overall_Status.values.flatMap(s =>
+        by_status.get(s).map(s.toString -> _)))
+      prefix_keys(theory_status_counts) ++
+      JSON_Object.if_proper(statuses.nonEmpty,
+        JSON_Object("theories" -> JSON_Object(statuses.map(status => status.origin -> status.json))))
     }
   }
 
@@ -66,16 +66,16 @@ object PIDE_MCP_Theory {
     overall_status: Document_Status.Overall_Status
   ) {
     def json: JSON.Object.T = {
-      val command_status_counts = JSON_Object(
+      val command_status_counts = JSON_Object(List(
         PIDE_MCP_Command.Status.unprocessed.name -> node_status.unprocessed,
         PIDE_MCP_Command.Status.running.name -> node_status.running,
         PIDE_MCP_Command.Status.failed.name -> node_status.failed,
         PIDE_MCP_Command.Status.warned.name -> node_status.warned,
-        PIDE_MCP_Command.Status.finished.name -> node_status.finished)
+        PIDE_MCP_Command.Status.finished.name -> node_status.finished).filter(_._2 > 0))
       JSON_Object(
         "overall_status" -> overall_status.toString,
         "percentage_commands_processed" -> node_status.percentage) ++
-        PIDE_MCP_Command.Status.prefix_keys(command_status_counts)
+      PIDE_MCP_Command.Status.prefix_keys(command_status_counts)
     }
   }
 
@@ -84,15 +84,16 @@ object PIDE_MCP_Theory {
     snapshot: Document.Snapshot,
     names: List[Document.Node.Name]
   ): List[JSON.Object.T] = {
-    val opts = PIDE_MCP_Command.State.Options(List(PIDE_MCP_Command.Message_Kind.errors))
     names.flatMap { name =>
       val node_snapshot = snapshot.switch(name)
-      PIDE_MCP_Command.States.commands(node_snapshot, None).flatMap { entry =>
-        Option.when(entry.status.contains(PIDE_MCP_Command.Status.running)) {
-          JSON_Object("origin" -> session.origin(name)) ++
-          entry.json(Line.Document(node_snapshot.node.source), opts)
+      lazy val doc = Line.Document(node_snapshot.node.source)
+      for {
+        state <- PIDE_MCP_Command.States.commands(node_snapshot, None)
+        problem <- state.problems.collectFirst {
+          case problem @ PIDE_MCP_Command.Problem.status(PIDE_MCP_Command.Status.running, _, _) => problem
         }
-      }
+      } yield JSON_Object("origin" -> session.origin(name)) ++
+        problem.json(doc, PIDE_MCP_Command.States.default_snippet_lines)
     }
   }
 }

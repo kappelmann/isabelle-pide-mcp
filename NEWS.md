@@ -4,11 +4,13 @@ PIDE MCP NEWS -- history of user-relevant changes
 New in this PIDE MCP version
 ----------------------------
 
+* Update to Isabelle version as specified in [ISABELLE\_VERSION](./ISABELLE_VERSION)
 
 New in PIDE MCP 2026
 ----------------------------
 
-* Update to Isabelle version as specified in [ISABELLE\_VERSION](./ISABELLE_VERSION)
+* Tuned tools and skills for more efficient token usage.
+* `get_session_state` no longer reports summary statistics over all sessions. INCOMPATIBILITY.
 * More compact `get_state`: by default, only a summary is returned instead of full commands.
   Empty commands are neither returned nor counted. New `include_details`, `problematic_commands_limit`, `include_goals`, and `include_warnings`.
   `commands_limit` is renamed to `unproblematic_commands_limit`. INCOMPATIBILITY.

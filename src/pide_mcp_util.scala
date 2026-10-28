@@ -60,6 +60,14 @@ object PIDE_MCP_Util {
   def numbered_lines_range(text: String, start_line: Int, end_line: Int): String =
     numbered_lines_range(Line.logical_lines(text), start_line, end_line)
 
+  def snippet(doc: Line.Document, range: Text.Range, snippet_lines: Int): String = {
+    val start = doc.position(range.start).line1
+    val (shown, rest) = Line.logical_lines(range.substring(doc.text).stripLineEnd).splitAt(snippet_lines)
+    val omitted = Option.when(rest.nonEmpty)(
+      line_range(start + shown.length, start + shown.length + rest.length - 1) + ": ...")
+    cat_lines(proper_string(numbered_lines(shown, start)).toList ::: omitted.toList)
+  }
+
   def print_process_result(process_result: Process_Result): String =
     process_result.print_rc + if_proper(process_result.err, s": ${process_result.err}")
 

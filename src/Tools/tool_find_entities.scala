@@ -27,7 +27,7 @@ class Tool_Find_Entities extends PIDE_MCP_Tool("find_entities") {
 
   def description: String =
     "Look up what entities (theorems, constants, types, commands,...) in a file are defined where and how, i.e. find their origin with source snippets. " +
-    "Useful to learn more about concepts that you are uncertain about or for which you need more information (e.g. the actual theorem statement) and to study the content of a file. To get all entities defined in a file, select the file with full range and also pass it in filter_origins. " +
+    "Useful to learn more about concepts that you are uncertain about or for which you need more information (e.g. the actual theorem statement) and to study the content of a file. To get entities defined in a certain file, pass it in filter_origins. " +
     PIDE_MCP_Tool_Schema.implicit_load_file
 
   private val snippet_lines_arg = PIDE_MCP_Tool_Arg.int_default(

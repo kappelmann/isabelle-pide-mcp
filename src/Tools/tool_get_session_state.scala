@@ -51,62 +51,37 @@ object Tool_Get_Session_State {
   def ml_heap_collected(props: Properties.T): Boolean =
     List(ML_Statistics.GCs_Minor, ML_Statistics.GCs_Major).exists(_.unapply(props).exists(_ > 0))
 
-  private def sum[A](xs: List[A], value: A => Option[Double]): Option[Double] = {
-    val values = xs.map(value)
-    Option.when(values.nonEmpty && values.forall(_.isDefined))(values.flatten.sum)
-  }
-
-  private def space_entry[A](
-    xs: List[A],
-    key: String,
-    value: A => Option[Double]
-  ): Option[(String, JSON.T)] =
-    sum(xs, value).map(bytes => key -> Space.B(bytes).print)
+  private def space_entry(key: String, bytes: Option[Double]): Option[(String, JSON.T)] =
+    bytes.map(bytes => key -> Space.B(bytes).print)
 
   private def space_average_maximum(
-    ml_stats: List[ML_Statistics],
+    ml: ML_Statistics,
     key: String,
     field: ML_Statistics.Field
   ): List[Option[(String, JSON.T)]] = {
     def entry(suffix: String, aggregate: ML_Statistics => Double) =
-      space_entry(ml_stats, key + suffix,
-        stats => Option.when(stats.content.nonEmpty)(Space.MiB(aggregate(stats)).B))
+      Option.when(ml.content.nonEmpty)(key + suffix -> Space.MiB(aggregate(ml)).print)
     List(entry("_average", _.average(field)), entry("_maximum", _.maximum(field)))
   }
 
   private def count_entry(
-    statistics: List[Properties.T],
+    props: Properties.T,
     key: String,
     field: ML_Statistics.Field
   ): Option[(String, JSON.T)] =
-    sum(statistics, field.unapply).map(count => key -> count.toLong)
+    field.unapply(props).map(count => key -> count.toLong)
 
-  object ML_Stats {
-    def apply(statistics: List[Properties.T]): ML_Stats = ML_Stats(
-      samples = statistics.length, ml = ML_Statistics(statistics),
-      after_gc = ML_Statistics(statistics.filter(ml_heap_collected)),
-      latest = statistics.lastOption)
-  }
-
-  sealed case class ML_Stats(
-    samples: Int,
-    ml: ML_Statistics,
-    after_gc: ML_Statistics,
-    latest: Option[Properties.T]
-  )
-
-  def ml_stats_json(stats: List[ML_Stats]): JSON.Object.T = {
-    val ml_stats = stats.map(_.ml)
-    val after_gc_stats = stats.map(_.after_gc)
-    val latest = stats.flatMap(_.latest)
+  def ml_stats_json(statistics: List[Properties.T]): JSON.Object.T = {
+    val ml = ML_Statistics(statistics)
+    val after_gc = ML_Statistics(statistics.filter(ml_heap_collected))
+    val latest = statistics.last
     JSON_Object.flatten(List(
-      Option.when(stats.nonEmpty)("samples" -> stats.map(_.samples).sum.toLong),
-      ml_stats.map(_.duration).maxOption.map(duration =>
-        "duration" -> Time.seconds(duration).message)) :::
-      space_average_maximum(after_gc_stats, "ml_heap_used_after_gc", ML_Heap_Used) :::
-      space_average_maximum(ml_stats, "ml_heap", ML_Statistics.Heap_Size) :::
-      space_average_maximum(ml_stats, "ml_code", ML_Statistics.Program_Code) :::
-      space_average_maximum(ml_stats, "ml_stack", ML_Statistics.Program_Stack) :::
+      Some("samples" -> statistics.length.toLong),
+      Some("duration" -> Time.seconds(ml.duration).message)) :::
+      space_average_maximum(after_gc, "ml_heap_used_after_gc", ML_Heap_Used) :::
+      space_average_maximum(ml, "ml_heap", ML_Statistics.Heap_Size) :::
+      space_average_maximum(ml, "ml_code", ML_Statistics.Program_Code) :::
+      space_average_maximum(ml, "ml_stack", ML_Statistics.Program_Stack) :::
       List(count_entry(latest, "tasks_running", ML_Statistics.Tasks_Running),
         count_entry(latest, "tasks_total", ML_Statistics.Tasks_Total),
         count_entry(latest, "workers_active", ML_Statistics.Workers_Active),
@@ -117,18 +92,17 @@ object Tool_Get_Session_State {
   def java_heap_collected(props: Properties.T): Boolean =
     ML_Statistics.Java_Heap_Size_Major.unapply(props).exists(_ > 0)
 
-  def java_heap(field: ML_Statistics.Field)(props: Properties.T): Option[Double] =
+  def java_heap(props: Properties.T, field: ML_Statistics.Field): Option[Double] =
     if (java_heap_collected(props)) field.unapply(props) else None
 
   def jvm_stats_json(): JSON.Object.T = {
-    val statistics = List(ML_Statistics.jvm_statistics())
+    val props = ML_Statistics.jvm_statistics()
     JSON_Object.flatten(
-      space_entry(statistics, "java_heap_used_after_gc",
-        java_heap(ML_Statistics.Java_Heap_Used_Major)),
-      space_entry(statistics, "java_heap", java_heap(ML_Statistics.Java_Heap_Size_Major)),
-      count_entry(statistics, "java_workers_active", ML_Statistics.Java_Workers_Active),
-      count_entry(statistics, "java_workers_total", ML_Statistics.Java_Workers_Total),
-      count_entry(statistics, "java_threads_total", ML_Statistics.Java_Threads_Total))
+      space_entry("java_heap_used_after_gc", java_heap(props, ML_Statistics.Java_Heap_Used_Major)),
+      space_entry("java_heap", java_heap(props, ML_Statistics.Java_Heap_Size_Major)),
+      count_entry(props, "java_workers_active", ML_Statistics.Java_Workers_Active),
+      count_entry(props, "java_workers_total", ML_Statistics.Java_Workers_Total),
+      count_entry(props, "java_threads_total", ML_Statistics.Java_Threads_Total))
   }
 }
 
@@ -166,7 +140,7 @@ class Tool_Get_Session_State extends PIDE_MCP_Tool("get_session_state") {
     Tool_Get_Session_State.Options_Mode.format, Tool_Get_Session_State.Options_Mode.default)
   private val include_statistics_arg = PIDE_MCP_Tool_Arg.bool_default(
     "include_statistics",
-    "Include each session's recent Isabelle/ML statistics (heap, threads,...), their summary, and the MCP server's JVM statistics (heap, threads,...). " +
+    "Include each session's recent Isabelle/ML statistics (heap, threads,...) and the MCP server's JVM statistics (heap, threads,...). " +
     "Use this to check memory consumption and when you think the server is stuck.",
     false)
 
@@ -197,12 +171,6 @@ class Tool_Get_Session_State extends PIDE_MCP_Tool("get_session_state") {
         error(s"Session(s) ${commas_quote(unknown)} of filter_origins not contained in " +
           s"selection ${commas_quote(selected_ids)}.")
       }
-      lazy val session_statistics: VectorMap[String, Tool_Get_Session_State.ML_Stats] =
-        VectorMap.from(selected_sessions.flatMap { session =>
-          val statistics = session.runtime_statistics()
-          Option.when(statistics.nonEmpty)(
-            session.id -> Tool_Get_Session_State.ML_Stats(statistics))
-        })
       val session_states = selected_sessions.map { session =>
         lazy val snapshot = session.snapshot()
         lazy val theories = PIDE_MCP_Theory.Loaded(session, snapshot.version.nodes)
@@ -217,7 +185,7 @@ class Tool_Get_Session_State extends PIDE_MCP_Tool("get_session_state") {
         JSON.optional(PIDE_MCP_Command.Status.key(PIDE_MCP_Command.Status.running.name) ->
           Option.when(include_commands_running) {
             PIDE_MCP_Theory.commands_running_json(session, snapshot, names)
-          }) ++
+          }.filter(_.nonEmpty)) ++
         JSON_Object.if_proper(include_theory_status,
           PIDE_MCP_Theory.Status.statuses_json(
             PIDE_MCP_Theory.Status.statuses(session, snapshot, names))) ++
@@ -226,14 +194,14 @@ class Tool_Get_Session_State extends PIDE_MCP_Tool("get_session_state") {
         JSON.optional("session_directories" ->
           Option.when(include_session_dirs)(session.directories().map(_.implode))) ++
         Tool_Get_Session_State.options_json(session.options, include_options) ++
-        JSON_Object.if_proper(include_statistics, session_statistics.get(session.id)
-          .map(stats => Tool_Get_Session_State.ml_stats_json(List(stats)))
-          .getOrElse(JSON_Object("note" -> "no ML statistics reported yet")))
+        JSON_Object.if_proper(include_statistics, {
+          val statistics = session.runtime_statistics()
+          if (statistics.isEmpty) JSON_Object("note" -> "no ML statistics reported yet")
+          else Tool_Get_Session_State.ml_stats_json(statistics)
+        })
       }
       JSON_Object("sessions" -> session_states) ++
-      JSON_Object.if_proper(include_statistics,
-        Tool_Get_Session_State.ml_stats_json(session_statistics.values.toList) ++
-        Tool_Get_Session_State.jvm_stats_json())
+      JSON_Object.if_proper(include_statistics, Tool_Get_Session_State.jvm_stats_json())
     }
 }
 

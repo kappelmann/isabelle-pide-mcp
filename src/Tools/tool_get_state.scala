@@ -52,7 +52,7 @@ class Tool_Get_State extends PIDE_MCP_Tool("get_state") {
   private val snippet_lines_arg = PIDE_MCP_Tool_Arg.int_default(
     "snippet_lines",
     "Number of source lines shown per summary snippet. Use 0 to only show line ranges.",
-    1, minimum = Some(0))
+    PIDE_MCP_Command.States.default_snippet_lines, minimum = Some(0))
 
   def input_schema: JSON.Object.T = PIDE_MCP_Tool_Schema.input_schema(
     List(PIDE_MCP_Tool_Schema.running_session_arg, PIDE_MCP_Tool_Schema.origin_arg,
