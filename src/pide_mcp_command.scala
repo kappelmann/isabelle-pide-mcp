@@ -135,7 +135,8 @@ object PIDE_MCP_Command {
 
   def output_positions(snapshot: Document.Snapshot, cmd: Command, elem: XML.Elem): XML.Elem = {
     def same_file(file: String): Boolean =
-      file == snapshot.node_name.node || Path.explode(file).expand.implode == snapshot.node_name.node
+      file == snapshot.node_name.node ||
+        Path.is_valid(file) && Path.explode(file).expand.implode == snapshot.node_name.node
     def line_text(line: Int, file: String): String =
       "(line " + line + if_proper(!same_file(file), " of " + quote(file)) + ")"
     def output(body: XML.Body): XML.Body =
