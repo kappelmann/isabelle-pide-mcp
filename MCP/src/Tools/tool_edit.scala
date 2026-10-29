@@ -19,6 +19,16 @@ object Tool_Edit {
         values.find(_.toString == mode)), _.toString)
   }
 
+  enum Edited_Lines { case none, each, range }
+
+  object Edited_Lines {
+    val default: Edited_Lines = range
+    val format = PIDE_MCP_Tool_Arg.Format(
+      JSON_Object("type" -> "string", "enum" -> values.toList.map(_.toString)),
+      json => JSON.Value.String.unapply(json).flatMap(report =>
+        values.find(_.toString == report)), _.toString)
+  }
+
   def replaced_range(mode: Edit_Mode, offset: Text.Offset, old_length: Int): Text.Range =
     mode match {
       case Edit_Mode.replace => Text.Range(offset, offset + old_length)
@@ -36,7 +46,7 @@ object Tool_Edit {
     old_text: String,
     edit_all: Boolean,
     progress: Progress
-  ): Int = {
+  ): List[(Int, Int)] = {
     if (session.is_base_session_theory(node_name))
       error(s"Cannot edit base session theory ${quote(session.origin(node_name))}")
     PIDE_MCP_Tool_Util.require_ordered_lines(start_line, end_line)
@@ -54,9 +64,9 @@ object Tool_Edit {
           val occurrences = new Regex(Regex.quote(actual_old_text))
             .findAllMatchIn(range_text).map(_.start + search_range.start).toList
           if (occurrences.isEmpty)
-            error("old_text not found in the given range. The file may have changed.")
+            error("old_text not found in given range. The file may have changed.")
           if (!edit_all && occurrences.length > 1)
-            error(s"Found ${occurrences.length} occurrences of old_text in the given range. " +
+            error(s"Found ${occurrences.length} occurrences of old_text in given range. " +
               "Expected exactly 1. " +
               "Provide more context (larger old_text), restrict the range, or use edit_all.")
           if (edit_all) occurrences else List(occurrences.head)
@@ -67,21 +77,22 @@ object Tool_Edit {
       }
       val changed = computed_text != current_text
       val edited_doc = Line.Document(computed_text)
-      val visible_lines =
+      val edited_lines =
         replaced_ranges.zipWithIndex.map { case (range, i) =>
           val start = range.start + i * (new_text.length - range.length)
           val line_range = edited_doc.range(Text.Range(start, start + new_text.length))
-          (line_range.start.line1, Some(line_range.stop.line1))
+          (line_range.start.line1, line_range.stop.line1)
         }
       progress.expose_interrupt()
       if (changed) session.write_file_content(node_name.path, computed_text)
       session.read_update(
-        List(node_name -> Some(visible_lines)), hide_others = true,
+        List(node_name -> Some(edited_lines.map(_ -> Some(_)))),
+        hide_others = true,
         // avoid disk <--> PIDE disagreement
         progress = new Uncancellable_Progress(progress))
       session.await_stable_snapshot(progress)
       session.resolve_dependencies(List(node_name), progress)
-      if (changed) offsets.length else 0
+      if (changed) edited_lines else Nil
     }
   }
 }
@@ -100,11 +111,14 @@ class Tool_Edit extends PIDE_MCP_Tool("edit") {
     "old_text", "Text to find. On empty old_text, the whole text in range is selected.")
   private val edit_all_arg = PIDE_MCP_Tool_Arg.bool_default(
     "edit_all", "Edit every match or a unique occurrence.", false)
+  private val edited_lines_arg = PIDE_MCP_Tool_Arg.default(
+    "edited_lines", "Return format.",
+    Tool_Edit.Edited_Lines.format, Tool_Edit.Edited_Lines.default)
 
   def input_schema: JSON.Object.T = PIDE_MCP_Tool_Schema.input_schema(
     List(PIDE_MCP_Tool_Schema.running_session_arg, PIDE_MCP_Tool_Schema.origin_arg, mode_arg,
       text_arg, PIDE_MCP_Tool_Schema.start_line_default_arg,
-      PIDE_MCP_Tool_Schema.opt_end_line_arg, old_text_arg, edit_all_arg))
+      PIDE_MCP_Tool_Schema.opt_end_line_arg, old_text_arg, edit_all_arg, edited_lines_arg))
 
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("destructiveHint" -> true))
 
@@ -122,11 +136,20 @@ class Tool_Edit extends PIDE_MCP_Tool("edit") {
       val edit_all = edit_all_arg.get(args)
       val start_line = PIDE_MCP_Tool_Schema.start_line_default_arg.get(args)
       val opt_end_line = PIDE_MCP_Tool_Schema.opt_end_line_arg.get(args)
-      val count = Tool_Edit.read_update_edit(
+      val edited_lines = Tool_Edit.read_update_edit(
         session, mode, node_name, text, start_line, opt_end_line, old_text,
         edit_all = edit_all, progress = progress)
-      JSON_Object("edits" -> count) ++
-      JSON_Object.if_proper(count == 0, JSON_Object("note" -> "The edit left the text unchanged."))
+      val lines = edited_lines_arg.get(args) match {
+        case Tool_Edit.Edited_Lines.none => None
+        case Tool_Edit.Edited_Lines.range =>
+          Option.when(edited_lines.nonEmpty)(
+            PIDE_MCP_Util.line_range(edited_lines.head._1, edited_lines.last._2))
+        case Tool_Edit.Edited_Lines.each =>
+          proper_list(edited_lines.map(PIDE_MCP_Util.line_range))
+      }
+      JSON_Object("edits" -> edited_lines.length) ++ JSON.optional("edited_lines" -> lines) ++
+      JSON_Object.if_proper(edited_lines.isEmpty,
+        JSON_Object("note" -> "The edit left the text unchanged."))
     }
 }
 

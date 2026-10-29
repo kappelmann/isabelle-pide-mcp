@@ -3,7 +3,7 @@ name: pide-mcp
 description: Using the Isabelle proof assistant with PIDE MCP. Use this whenever working with theory files (*.thy) or ML files (*.ML) or when you are dealing with Isabelle in the general sense and have access to the PIDE MCP.
 ---
 
-PIDE MCP's tools and services are customisable. Some named below may be unavailable. Also load skills of PIDE MCP tools and services.
+PIDE MCP's tools and services (extensions) are customisable. Some named below may be unavailable. Also load skills of extensions.
 
 ## Sessions
 - Each session has its own base session, directories, options, and state.
