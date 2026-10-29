@@ -172,10 +172,10 @@ Check out the [quick start tutorial](https://formalproof.ai/quick-start/) to lea
 
 ## Customizing the MCP Server's Tools
 
-Tools that should be offered by the server must extend `PIDE_MCP_Tools`, be registered via the `services` field in `build.props`, and be enabled in the Isabelle option `pide_mcp_tools`.
-- Disable tools at compilation time by removing them from `services` in `build.props` or exclude them at startup using the Isabelle option `pide_mcp_tools` (see [`etc/options`](./etc/options)).
-- Add tools by adding the relevant source files to `sources` and the relevant class to `services` in `build.props` and include them in the Isabelle option `pide_mcp_tools`.
-- Restart the MCP server after editing the services or option.
+Tools that should be offered by the server must extend `PIDE_MCP_Tools`, be registered via the `services` field in `build.props`, and be enabled in the Isabelle option `pide_mcp_tools_include`.
+- Disable tools at compilation time by removing them from `services` in `build.props` or exclude them at startup using the Isabelle options `pide_mcp_tools_include` and `pide_mcp_tools_exclude` (see [`etc/options`](./etc/options)).
+- Add tools by adding the relevant source files to `sources` and the relevant class to `services` in `build.props` and include them in the Isabelle option `pide_mcp_tools_include`.
+- Restart the MCP server after editing the services or options.
 
 You can either use the PIDE MCP's `build.props` (modify [`etc/build.props`](./etc/build.props))
 or use a different Scala component:
@@ -183,7 +183,7 @@ or use a different Scala component:
 1. Add `env:ISABELLE_PIDE_MCP_JAR` to the component's `requirements` in `build.props`.
 1. Add your tools' `sources` and `services`.
 1. Register the component: `isabelle components -u <PATH_TO_THE_COMPONENT>`.
-1. Add the tool to the Isabelle option `pide_mcp_tools`
+1. Add the tool to the Isabelle option `pide_mcp_tools_include`
 
 See [tool\_extensions](./tool_extensions) for such a component with experimental tool extensions.
 

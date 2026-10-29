@@ -89,7 +89,7 @@ object Tool_Edit {
 class Tool_Edit extends PIDE_MCP_Tool("edit") {
   def description: String =
     "Edit the text matching old_text in a given range. " +
-    PIDE_MCP_Tool_Schema.range_visibility + " " +
+    PIDE_MCP_Tool_Schema.range_perspective + " " +
     PIDE_MCP_Tool_Schema.no_processing_wait + " " +
     PIDE_MCP_Tool_Schema.implicit_reload_file
 

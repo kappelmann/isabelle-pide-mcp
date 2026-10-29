@@ -10,7 +10,7 @@ class Tool_Read extends PIDE_MCP_Tool("read") {
   def description: String =
     "Read line-numbered content. " +
     "Re-synchronises the file's disk content with the session. " +
-    PIDE_MCP_Tool_Schema.range_visibility + " " +
+    PIDE_MCP_Tool_Schema.range_perspective + " " +
     PIDE_MCP_Tool_Schema.no_processing_wait + " " +
     PIDE_MCP_Tool_Schema.implicit_reload_file
 

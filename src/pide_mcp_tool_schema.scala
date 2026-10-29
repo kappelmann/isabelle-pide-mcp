@@ -11,7 +11,7 @@ import isabelle._
 object PIDE_MCP_Tool_Schema {
   val implicit_load_file: String = "Implicitly loads file if required."
   val implicit_reload_file: String = "Implicitly (re)loads file."
-  val range_visibility: String = "Sets PIDE perspective on the range."
+  val range_perspective: String = "Moves PIDE perspective to the range."
   val no_processing_wait: String = "Does not wait for commands to finish."
   val session_restart: String =
     "Use only when required: unresponsiveness or ROOT or base session updates."

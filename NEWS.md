@@ -10,6 +10,7 @@ New in PIDE MCP 2026
 ----------------------------
 
 * Improved all tools and skills for more efficient token usage. INCOMPATIBILITY.
+* New option `pide_mcp_tools_exclude` to disable tools at startup time. Option `pide_mcp_tools` is renamed to `pide_mcp_tools_include`. INCOMPATIBILITY.
 * `get_session_state` no longer reports summary statistics over all sessions. INCOMPATIBILITY.
 * More compact `get_state`: by default, only a summary is returned instead of full commands.
   Empty commands are neither returned nor counted. New `details` replacing `include_infos`, `include_types`, `include_facts`, and `include_full_markup`.
