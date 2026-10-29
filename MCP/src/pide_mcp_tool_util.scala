@@ -40,9 +40,8 @@ object PIDE_MCP_Tool_Util {
     node_name: Document.Node.Name,
     progress: Progress
   ): Document.Snapshot = {
-    val snapshot = Exn.result { session.node_snapshot(node_name) } match {
-      case Exn.Res(snapshot) => snapshot
-      case Exn.Exn(_) =>
+    val snapshot = try { session.node_snapshot(node_name) } catch {
+      case ERROR(_) =>
         if (PIDE_MCP_Util.is_loaded_dynamic(session.tip_version(progress).nodes(node_name)))
           error(s"The origin ${quote(session.origin(node_name))} is loaded but has not been " +
             "processed yet. " + retry_soon_message)

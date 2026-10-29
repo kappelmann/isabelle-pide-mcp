@@ -42,7 +42,7 @@ object Tool_Edit {
     PIDE_MCP_Tool_Util.require_ordered_lines(start_line, end_line)
     session.with_lock(progress) {
       val current_text = session.read_update(
-        List(node_name -> Nil), hide_others = false, progress = progress)(node_name)
+        List(node_name -> None), hide_others = false, progress = progress)(node_name)
       val doc = Line.Document(current_text)
       val (first_line, last_line) =
         PIDE_MCP_Tool_Util.resolve_lines(start_line, end_line, doc.lines.length)
@@ -76,7 +76,7 @@ object Tool_Edit {
       progress.expose_interrupt()
       if (changed) session.write_file_content(node_name.path, computed_text)
       session.read_update(
-        List(node_name -> visible_lines), hide_others = true,
+        List(node_name -> Some(visible_lines)), hide_others = true,
         // avoid disk <--> PIDE disagreement
         progress = new Uncancellable_Progress(progress))
       session.await_stable_snapshot(progress)

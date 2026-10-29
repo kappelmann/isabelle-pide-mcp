@@ -24,7 +24,7 @@ class PIDE_MCP_Editor(mcp_session: PIDE_MCP_Session, progress: Progress) extends
   def current_node(context: Context): Option[Document.Node.Name] = Some(context.node_name)
   def node_snapshot(name: Document.Node.Name): Document.Snapshot = mcp_session.node_snapshot(name)
   def current_node_snapshot(context: Context): Option[Document.Snapshot] =
-    Exn.the_res.lift(Exn.result(node_snapshot(context.node_name)))
+    try { Some(node_snapshot(context.node_name)) } catch { case ERROR(_) => None }
   def current_command(context: Context, snapshot: Document.Snapshot): Option[Command] =
     snapshot.current_command(context.node_name, context.offset)
 

@@ -19,11 +19,11 @@ object PIDE_MCP_Definition {
     name: String,
     origin: String,
     line: Int,
-    exn: Throwable
+    msg: String
   ): PIDE_MCP_Definition = PIDE_MCP_Definition(name, name_space_entry.kind,
     def_label(name_space_entry), origin = Some(origin), line = Some(line),
     note = Some(s"The definition entry's source file ${quote(origin)} " +
-      s"could not be resolved: ${Exn.message(exn)}"))
+      s"could not be resolved: $msg"))
 
   class Context(val session: PIDE_MCP_Session, val snapshot: Document.Snapshot) {
     private val cache = mutable.Map.empty[Document.Node.Name, List[String]]
@@ -55,15 +55,13 @@ object PIDE_MCP_Definition {
   ): Option[PIDE_MCP_Definition] = {
     val session = context.session
     def make(origin: String, line: Int): Option[PIDE_MCP_Definition] =
-      Exn.result {
+      try {
         val node_name = session.node_name(origin)
         val node_origin = session.origin(node_name)
         Option.when(filter_origins.forall(_.contains(node_origin)))(
           resolved(context, name_space_entry, name, node_name, node_origin, line, snippet_lines))
-      } match {
-        case Exn.Res(definition) => definition
-        case Exn.Exn(exn) => Some(unresolved(name_space_entry, name, origin, line, exn))
       }
+      catch { case ERROR(msg) => Some(unresolved(name_space_entry, name, origin, line, msg)) }
     name_space_entry.properties match {
       case Position.Item_Def_File(def_file, def_line, _) => make(def_file, def_line)
       case Position.Item_Def_Id(def_id, def_range) =>

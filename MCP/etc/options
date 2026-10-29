@@ -12,6 +12,9 @@ option pide_mcp_range_context : int = 50 for pide_mcp
 option pide_mcp_unicode_symbols_disk : bool = false for pide_mcp
   -- "store Isabelle symbols in source files via Unicode"
 
+option pide_mcp_file_watcher_delay : real = 0.5 for pide_mcp
+  -- "delay for polling loaded files for external changes (seconds)"
+
 option pide_mcp_session_progress_delay : real = 5.0 for pide_mcp
   -- "delay for progress messages of potentially blocking PIDE session operations (seconds)"
 

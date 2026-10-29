@@ -146,7 +146,6 @@ class PIDE_MCP_Session private(
   def range_context: Int = options.int("pide_mcp_range_context")
   def statistics_limit: Int = options.int("pide_mcp_session_statistics_limit")
   def unicode_symbols_disk: Boolean = options.bool("pide_mcp_unicode_symbols_disk")
-
   def disk_text(path: Path, text: String): String =
     if (Symbols.supports_isabelle_symbols(path)) Symbol.output(unicode_symbols_disk, text)
     else text
@@ -269,10 +268,8 @@ class PIDE_MCP_Session private(
     snapshot: Document.Snapshot,
     node_name: Document.Node.Name
   ): String =
-    Exn.result { switch(snapshot, node_name) } match {
-      case Exn.Res(new_snapshot) => new_snapshot.node.source
-      case Exn.Exn(_) => read_file_content(node_name)
-    }
+    try { switch(snapshot, node_name).node.source }
+    catch { case ERROR(_) => read_file_content(node_name) }
 
   def update(edits: List[Document.Edit_Text]): Unit =
     if (edits.nonEmpty) {
@@ -334,24 +331,39 @@ class PIDE_MCP_Session private(
 
   def editor(progress: Progress): PIDE_MCP_Editor = new PIDE_MCP_Editor(this, progress)
 
-  private def replace_edits(old_text: String, new_text: String): List[Text.Edit] = {
-    val prefix = old_text.iterator.zip(new_text.iterator).takeWhile(_ == _).length
-    val (old_rest, new_rest) = (old_text.drop(prefix), new_text.drop(prefix))
-    val suffix = old_rest.reverseIterator.zip(new_rest.reverseIterator).takeWhile(_ == _).length
-    Text.Edit.replace(prefix, old_rest.dropRight(suffix), new_rest.dropRight(suffix))
+  private object Replacement {
+    def make(old_text: String, new_text: String): Replacement = {
+      val prefix = old_text.iterator.zip(new_text.iterator).takeWhile(_ == _).length
+      val (old_rest, new_rest) = (old_text.drop(prefix), new_text.drop(prefix))
+      val suffix = old_rest.reverseIterator.zip(new_rest.reverseIterator).takeWhile(_ == _).length
+      Replacement(prefix, old_rest.dropRight(suffix), new_rest.dropRight(suffix))
+    }
+  }
+
+  private sealed case class Replacement(start: Text.Offset, old_text: String, new_text: String) {
+    def edits: List[Text.Edit] = Text.Edit.replace(start, old_text, new_text)
+
+    def restrict(perspective: Text.Perspective): Text.Perspective = {
+      val before = Text.Range(0, start)
+      val after = Text.Range(start + old_text.length, Text.Range.full.stop)
+      val shift = new_text.length - old_text.length
+      Text.Perspective(perspective.ranges.flatMap(range =>
+        range.try_restrict(before).toList :::
+        range.try_restrict(after).map(_ + shift).toList).filterNot(_.is_singularity))
+    }
   }
 
   private case class Node_Model(
     node_name: Document.Node.Name,
     node: Document.Node,
     text: String,
+    pending_edits: List[Text.Edit],
     text_perspective: Text.Perspective
   ) extends Document.Model {
     def session: Document.Session = PIDE_MCP_Session.this.session
     def node_required: Boolean = text.nonEmpty
     def untyped_data: AnyRef = File_Format.registry.parse_data(node_name, text)
 
-    lazy val pending_edits: List[Text.Edit] = replace_edits(node.source, text)
     def is_stable: Boolean = pending_edits.isEmpty
 
     def get_text(range: Text.Range): Option[String] = range.try_substring(text)
@@ -389,7 +401,7 @@ class PIDE_MCP_Session private(
     }
 
   def read_update(
-    nodes: List[(Document.Node.Name, List[(Int, Option[Int])])],
+    nodes: List[(Document.Node.Name, Option[List[(Int, Option[Int])]])],
     hide_others: Boolean,
     range_context: Int = range_context,
     progress: Progress
@@ -397,12 +409,18 @@ class PIDE_MCP_Session private(
     val models = with_lock(progress) {
       val version = tip_version(progress)
       val models1 = nodes.map { case (name, visible_lines) =>
+        val node = version.nodes(name)
         val text = read_file_content(name)
-        val doc = Line.Document(text)
-        val line_ranges = visible_lines.map { case (start_line, opt_end_line) =>
-          (start_line, opt_end_line.getOrElse(doc.lines.length)) }
-        Node_Model(name, version.nodes(name), text,
-          PIDE_MCP_Util.text_perspective(doc, line_ranges, range_context))
+        val replacement = Replacement.make(node.source, text)
+        val text_perspective = visible_lines match {
+          case None => replacement.restrict(node.text_perspective)
+          case Some(visible_lines) =>
+            val doc = Line.Document(text)
+            val line_ranges = visible_lines.map { case (start_line, opt_end_line) =>
+              (start_line, opt_end_line.getOrElse(doc.lines.length)) }
+            PIDE_MCP_Util.text_perspective(doc, line_ranges, range_context)
+        }
+        Node_Model(name, node, text, replacement.edits, text_perspective)
       }
       val other_edits =
         if (hide_others) hide_edits(version.nodes, nodes.map(_._1).toSet)
@@ -452,7 +470,7 @@ class PIDE_MCP_Session private(
     ): Unit = {
       val names = required_nodes(tip_version(progress), seen, loaded_origins, progress)
       if (names.nonEmpty) {
-        read_update(names.toList.map(_ -> Nil), hide_others = false, progress = progress)
+        read_update(names.toList.map(_ -> Some(Nil)), hide_others = false, progress = progress)
         loop(seen ++ names, Nil)
       }
     }
@@ -469,7 +487,7 @@ class PIDE_MCP_Session private(
   ): String = {
     if (is_base_session_theory(node_name)) node_snapshot(node_name).node.source
     else {
-      val text = read_update(List(node_name -> visible_lines), hide_others,
+      val text = read_update(List(node_name -> Some(visible_lines)), hide_others,
         range_context, progress)(node_name)
       if (await_stable_before_resolve) await_stable_snapshot(progress)
       resolve_dependencies(List(node_name), progress)
@@ -481,7 +499,8 @@ class PIDE_MCP_Session private(
     node_name: Document.Node.Name,
     node: Document.Node
   ): List[Document.Edit_Text] = {
-    val model = Node_Model(node_name, node, "", Text.Perspective.empty)
+    val model =
+      Node_Model(node_name, node, "", Text.Edit.removes(0, node.source), Text.Perspective.empty)
     model.node_edits(
       Resources.Thy.empty, model.pending_edits, Document.Node.Perspective_Text.empty)
   }
