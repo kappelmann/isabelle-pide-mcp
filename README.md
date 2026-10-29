@@ -46,6 +46,9 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
     In Isabelle/jEdit, it is sometimes necessary to reload manually (e.g. by using the F5 key). Isabelle/VSCode supports auto-reload. 
     Avoid editing a file while the agent works on it. You might have to merge conflicts by hand otherwise.
 - If you want the agent to see proof states in pre-built base sessions, you have to build them with `-o show_states`. Note that such builds take significantly longer!
+- By default, the MCP server writes Isabelle symbols to files on disk as ASCII (e.g. `\<forall>`), as required by batch Isabelle tools like `isabelle build`.
+    Use option `pide_mcp_unicode_symbols_disk` (e.g. `-o pide_mcp_unicode_symbols_disk`) to write them via Unicode instead.
+    The tool `isabelle symbols -d|-e FILES` converts files in either direction.
 
 ## Installing the MCP Server
 
@@ -62,7 +65,7 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
     cd isabelle-pide-mcp
     git checkout <BRANCH>
     ```
-    **Note for Windows users:** make sure that `etc/settings` uses `LF` line breaks.
+    **Note for Windows users:** make sure that all `etc/settings` files use `LF` line breaks.
 
 3. Register this project as an Isabelle component by inserting the file path to this project into the command below.
     ```bash
@@ -173,11 +176,11 @@ Check out the [quick start tutorial](https://formalproof.ai/quick-start/) to lea
 ## Customizing the MCP Server's Tools
 
 Tools that should be offered by the server must extend `PIDE_MCP_Tools`, be registered via the `services` field in `build.props`, and be enabled in the Isabelle option `pide_mcp_tools_include`.
-- Disable tools at compilation time by removing them from `services` in `build.props` or exclude them at startup using the Isabelle options `pide_mcp_tools_include` and `pide_mcp_tools_exclude` (see [`etc/options`](./etc/options)).
+- Disable tools at compilation time by removing them from `services` in `build.props` or exclude them at startup using the Isabelle options `pide_mcp_tools_include` and `pide_mcp_tools_exclude` (see [`MCP/etc/options`](./MCP/etc/options)).
 - Add tools by adding the relevant source files to `sources` and the relevant class to `services` in `build.props` and include them in the Isabelle option `pide_mcp_tools_include`.
 - Restart the MCP server after editing the services or options.
 
-You can either use the PIDE MCP's `build.props` (modify [`etc/build.props`](./etc/build.props))
+You can either use the PIDE MCP's `build.props` (modify [`MCP/etc/build.props`](./MCP/etc/build.props))
 or use a different Scala component:
 1. Create a Scala component.
 1. Add `env:ISABELLE_PIDE_MCP_JAR` to the component's `requirements` in `build.props`.
@@ -185,7 +188,7 @@ or use a different Scala component:
 1. Register the component: `isabelle components -u <PATH_TO_THE_COMPONENT>`.
 1. Add the tool to the Isabelle option `pide_mcp_tools_include`
 
-See [tool\_extensions](./tool_extensions) for such a component with experimental tool extensions.
+See [Tool\_Extensions](./Tool_Extensions) for such a component with experimental tool extensions.
 
 ## Known Limitations/Future Work
 

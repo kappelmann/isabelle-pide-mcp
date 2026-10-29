@@ -10,6 +10,8 @@ New in PIDE MCP 2026
 ----------------------------
 
 * Improved all tools and skills for more efficient token usage. INCOMPATIBILITY.
+* New option `pide_mcp_unicode_symbols_disk` to store Isabelle symbols in source files via Unicode. Symbols are now also recoded in `.sml` and `.sig` files.
+* New Isabelle tool `isabelle symbols` to encode or decode Isabelle symbols in files.
 * New option `pide_mcp_tools_exclude` to disable tools at startup time. Option `pide_mcp_tools` is renamed to `pide_mcp_tools_include`. INCOMPATIBILITY.
 * `get_session_state` no longer reports summary statistics over all sessions. INCOMPATIBILITY.
 * More compact `get_state`: by default, only a summary is returned instead of full commands.
@@ -25,7 +27,7 @@ New in PIDE MCP 2026
 * Add Isabelle/ML skill file.
 * Reading or editing a theory loads its unloaded files.
 * `unload` now also unloads files of unloaded theories unless a remaining theory still loads them.
-* Add [tool\_extensions](./tool_extensions) with experimental sledgehammer tool as an example user-level tool extension.
+* Add [Tool\_Extensions](./Tool_Extensions) with experimental sledgehammer tool as an example user-level tool extension.
 * Add overlay and query operations support.
 * Remove `show_results` default value. Set options manually if required. INCOMPATIBILITY.
 * Enable `show_states` only for live sessions, not for base session builds. Disable `editor_output_state` to avoid duplicate states. INCOMPATIBILITY.

@@ -26,7 +26,7 @@ In priority order:
 
 ## Closing goals
 - If a goal does not close with an obvious guess:
-  - If standard automation (simp, auto, blast, force, fastforce,...) should solve it and you know which facts to pass, use try0 (usually <5s) with those facts, e.g. using <facts> try0 simp: <rules> intro: <rules>.
+  - If standard automation (simp, auto, blast, force, fastforce,...) should solve it and you know which facts to pass, use try0 (usually <5s) with those facts, e.g. `using <facts> try0 simp: <rules> intro: <rules>`.
   - Otherwise, e.g. if you do not know the needed lemmas or the proof likely needs metis or smt, use sledgehammer (usually <20s).
 - From the suggested proofs, pick the most robust: methods with good default behaviour (simp, auto, fastforce,...) over explicit ones (metis, rule) over smt, unless they are much slower.
 - Don't keep on guessing proofs for easy steps (particularly metis calls): sledgehammer typically finds them in seconds. Turn hard steps into a structured proof or a separate lemma.
@@ -36,7 +36,7 @@ In priority order:
 ## Search
 - Unlike text search, find_theorems and find_consts also find generated facts (e.g. from datatype).
 - find_theorems: use ?x or _ for variables (a free x matches only itself). intro, elim, dest, solves refer to the current goal. Limit results with find_theorems (<n>).
-- find_consts "<type>" finds constants whose type contains the pattern; strict: "<type>" requires the whole type to match.
+- find_consts "<type>" finds constants whose type contains the pattern; `strict: "<type>"` requires the whole type to match.
 - find_theorems, find_consts, and sledgehammer only see transitively imported theories. For other ones, import them if cheap (base session or small dependency); otherwise search their sources as text.
 
 ## Theorem tagging
@@ -44,9 +44,9 @@ In priority order:
 - Tag fundamental theorems of new definitions, unless they are rarely used; then pass the rules explicitly.
 
 ## Style
-- Prefer Isar proofs: use proof - or proof <method>, never an implicit method. apply scripts are fine for exploration (then turn them into Isar) and where they are standard style (e.g. program logics).
+- Prefer Isar proofs: use `proof -` or proof <method>, never an implicit method. `apply` scripts are fine for exploration (then turn them into Isar) and where they are standard style (e.g. program logics).
 - Don't be overly verbose: proofs with many low-level steps are brittle and hard to follow. Let automation handle them.
-- Prefer structured statements: implicit quantification, ⋀ and for over ∀; obtains over ∃ in conclusions; Isar's and over ∧.
+- Prefer structured statements: implicit quantification, ⋀ and `for` over ∀; `obtains` over ∃ in conclusions; Isar's `and` over ∧.
 - Use Isabelle's structuring mechanisms where appropriate:
   - sessions (ROOT) for larger developments, so stable parts are built once and reused
   - separate theories instead of large ones

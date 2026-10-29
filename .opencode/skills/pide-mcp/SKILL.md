@@ -13,6 +13,7 @@ PIDE MCP's tool set is customisable: tools named here may be unavailable. Also l
 ## Edits and synchronisation
 - read and edit synchronise disk and PIDE state: after external disk edits or when asked to synchronise, use read.
 - Edits re-check all later commands, also in dependent theories: check beyond the edited range.
+- PIDE MCP uses Unicode for Isabelle symbols (e.g. ∀ for \<forall>) internally and follows option pide_mcp_unicode_symbols_disk for disk operations, configurable on session start. Non-PIDE Isabelle tools may require ASCII files: recode with `isabelle symbols`.
 
 ## Checking state
 - Check your changes: get_state for local information (errors, goals, sorrys in a file), get_session_state for global information (all theories' status, processing commands).
