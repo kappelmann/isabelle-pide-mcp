@@ -7,6 +7,8 @@ package isabelle.pide.mcp
 import isabelle._
 
 class Service_File_Watcher extends PIDE_MCP_Service("file_watcher") {
+  def description: String = "Synchronise disk changes of loaded files."
+
   private val watchers =
     Synchronized(Map.empty[String, (PIDE_MCP_File_Watcher[Document.Node.Name], Progress)])
 

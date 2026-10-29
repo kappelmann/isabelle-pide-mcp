@@ -34,6 +34,7 @@ sources = \
   src/Tools/tool_find_entities.scala \
   src/Tools/tool_get_session_state.scala \
   src/Tools/tool_get_state.scala \
+  src/Tools/tool_list_extensions.scala \
   src/Tools/tool_list_sessions.scala \
   src/Tools/tool_read.scala \
   src/Tools/tool_start_session.scala \
@@ -48,6 +49,7 @@ services = \
   isabelle.pide.mcp.Tools_Find_Entities \
   isabelle.pide.mcp.Tools_Get_Session_State \
   isabelle.pide.mcp.Tools_Get_State \
+  isabelle.pide.mcp.Tools_List_Extensions \
   isabelle.pide.mcp.Tools_List_Sessions \
   isabelle.pide.mcp.Tools_Read \
   isabelle.pide.mcp.Tools_Start_Session \

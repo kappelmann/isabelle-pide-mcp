@@ -9,6 +9,7 @@ New in this PIDE MCP version
 New in PIDE MCP 2026
 ----------------------------
 
+* New tool `list_extensions` to list enabled services and tools.
 * New service `file_watcher`: changes of loaded files on disk are synced with their PIDE state.
   Use option `pide_mcp_file_watcher_delay` to configure the polling delay.
 * New `service` extensions with per-session start and stop hooks, configurable via options `pide_mcp_services_include` and `pide_mcp_services_exclude`.

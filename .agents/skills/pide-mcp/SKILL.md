@@ -3,7 +3,7 @@ name: pide-mcp
 description: Using the Isabelle proof assistant with PIDE MCP. Use this whenever working with theory files (*.thy) or ML files (*.ML) or when you are dealing with Isabelle in the general sense and have access to the PIDE MCP.
 ---
 
-PIDE MCP's tool set is customisable: tools named here may be unavailable. Also load skills of PIDE MCP tools.
+PIDE MCP's tools and services are customisable. Some named below may be unavailable. Also load skills of PIDE MCP tools and services.
 
 ## Sessions
 - Each session has its own base session, directories, options, and state.
@@ -11,7 +11,7 @@ PIDE MCP's tool set is customisable: tools named here may be unavailable. Also l
 - Prefer unloading a stuck theory over restarting a session.
 
 ## Edits and synchronisation
-- read and edit synchronise disk and PIDE state: after external disk edits or when asked to synchronise, use read.
+- file_watcher service synchronises disk edits of loaded files. read and edit synchronise immediately. Use read when asked to synchronise or if file_watcher is unavailable.
 - Edits re-check all later commands, also in dependent theories: check beyond the edited range.
 - PIDE MCP uses Unicode for Isabelle symbols (e.g. ∀ for \<forall>) internally and follows option pide_mcp_unicode_symbols_disk for disk operations, configurable on session start. Non-PIDE Isabelle tools may require ASCII files: recode with `isabelle symbols`.
 

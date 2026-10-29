@@ -57,6 +57,10 @@ abstract class PIDE_MCP_Service(val name: String) {
 
   if (!PIDE_MCP_Service.valid_name(name)) error(s"Bad PIDE_MCP $kind name: ${quote(name)}")
 
+  def description: String
+
+  def json: JSON.Object.T = JSON_Object("name" -> name, "description" -> description)
+
   // called after each session start
   def start(
     sessions: PIDE_MCP_Sessions,

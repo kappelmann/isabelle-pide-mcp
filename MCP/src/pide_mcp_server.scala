@@ -250,11 +250,7 @@ class PIDE_MCP_Server(
   }
 
   private def handle_tools_list(id: JSON_RPC.Id, out: BufferedWriter): Unit = {
-    val tools = sessions.tool_table.values.toList.sortBy(_.name).map { tool =>
-      JSON_Object("name" -> tool.name, "description" -> tool.description,
-        "inputSchema" -> tool.input_schema) ++
-      JSON.optional("annotations" -> tool.annotations)
-    }
+    val tools = sessions.tool_table.values.toList.sortBy(_.name).map(_.json)
     respond(out, JSON_RPC.result(id, JSON_Object("tools" -> tools)))
   }
 

@@ -21,9 +21,12 @@ object PIDE_MCP_Tool {
 abstract class PIDE_MCP_Tool(name: String) extends PIDE_MCP_Service(name) {
   override def kind: String = PIDE_MCP_Tool.kind
 
-  def description: String
   def input_schema: JSON.Object.T
   def annotations: Option[JSON.Object.T] = None
+
+  override def json: JSON.Object.T =
+    super.json ++ JSON_Object("inputSchema" -> input_schema) ++
+    JSON.optional("annotations" -> annotations)
 
   def handle(
     sessions: PIDE_MCP_Sessions,
