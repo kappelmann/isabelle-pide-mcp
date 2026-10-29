@@ -7,7 +7,7 @@
 This repository contains:
 1. A Model Context Protocol (MCP) server to **let AI agents interactively work with Isabelle** sessions, theories, and ML files via Isabelle/PIDE.
     The MCP server is **headless** and **editor-agnostic**: you can let the agent work on its own or run it alongside Isabelle/jEdit or Isabelle/VSCode.
-    The MCP server is also **customizable** and **extensible**: you can freely add and remove MCP tools offered to the agents.
+    The MCP server is also **customizable** and **extensible**: you can freely add and remove background services and MCP tools.
 1. A curated set of MCP tools for typical Isabelle workflows (auto-formalization, state inspection, entity lookups, session management, etc.), supporting cancellation and progress reports.
 1. A set of agent skills on how to effectively use the MCP and provided tools and general guidance for formalization tasks and Isabelle.
 
@@ -173,20 +173,24 @@ on the same files at the same time (cf. screenshot above),
 keeping the synchronization caveats from the [usage notes](#usage-notes) section in mind.
 Check out the [quick start tutorial](https://formalproof.ai/quick-start/) to learn how to write your first agentic proof.
 
-## Customizing the MCP Server's Tools
+## Customisation
 
-Tools that should be offered by the server must extend `PIDE_MCP_Tools`, be registered via the `services` field in `build.props`, and be enabled in the Isabelle option `pide_mcp_tools_include`.
-- Disable tools at compilation time by removing them from `services` in `build.props` or exclude them at startup using the Isabelle options `pide_mcp_tools_include` and `pide_mcp_tools_exclude` (see [`MCP/etc/options`](./MCP/etc/options)).
-- Add tools by adding the relevant source files to `sources` and the relevant class to `services` in `build.props` and include them in the Isabelle option `pide_mcp_tools_include`.
+The server is extensible by services and tools:
+- Services run in the background and only have start and stop hooks.
+- Tools are services that are offered via MCP, additionally implementing a `handle` for tool calls.
+
+Both are registered in the `services` field in `build.props` and selected at startup using the Isabelle options `pide_mcp_services_include`, `pide_mcp_services_exclude`, `pide_mcp_tools_include`, and `pide_mcp_tools_exclude` (see [`MCP/etc/options`](./MCP/etc/options)).
+- Disable them at compilation time by removing them from `services` in `build.props` or exclude them at startup using the options.
+- Add them by adding the relevant source files to `sources` and the relevant class to `services` in `build.props` and include them in the options.
 - Restart the MCP server after editing the services or options.
 
 You can either use the PIDE MCP's `build.props` (modify [`MCP/etc/build.props`](./MCP/etc/build.props))
 or use a different Scala component:
 1. Create a Scala component.
 1. Add `env:ISABELLE_PIDE_MCP_JAR` to the component's `requirements` in `build.props`.
-1. Add your tools' `sources` and `services`.
+1. Add your services' and tools' `sources` and `services`.
 1. Register the component: `isabelle components -u <PATH_TO_THE_COMPONENT>`.
-1. Add the tool to the Isabelle option `pide_mcp_tools_include`
+1. Include them in the options.
 
 See [Tool\_Extensions](./Tool_Extensions) for such a component with experimental tool extensions.
 

@@ -21,6 +21,12 @@ option pide_mcp_progress_threshold : real = 20 for pide_mcp
 option pide_mcp_session_statistics_limit : int = 200 for pide_mcp
   -- "maximum number of buffered runtime statistics samples per session"
 
+option pide_mcp_services_include : string = "*" for pide_mcp
+  -- "comma-separated names of services to run or \"*\" to run all"
+
+option pide_mcp_services_exclude : string = "" for pide_mcp
+  -- "comma-separated names of services not to run or \"*\" to run none"
+
 option pide_mcp_tools_include : string = "*" for pide_mcp
   -- "comma-separated names of tools to serve or \"*\" to serve all"
 

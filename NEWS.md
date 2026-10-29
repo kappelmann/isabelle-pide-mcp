@@ -10,6 +10,7 @@ New in PIDE MCP 2026
 ----------------------------
 
 * Improved all tools and skills for more efficient token usage. INCOMPATIBILITY.
+* New `service` extensions with per-session start and stop hooks, configurable via options `pide_mcp_services_include` and `pide_mcp_services_exclude`.
 * New option `pide_mcp_unicode_symbols_disk` to store Isabelle symbols in source files via Unicode. Symbols are now also recoded in `.sml` and `.sig` files.
 * New Isabelle tool `isabelle symbols` to encode or decode Isabelle symbols in files.
 * New option `pide_mcp_tools_exclude` to disable tools at startup time. Option `pide_mcp_tools` is renamed to `pide_mcp_tools_include`. INCOMPATIBILITY.

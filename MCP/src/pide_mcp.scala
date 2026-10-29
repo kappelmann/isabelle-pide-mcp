@@ -11,6 +11,10 @@ import isabelle._
 object PIDE_MCP {
   def progress_threshold(options: Options): Time =
     options.seconds("pide_mcp_progress_threshold")
+  def services_include(options: Options): String =
+    options.string("pide_mcp_services_include")
+  def services_exclude(options: Options): String =
+    options.string("pide_mcp_services_exclude")
   def tools_include(options: Options): String =
     options.string("pide_mcp_tools_include")
   def tools_exclude(options: Options): String =
@@ -67,9 +71,10 @@ Usage: isabelle pide_mcp [OPTIONS]
             verbose = verbose, threshold = threshold, detailed = false, stderr = true)
         }
       val log = Logger.make_progress(progress)
-      val tool_table =
-        PIDE_MCP_Tool_Util.make_tool_table(tools_include(options), tools_exclude(options))
-      val sessions = new PIDE_MCP_Sessions(tool_table, log, progress, options)
+      val service_table =
+        PIDE_MCP_Service.make_table(services_include(options), services_exclude(options))
+      val tool_table = PIDE_MCP_Tool.make_table(tools_include(options), tools_exclude(options))
+      val sessions = new PIDE_MCP_Sessions(service_table, tool_table, log, progress, options)
       val server = new PIDE_MCP_Server(sessions, log, progress, log_messages)
       def start_sessions(progress: Progress): Unit = {
         log("Starting PIDE sessions...")

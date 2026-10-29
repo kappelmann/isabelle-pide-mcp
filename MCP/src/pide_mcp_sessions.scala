@@ -9,6 +9,7 @@ import isabelle._
 import scala.collection.immutable.VectorMap
 
 class PIDE_MCP_Sessions(
+  val service_table: Map[String, PIDE_MCP_Service],
   val tool_table: Map[String, PIDE_MCP_Tool],
   val log: Logger,
   val base_progress: Progress,
@@ -90,16 +91,17 @@ class PIDE_MCP_Sessions(
       if (phase == Phase.Running) session_future.peek.collect { case Exn.Res(session) => session }
       else None
 
-    private def run_tools_lifecycle(
+    private def run_services_lifecycle(
       operation: String,
-      run: PIDE_MCP_Tool => Unit
+      run: PIDE_MCP_Service => Unit
     ): List[Throwable] = {
-      def failure_message(tool: PIDE_MCP_Tool, message: String): String =
-        s"Fatal error during $operation of tool ${quote(tool.name)} " +
+      def failure_message(service: PIDE_MCP_Service, message: String): String =
+        s"Fatal error during $operation of ${service.kind} ${quote(service.name)} " +
         s"for session ${quote(id)}: $message"
-      PIDE_MCP_Util.capture_failures(tool_table.valuesIterator, run).map { case (tool, exn) =>
-        Exn.capture { log.error_message(failure_message(tool, Exn.print(exn))) }
-        if (Exn.is_interrupt(exn)) exn else ERROR(failure_message(tool, Exn.message(exn)))
+      val services = service_table.valuesIterator ++ tool_table.valuesIterator
+      PIDE_MCP_Util.capture_failures(services, run).map { case (service, exn) =>
+        Exn.capture { log.error_message(failure_message(service, Exn.print(exn))) }
+        if (Exn.is_interrupt(exn)) exn else ERROR(failure_message(service, Exn.message(exn)))
       }.toList
     }
 
@@ -107,7 +109,7 @@ class PIDE_MCP_Sessions(
       Exn.capture { log(s"Stopping PIDE session ${quote(id)}...") }
       for (consumer <- phase_consumer.change_result(consumer => (consumer, None)))
         session.session.phase_changed -= consumer
-      val hook_failures = run_tools_lifecycle("stop", _.stop(
+      val hook_failures = run_services_lifecycle("stop", _.stop(
         PIDE_MCP_Sessions.this, session, new Uncancellable_Progress(progress)))
       Exn.capture { Isabelle_Thread.perhaps_uninterruptible { session.stop() } } match {
         case Exn.Res(process_result) =>
@@ -164,9 +166,9 @@ class PIDE_MCP_Sessions(
         start_progress.expose_interrupt()
         log(s"PIDE session ${quote(id)} started")
         PIDE_MCP_Util.check_failures(
-          run_tools_lifecycle("start", tool => {
+          run_services_lifecycle("start", service => {
             start_progress.expose_interrupt()
-            tool.start(PIDE_MCP_Sessions.this, session, start_progress)
+            service.start(PIDE_MCP_Sessions.this, session, start_progress)
           }))
         if (stop_request.value.isDefined || !session.session.is_ready)
           error(s"PIDE session ${quote(id)} was stopped during startup")

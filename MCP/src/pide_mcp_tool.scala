@@ -7,37 +7,29 @@ package isabelle.pide.mcp
 import isabelle._
 
 object PIDE_MCP_Tool {
-  val max_name_length: Int = 128
-  def valid_name(name: String): Boolean =
-    name.nonEmpty && name.length <= max_name_length &&
-    name.forall(c => Symbol.is_ascii_letter(c) || Symbol.is_ascii_digit(c) || "_-.".contains(c))
+  val kind: String = "tool"
+
+  def make_table(
+    include_names: String = PIDE_MCP_Service.all_option,
+    exclude_names: String = ""
+  ): Map[String, PIDE_MCP_Tool] =
+    PIDE_MCP_Service.make_table(kind,
+      Isabelle_System.make_services(classOf[PIDE_MCP_Tools]).flatMap(_.entries),
+      include_names, exclude_names)
 }
 
-abstract class PIDE_MCP_Tool(val name: String) {
-  if (!PIDE_MCP_Tool.valid_name(name)) error(s"Bad PIDE_MCP tool name: ${quote(name)}")
+abstract class PIDE_MCP_Tool(name: String) extends PIDE_MCP_Service(name) {
+  override def kind: String = PIDE_MCP_Tool.kind
 
   def description: String
   def input_schema: JSON.Object.T
   def annotations: Option[JSON.Object.T] = None
 
-  // called after each session start
-  def start(
-    sessions: PIDE_MCP_Sessions,
-    session: PIDE_MCP_Session,
-    progress: Progress
-  ): Unit = ()
   def handle(
     sessions: PIDE_MCP_Sessions,
     args: JSON.Object.T,
     progress: Progress
   ): PIDE_MCP_Tool_Result
-  // called before each session stop (normal) or after (abrupt stop)
-  // note: the tool's start might not have been finished or called yet
-  def stop(
-    sessions: PIDE_MCP_Sessions,
-    session: PIDE_MCP_Session,
-    progress: Progress
-  ): Unit = ()
 }
 
 class PIDE_MCP_Tools(tools: PIDE_MCP_Tool*) extends Isabelle_System.Service {

@@ -11,34 +11,6 @@ import isabelle._
 object PIDE_MCP_Tool_Util {
   val retry_soon_message: String = "Please retry soon."
   val default_start_line: Int = 1
-  val all_tools_option: String = "*"
-
-  def make_tool_table(
-    include_names: String = all_tools_option,
-    exclude_names: String = ""
-  ): Map[String, PIDE_MCP_Tool] = {
-    val tools =
-      Isabelle_System.make_services(classOf[PIDE_MCP_Tools]).flatMap(_.entries).
-        foldLeft(Map.empty[String, PIDE_MCP_Tool]) {
-          case (tools, tool) =>
-            if (tools.isDefinedAt(tool.name))
-              error(s"Duplicate PIDE_MCP tool: ${Library.quote(tool.name)}")
-            else tools + (tool.name -> tool)
-        }
-    def select(names: String): Set[String] =
-      if (names == all_tools_option) tools.keySet
-      else {
-        val list = space_explode(',', names)
-        val unknown = list.filterNot(tools.isDefinedAt)
-        if (unknown.nonEmpty)
-          error(s"Unknown PIDE_MCP tool(s): ${commas_quote(unknown)}. " +
-            s"Available tool(s): ${commas_quote(tools.keys.toList.sorted)}")
-        list.toSet
-      }
-    val included = select(include_names)
-    val excluded = select(exclude_names)
-    tools.filter { case (name, _) => included(name) && !excluded(name) }
-  }
 
   def running_session_param(
     sessions: PIDE_MCP_Sessions,

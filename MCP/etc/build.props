@@ -18,6 +18,7 @@ sources = \
   src/pide_mcp_editor.scala \
   src/pide_mcp_query.scala \
   src/pide_mcp_sessions.scala \
+  src/pide_mcp_service.scala \
   src/pide_mcp_tool.scala \
   src/pide_mcp_tool_arg.scala \
   src/pide_mcp_tool_result.scala \
