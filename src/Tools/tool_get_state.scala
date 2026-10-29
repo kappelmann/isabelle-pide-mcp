@@ -21,6 +21,7 @@ class Tool_Get_State extends PIDE_MCP_Tool("get_state") {
     "Summary (errors, commands being processed,...) and optional details " +
     "(subgoals, types, markup,...) for commands. " +
     "Limits do not affect counts. " +
+    "For a non-theory file, the state is that of the command loading it. " +
     PIDE_MCP_Tool_Schema.implicit_load_file
 
   private val include_summary_warnings_arg = PIDE_MCP_Tool_Arg.bool_default(

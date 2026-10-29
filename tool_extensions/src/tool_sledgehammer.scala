@@ -15,19 +15,19 @@ class Tool_Sledgehammer extends PIDE_MCP_Tool("sledgehammer") {
   private val line_arg = PIDE_MCP_Tool_Arg.int("line", "", minimum = Some(1))
   private val prefix_arg = PIDE_MCP_Tool_Arg.opt_string(
     "prefix",
-    "Prefix of the line. Sledgehammer runs on the command after the prefix. Default: end of line.")
+    "Prefix of the line. Sledgehammer runs on the command following it. Default: end of line.")
   private val provers_arg = PIDE_MCP_Tool_Arg.opt_string(
     "provers",
     "Space-separated provers to run. Empty for Sledgehammer's default provers. " +
-    "Default: the session's sledgehammer_provers option.")
+    "Default: sledgehammer_provers option.")
   private val isar_proofs_arg = PIDE_MCP_Tool_Arg.bool_default(
     "isar_proofs", "Also generate structured Isar proofs.", false)
   private val try0_arg = PIDE_MCP_Tool_Arg.bool_default(
-    "try0", "Try integrated provers with the found facts before external ones.", true)
+    "try0", "Try integrated provers with found facts before external ones.", true)
   private val proofs_limit_arg = PIDE_MCP_Tool_Arg.int_default(
     "proofs_limit", "Proofs to be found.", 1, minimum = Some(1))
   private val timeout_arg = PIDE_MCP_Tool_Arg.opt_int(
-    "timeout", "Seconds to wait before cancellation.",
+    "timeout", "Seconds before cancellation.",
     minimum = Some(1))
 
   def input_schema: JSON.Object.T = PIDE_MCP_Tool_Schema.input_schema(

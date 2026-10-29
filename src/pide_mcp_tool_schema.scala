@@ -14,8 +14,7 @@ object PIDE_MCP_Tool_Schema {
   val range_visibility: String = "Sets PIDE perspective on the range."
   val no_processing_wait: String = "Does not wait for commands to finish."
   val session_restart: String =
-    "Use only when required, e.g. restarts due to " +
-    "non-responsiveness or ROOT file or base session changes."
+    "Use only when required: unresponsiveness or ROOT or base session updates."
 
   val running_session_arg = PIDE_MCP_Tool_Arg.opt_string(
     "session", "Running session id. Default: unique running session.")

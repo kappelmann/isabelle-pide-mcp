@@ -53,7 +53,8 @@ object Tool_Edit {
         else {
           val occurrences = new Regex(Regex.quote(actual_old_text))
             .findAllMatchIn(range_text).map(_.start + search_range.start).toList
-          if (occurrences.isEmpty) error("old_text not found in the given range")
+          if (occurrences.isEmpty)
+            error("old_text not found in the given range. The file may have changed.")
           if (!edit_all && occurrences.length > 1)
             error(s"Found ${occurrences.length} occurrences of old_text in the given range. " +
               "Expected exactly 1. " +

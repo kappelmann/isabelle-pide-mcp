@@ -7,7 +7,9 @@ package isabelle.pide.mcp
 import isabelle._
 
 class Tool_Unload extends PIDE_MCP_Tool("unload") {
-  def description: String = "Unload origins and their dependents."
+  def description: String =
+    "Unload origins and their dependents. " +
+    "Use only if a theory is stuck or resources must be freed."
 
   private val origins_arg = PIDE_MCP_Tool_Arg.strings("origins", "")
 

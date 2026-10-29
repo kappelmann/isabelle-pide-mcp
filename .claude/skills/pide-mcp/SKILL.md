@@ -1,142 +1,24 @@
 ---
 name: pide-mcp
-description: Using the Isabelle proof assistant with the PIDE MCP server. Use this skill whenever working with Isabelle theory files (*.thy) or ML files (*.ML) or when you are dealing with Isabelle in the general sense and have access to the PIDE MCP.
-metadata:
-  version: "1.0"
+description: Using the Isabelle proof assistant with PIDE MCP. Use this whenever working with theory files (*.thy) or ML files (*.ML) or when you are dealing with Isabelle in the general sense and have access to the PIDE MCP.
 ---
 
-## What I Do
+PIDE MCP's tool set is customisable: tools named here may be unavailable. Also load skills of PIDE MCP tools.
 
-Guidance for Isabelle formalizations and proof development using the PIDE MCP server.
+## Sessions
+- Each session has its own base session, directories, options, and state.
+- A session has a limited number of worker threads. Commands may be unprocessed only because all workers are busy, e.g. with commands in other theories: check get_session_state.
+- Prefer unloading a stuck theory over restarting a session.
 
-## When To Use Me
+## Edits and synchronisation
+- read and edit synchronise disk and PIDE state: after external disk edits or when asked to synchronise, use read.
+- Edits re-check all later commands, also in dependent theories: check beyond the edited range.
 
-Use this skill when working with Isabelle theory files (*.thy) or ML files (*.ML) via the PIDE MCP.
-
-## Quick Reference
-
-PIDE MCP comes with a customizable set of tools.
-This SKILL file describes some basic tools that might be available.
-Also load other SKILL files that describe tools offered by PIDE MCP.
-Important rules (further elaborated in the sections below):
-
-- PIDE MCP can manage several Isabelle PIDE sessions. **Some sessions might have already been started.**
-- **Most tools take the id of a running session as input. Use `list_sessions` to get the ids and status of all sessions.**
-- **After edits, use `get_state`** to see status, errors, warnings, timing,...
-- **Restrict by `start_line` / `end_line`** when querying to avoid analysing data for hundreds of finished commands in large theories.
-- **`sorry` is reported as `bad`, not as an `error`.** A clean theory has no bad commands, no errors, no failures.
-- **If `> 0` commands are running for more than ~20s, suspect a loop** - restructure rather than wait.
-- **Use `get_session_state` whenever you think the process is stuck** - it shows progress of theories and lists currently running commands and resource statistics.
-- **Use `get_session_state` for a global overview and `get_state` for theory-local information.**
-- **The PIDE perspective** is set by some tools and marks the commands for which print functions are run, which return extra output e.g. automatic `quickcheck` and `solve_direct` information.
-- **`create_scratch`**: use for exploration and alternatives. (Typically) use the same imports on scratch theories as the ones you use for the development that you are creating a scratch theory for.
-
-## Interaction with Isabelle via PIDE MCP
-
-### Session Management
-
-- **Each (PIDE) session has a unique id and its own base session, directories, options, and independent state.** A file loaded in one is invisible to the others.
-- Most tools take a running session's id as input, which may be omitted when exactly one session runs.
-- **`start_session` is synchronous and may take minutes** as it builds the base session if missing.
-    **Use it only when required**, e.g. to restart an unresponsive session, after a `ROOT` file change, or to move to a different base session.
-- **Only use `stop_session` when required**, e.g. when you have to restart a session or urgently need to free resources.
-- `stop_session` keeps files on disk, unless some tool decides to cleanup (e.g. `create_scratch` deletes the session's scratch files).
-- **`unload` unloads a file and its dependents from the session. Only use it when required**, e.g. when you are 100% certain a theory got unresponsive or you urgently need to free resources.
-
-### State Synchronization
-- **All changes are immediately checked** by PIDE after edits.
-- **If you experience discrepancies between the PIDE state and the file's disk content, use read on the affected file to re-synchronise the content.** This might happen, for example, when a human user is working on the same file as you or when you didn't edit via PIDE MCP but with other means.
-- **Prefer to use the `edit` tool.** It keeps file and PIDE state synchronized. If you had to use external tools (sed, Python, etc.) use `read` to re-synchronise.
-- **Avoid absolute file path imports for theories. Use session-qualified theory names for sessions available to you.** See `get_session_state` on how to find session qualifiers.
-- When you are told to synchronise, just re-read the file.
-- **Edits require `old_text` (the text to be searched for in the target range). If the file changed since you last read it (e.g., a human edited it concurrently), old_text might not be found and the edit be rejected. Re-synchronise in this case.**
-
-### After Every Edit
-1. **Check for errors/unfinished/successful commands after edits with `get_state`**.
-2. **`sorry`s are included as `bad` commands. `errors` counts actual failures.**
-
-### Time Management
-- **Avoid adding large amounts of new material at once, as it makes it hard to identify the source of errors and nontermination.**
-- **Proof methods typically terminate in less than 5 seconds.**
-- If commands take longer, be suspicious! Only if you are very confident that a proof legitimately needs more time wait a bit longer. Short waits typically let you move faster!
-- **If `get_state` shows `> 0` running commands for more than ~20 seconds, suspect non-termination** (a loop or overly expensive computation). Restructure rather than wait.
-- **Use `get_session_state` to show the progress and currently running commands across all theories.**
-
-### Scratch Theories
-- **Use `create_scratch` to test large changes in a scratch theory before radically changing an existing theory.**
-- **Scratch theories persist for the session**. They are deleted on session stop. You may further change and explore them once created in the course of the session.
-- Use the scratch theories to try proofs and search tools without polluting your main development. Exception: if it is just a brief exploration (e.g. calling `sledgehammer` or `find_theorems` on the currently open goals), just do it in the same theory.
-- For scratch theories, pass the imports matching your needs. Typically, it is the same imports as the ones you use for the development that you are creating a scratch theory for.
-
-**Incremental workflow** (for developing complex proofs):
-```
-1. create_scratch → scratch theory_path
-
-2. edit → extend the scratch theory (insert new content)
-
-3. get_state → check the new status in the scratch theory
-
-4. happy with the result → write it back to the original file
-```
-
-This allows you to test proof strategies and alternative developments without changing the original file.
-Final results can be written back to the original file.
-
-### Querying (Proof) Context
-- **`get_state` returns structured information at any command position:** a summary with status counts, errors, warnings, and their messages (check it after edits) and, optionally, the commands' subgoals, type information for terms,...
-- **`get_state` accepts flags to opt into some of the data**.
-- **Set the `get_state` command limits** when you include details - a large number of commands may flood your context.
-- **Restrict by `start_line` / `end_line`** when you only care about a specific lemma or error - it is less verbose than scanning the whole file. But don't forget that local changes may have global effects.
-- **`find_entities` lets you explore defined entities (theorems, definitions, methods, ML terms, etc.)**.
-Moreover, you can use Isar commands if necessary, for example:
-- **`print_facts` - print all facts of the current context (named assumptions, case facts, intermediate results, locale assumptions, etc.)**
-- `find_theorems`
-- `find_consts`
-
-### Importing existing library, facts, and definitions
-- **Use `get_session_state` to get all available session directories, often containing useful library material.**
-- Import theories from these sessions using the right **session-qualified import**.
-- **To get session qualifiers, grep the `ROOT` files in the session directories.**
-
-### Common Pitfalls
-
-#### Large Changes
-- ❌ **Don't:** Add hundreds of lines of new definitions and proofs in one edit
-- ✅ **Do:** Add incrementally - a few definitions at a time, check after each
-    - Easier to identify source of errors
-    - Faster feedback on timeouts
-    - Better isolation of problematic proofs
-
-#### Status Checking
-- ❌ **Don't:** Make multiple edits without checking status
-    ```
-    edit  (* Add lemma 1 *)
-    edit  (* Add lemma 2 *)
-    edit  (* Add lemma 3 - which one has the error? *)
-    ```
-- ✅ **Do:** Check `get_state` after each significant edit
-    ```
-    edit
-    get_state  (* Verify status: ok *)
-    edit  (* Continue only after verification *)
-    ```
-
-#### Scratch Theory Usage
-- ❌ **Don't:** Try to import scratch theories from your main development
-- ✅ **Do:** Use scratch theories for experimentation, then copy successful results back to main theory
-    ```
-    1. create_scratch to test approach
-    2. Verify it works in scratch theory
-    3. Copy successful proof back to main theory with edit
-    ```
-
-### Error Recovery
-
-If you encounter errors or non-termination:
-1. Check the exact error.
-2. Isolate the problem: use `sorry` to skip problematic parts temporarily.
-3. Make incremental fixes: make small changes and check after each.
-4. Use `create_scratch` for experimentation and alternatives.
-5. Increase wait for termination if needed, but prefer refactoring over long waits!
-6. If you think the process is unresponsive, use `get_session_state` to find information. If all other means fail, unload the theory and, if that also fails, restart the session.
-
+## Checking state
+- Check your changes: get_state for local information (errors, goals, sorrys in a file), get_session_state for global information (all theories' status, processing commands).
+- processing means a command has not finished yet, not that it succeeded.
+- A theory status ok means all commands finished without errors. It may still contain sorrys (reported as bad, not as errors), proofs aborted with oops (not reported), and warnings.
+- Errors appear in two forms: error messages and failed commands. A failed command might not have an error message.
+- Request only information you need and set limits: details for a whole theory flood your context.
+- Only commands in the PIDE perspective run automatically tried tools (e.g. quickcheck, solve_direct).
+- Isar diagnostic commands (try0, sledgehammer, print_facts, find_theorems,...) work: their output appears under infos in get_state (poll while processing).
