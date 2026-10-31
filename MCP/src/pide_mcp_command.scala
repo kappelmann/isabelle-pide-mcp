@@ -11,34 +11,17 @@ import isabelle._
 import scala.collection.mutable
 
 object PIDE_MCP_Command {
-  enum Message_Kind { case goals, errors, warnings, writeln, information, tracing }
-  object Message_Kind {
-    val info: List[Message_Kind] = List(writeln, information, tracing)
-    val all: List[Message_Kind] = values.toList
+  val bad = Markup.BAD
 
-    def of(elem: XML.Elem): Option[Message_Kind] =
-      if (Protocol.is_state(elem)) Some(goals)
-      else if (Protocol.is_error(elem)) Some(errors)
-      else if (Protocol.is_warning_or_legacy(elem)) Some(warnings)
-      else if (Protocol.is_writeln(elem)) Some(writeln)
-      else if (Protocol.is_information(elem)) Some(information)
-      else if (Protocol.is_tracing(elem)) Some(tracing)
-      else None
-
-    require(Markup.messages.keySet.forall(name => of(XML.Elem(Markup(name, Nil), Nil)).isDefined),
-      "Unclassified message kinds")
-  }
-
-  sealed case class Message(kind: Message_Kind, elem: XML.Elem, ranges: List[Text.Range]) {
-    lazy val text: String = PIDE_MCP_Util.elem_body_plain_text(elem)
-  }
-
-  enum Status(val name: String, val message_kind: Option[Message_Kind] = None) {
+  enum Status(
+    val name: String,
+    val message_kind: Option[PIDE_MCP_Message.Message_Kind] = None
+  ) {
     case unprocessed extends Status("unprocessed")
     // running confuses agents: "running" = "it worked"
     case running extends Status("processing")
-    case failed extends Status("failed", Some(Message_Kind.errors))
-    case warned extends Status("warned", Some(Message_Kind.warnings))
+    case failed extends Status("failed", Some(PIDE_MCP_Message.Message_Kind.errors))
+    case warned extends Status("warned", Some(PIDE_MCP_Message.Message_Kind.warnings))
     case finished extends Status("finished")
     case canceled extends Status("canceled")
   }
@@ -54,9 +37,6 @@ object PIDE_MCP_Command {
     }
   }
 
-  val bad = Markup.BAD
-  val Markup_ML = "ML"
-
   private def statuses(status: Document_Status.Command_Status): List[Status] =
     List(
       Option.when(status.is_unprocessed)(Status.unprocessed),
@@ -66,140 +46,81 @@ object PIDE_MCP_Command {
       Option.when(status.is_finished)(Status.finished),
       Option.when(status.is_canceled)(Status.canceled)).flatten
 
-  def iterator(
+  // cf. Rendering.overview_color
+  def range_status(
     snapshot: Document.Snapshot,
-    range: Option[Text.Range]
-  ): Iterator[(Command, Text.Offset)] =
-    range.fold(snapshot.node.command_iterator())(snapshot.node.command_iterator(_))
-
-  // like select, but returns all covering markups (full markup stack) at each sub-range
-  private def select_covering(
-    snapshot: Document.Snapshot,
-    range: Text.Range,
-    elements: Markup.Elements
-  ): List[Text.Info[List[Text.Info[XML.Elem]]]] =
-    snapshot.cumulate(range, List.empty[Text.Info[XML.Elem]], elements,
-      _ => { case (acc, info) => Some(info :: acc) })
-
-  def facts_json(snapshot: Document.Snapshot, range: Text.Range): List[String] = {
-    val fact_kinds = Set(Markup.FACT, Markup.DYNAMIC_FACT, Markup.LITERAL_FACT)
-    snapshot.select(range, Markup.Elements(Markup.ENTITY), _ => {
-      case Text.Info(_, XML.Elem(Markup.Entity(entry), _)) if fact_kinds.contains(entry.kind) =>
-        Some(entry.name)
-      case _ => None
-    }).map(_.info)
+    range: Text.Range
+  ): Document_Status.Command_Status = {
+    val markups = snapshot.cumulate[List[Markup]](range, Nil,
+      Document_Status.Command_Status.liberal_elements,
+      _ => { case (status, Text.Info(_, elem)) => Some(elem.markup :: status) }, status = true)
+    Document_Status.Command_Status.make(Date.now(), markups = markups.flatMap(_.info))
   }
 
-  // this is hairy, but I think there is no good library function to obtain type information
-  def types_json(snapshot: Document.Snapshot, range: Text.Range): List[JSON.Object.T] = {
-    val term_kinds = Set(Markup.FREE, Markup.BOUND, Markup.VAR, Markup.SKOLEM, Markup.CONST)
-    val elements =
-      Markup.Elements(term_kinds.toSeq :+ Markup.TYPING :+ Markup.ENTITY :+ Markup.ML_TYPING: _*)
-
-    def kind_and_type(at_range: List[Text.Info[XML.Elem]]): Option[(String, String)] =
-      at_range.collectFirst { case Text.Info(_, e) if e.name == Markup.ML_TYPING =>
-        (Markup_ML, XML.content(e.body))
-      }.orElse(for {
-        kind_elem <- at_range.collectFirst {
-          case Text.Info(_, e) if term_kinds.contains(e.name) => e }
-        typing_elem <- at_range.collectFirst {
-          case Text.Info(_, e) if e.name == Markup.TYPING => e }
-      } yield (kind_elem.name, XML.content(typing_elem.body)))
-
-    select_covering(snapshot, range, elements).flatMap {
-      case Text.Info(r, infos @ (info :: _)) if info.range == r => // only keep leaf nodes
-        val at_range = infos.filter(_.range == r)
-        val name_at = PIDE_MCP_Util.display_name(
-          at_range.collectFirst { case Text.Info(_, XML.Elem(Markup.Entity(entry), _)) => entry },
-          r, snapshot.node.source)
-        kind_and_type(at_range).map { case (kind, t) =>
-          JSON_Object("name" -> name_at, "kind" -> kind, "type" -> t)
-        }
-      case _ => None
-    }.distinct
-  }
-
-  def markup_json(
-    snapshot: Document.Snapshot,
-    range: Text.Range,
-    elements: Markup.Elements
-  ): List[JSON.Object.T] =
-    select_covering(snapshot, range, elements).flatMap {
-      case Text.Info(r, infos) =>
-        infos.filter(_.range == r).map(i => PIDE_MCP_JSON.from_xml(i.info))
-    }
-
-  private def self_id(
-    snapshot: Document.Snapshot,
+  def self_id(
+    state: Document.State,
     cmd: Command
   )(id: Document_ID.Generic): Boolean =
-    id == cmd.id || snapshot.state.lookup_id(id).exists(_.command.id == cmd.id)
+    id == cmd.id || state.lookup_id(id).exists(_.command.id == cmd.id)
+
+  def elem_positions(
+    snapshot: Document.Snapshot,
+    cmd: Command,
+    elem: XML.Elem
+  ): Set[Text.Range] = {
+    val chunk_name = if (snapshot.node_name.is_theory) Symbol.Text_Chunk.Default
+      else Symbol.Text_Chunk.File(snapshot.node_name.node)
+    cmd.chunks.get(chunk_name) match {
+      case None => Set.empty
+      case Some(chunk) =>
+        cmd.message_positions(self_id(snapshot.state, cmd), chunk_name, chunk, elem)
+    }
+  }
 
   private val here: String = Symbol.decode("\\<^here>")
 
-  def output_positions(snapshot: Document.Snapshot, cmd: Command, elem: XML.Elem): XML.Elem = {
-    def same_file(file: String): Boolean =
-      file == snapshot.node_name.node ||
-        Path.is_valid(file) && Path.explode(file).expand.implode == snapshot.node_name.node
+  def resolve_positions(snapshot: Document.Snapshot, cmd: Command, body: XML.Body): XML.Body = {
+    def same_file(file: String): Boolean = file == snapshot.node_name.node ||
+      Path.is_valid(file) && Path.explode(file).expand.implode == snapshot.node_name.node
     def line_text(line: Int, file: String): String =
       "(line " + line + if_proper(!same_file(file), " of " + quote(file)) + ")"
-    def output(body: XML.Body): XML.Body =
-      body.flatMap {
-        case XML.Elem(Markup(Markup.POSITION, Position.Item_Id(id, range)), List(XML.Text(text)))
-        if text == here =>
-          if (self_id(snapshot, cmd)(id)) Nil
-          else snapshot.find_command_position(id, range.start)
-            .map(pos => XML.Text(" " + line_text(pos.line1, pos.name))).toList
-        case XML.Elem(markup @ Markup(Markup.POSITION, props @ Position.Line(line)), _)
-        if Position.File.unapply(props).exists(same_file) =>
-          List(XML.Elem(markup, XML.string(line_text(line, snapshot.node_name.node))))
-        case XML.Elem(markup, body1) => List(XML.Elem(markup, output(body1)))
-        case text => List(text)
-      }
-    XML.Elem(elem.markup, output(elem.body))
-  }
-
-  def messages(
-    snapshot: Document.Snapshot,
-    cmd: Command,
-    command_start: Text.Offset,
-    range: Text.Range
-  ): Iterator[Message] = {
-    val chunk_name = snapshot.commands_loading.headOption match {
-        case None => Symbol.Text_Chunk.Default
-        case Some(_) => Symbol.Text_Chunk.File(snapshot.node_name.node)
-      }
-    val chunk = cmd.chunks.get(chunk_name)
-    def message_ranges(elem: XML.Elem): List[Text.Range] = {
-      val positions =
-        chunk.fold(Set.empty[Text.Range])(
-          cmd.message_positions(self_id(snapshot, cmd), chunk_name, _, elem))
-      if (positions.isEmpty) List(range)
-      else positions.toList.map(_ + command_start).filter(_.overlaps(range))
-        .sortBy(_.start).map(_.restrict(range))
+    body.flatMap {
+      case XML.Elem(Markup(Markup.POSITION, Position.Item_Id(id, range)), List(XML.Text(text)))
+      if text == here => if (self_id(snapshot.state, cmd)(id)) Nil
+        else snapshot.find_command_position(id, range.start)
+          .map(pos => XML.Text(" " + line_text(pos.line1, pos.name))).toList
+      case XML.Elem(markup @ Markup(Markup.POSITION, props @ Position.Line(line)), _)
+      if Position.File.unapply(props).exists(same_file) =>
+        List(XML.Elem(markup, XML.string(line_text(line, snapshot.node_name.node))))
+      case XML.Elem(markup, body1) =>
+        List(XML.Elem(markup, resolve_positions(snapshot, cmd, body1)))
+      case text => List(text)
     }
-    def output_message(elem: XML.Elem): XML.Elem = // cf. Editor.output
-      elem match {
-        case Protocol.ML_Profiling(report) => XML.Elem(elem.markup, XML.string(report.print))
-        case _ => output_positions(snapshot, cmd, elem)
-      }
-    snapshot.command_results(cmd).iterator.flatMap((_, elem) =>
-      for {
-        kind <- Message_Kind.of(elem)
-        ranges = message_ranges(elem) if ranges.nonEmpty
-      } yield Message(kind, output_message(elem), ranges))
   }
 
-  def messages_json(
-    messages: Map[Message_Kind, List[Message]],
-    kinds: List[Message_Kind]
-  ): List[Option[JSON.Object.Entry]] =
-    kinds.map(kind => messages.get(kind).map(msgs => kind.toString -> msgs.map(_.text)))
+  def single_command(snapshot: Document.Snapshot): Option[Command] =
+    if (!snapshot.node_name.is_theory) snapshot.commands_loading.headOption
+    else snapshot.node.get_theory
+
+  def select(
+    snapshot: Document.Snapshot,
+    range: Option[Text.Range]
+     // commands intersecting range, with the intersection relative to their start
+  ): List[(Command, Text.Range)] =
+    single_command(snapshot) match {
+      case Some(cmd) =>
+        List(cmd -> PIDE_MCP_Util.restrict_text_range(snapshot.node.source, range))
+      case None =>
+        range.fold(snapshot.node.command_iterator())(snapshot.node.command_iterator(_))
+          .map { case (cmd, start) =>
+            cmd -> (PIDE_MCP_Util.intersect_range(cmd.range + start, range) - start)
+          }.toList
+    }
 
   enum Problem {
     case status(status: Status, range: Text.Range, timing_ms: Long)
     case bad(info: Text.Info[String])
-    case message(msg: Message)
+    case message(msg: PIDE_MCP_Message.Message)
 
     def key: String =
       this match {
@@ -208,7 +129,7 @@ object PIDE_MCP_Command {
         case Problem.message(msg) => msg.kind.toString
       }
 
-    def message_kind: Option[Message_Kind] =
+    def message_kind: Option[PIDE_MCP_Message.Message_Kind] =
       this match {
         case Problem.status(status, _, _) => status.message_kind
         case Problem.bad(_) => None
@@ -241,15 +162,17 @@ object PIDE_MCP_Command {
     enum Detail { case errors, warnings, infos, goals, src, types, facts, markup }
 
     object Detail {
-      def of(kind: Message_Kind): Detail =
+      def of(kind: PIDE_MCP_Message.Message_Kind): Detail =
         kind match {
-          case Message_Kind.goals => goals
-          case Message_Kind.errors => errors
-          case Message_Kind.warnings => warnings
-          case Message_Kind.writeln | Message_Kind.information | Message_Kind.tracing => infos
+          case PIDE_MCP_Message.Message_Kind.goals => goals
+          case PIDE_MCP_Message.Message_Kind.errors => errors
+          case PIDE_MCP_Message.Message_Kind.warnings => warnings
+          case PIDE_MCP_Message.Message_Kind.writeln | PIDE_MCP_Message.Message_Kind.information |
+            PIDE_MCP_Message.Message_Kind.tracing => infos
         }
       require(
-        Message_Kind.all.forall(kind => Message_Kind.info.contains(kind) == (of(kind) == infos)),
+        PIDE_MCP_Message.Message_Kind.values.forall(kind =>
+          PIDE_MCP_Message.Message_Kind.info.contains(kind) == (of(kind) == infos)),
         "Inconsistent info message kinds")
     }
   }
@@ -258,32 +181,24 @@ object PIDE_MCP_Command {
     snapshot: Document.Snapshot,
     cmd: Command,
     range: Text.Range,
-    messages: List[Message]
+    messages: List[PIDE_MCP_Message.Message]
   ) {
-    lazy val command_status: Document_Status.Command_Status =
-      snapshot.state.command_status(snapshot.version, cmd)
-    // cf. Rendering.overview_color
-    private lazy val range_status: Document_Status.Command_Status = {
-      val markups =
-        snapshot.cumulate[List[Markup]](range, Nil, Document_Status.Command_Status.liberal_elements,
-          _ => { case (status, Text.Info(_, elem)) => Some(elem.markup :: status) }, status = true)
-      Document_Status.Command_Status.make(Date.now(), markups = markups.flatMap(_.info))
+    lazy val command_status: Document_Status.Command_Status = snapshot.state.command_status(
+      snapshot.version, cmd)
+    private lazy val range_status = PIDE_MCP_Command.range_status(snapshot, range)
+    lazy val status: List[Status] = statuses(command_status).filter {
+      case Status.warned => range_status.is_warned
+      case Status.failed => range_status.is_failed
+      case _ => true
     }
-    lazy val status: List[Status] =
-      statuses(command_status).filter {
-        case Status.warned => range_status.is_warned
-        case Status.failed => range_status.is_failed
-        case _ => true
-      }
     lazy val timing_ms: Long = command_status.timings.sum(Date.now()).ms
-    private lazy val messages_by_kind: Map[Message_Kind, List[Message]] = messages.groupBy(_.kind)
-    def messages_of(kind: Message_Kind): List[Message] = messages_by_kind.getOrElse(kind, Nil)
-    lazy val errors: List[Message] = messages_of(Message_Kind.errors)
-    lazy val warnings: List[Message] = messages_of(Message_Kind.warnings)
-    lazy val bad: List[Text.Info[String]] =
-      snapshot.select(range, Markup.Elements(Markup.BAD), _ => {
-        case Text.Info(r, elem) => Some(Text.Info(r, PIDE_MCP_Util.elem_body_plain_text(elem)))
-      }).map(_.info).filterNot(info => errors.nonEmpty && info.info.isEmpty)
+    private lazy val messages_by_kind = messages.groupBy(_.kind)
+    def messages_of(kind: PIDE_MCP_Message.Message_Kind): List[PIDE_MCP_Message.Message] =
+      messages_by_kind.getOrElse(kind, Nil)
+    lazy val errors = messages_of(PIDE_MCP_Message.Message_Kind.errors)
+    lazy val warnings = messages_of(PIDE_MCP_Message.Message_Kind.warnings)
+    lazy val bad: List[Text.Info[String]] = PIDE_MCP_Markup.bad(snapshot, range).filterNot(info =>
+      errors.nonEmpty && info.info.isEmpty)
     private def bad_json(doc: Line.Document): List[JSON.Object.T] =
       bad.map { case Text.Info(r, text) =>
         JSON_Object.flatten(
@@ -294,46 +209,39 @@ object PIDE_MCP_Command {
       }
 
     def problem(st: Status): Problem = Problem.status(st, range, timing_ms)
-    lazy val problems: List[Problem] =
-      status.filter(Status.problematic).map(problem) :::
-      bad.map(Problem.bad(_)) :::
-      (errors ::: warnings).map(Problem.message(_))
+    lazy val problems: List[Problem] = status.filter(Status.problematic).map(problem) :::
+      bad.map(Problem.bad(_)) ::: (errors ::: warnings).map(Problem.message(_))
 
-    def is_ignorable: Boolean = cmd.is_ignored && messages.isEmpty && problems.isEmpty
+    def is_ignorable_now: Boolean = cmd.is_ignored && messages.isEmpty && problems.isEmpty
+    def is_ignorable_for_good: Boolean = is_ignorable_now && command_status.is_terminated
 
     def json(doc: Line.Document, details: Set[State.Detail]): JSON.Object.T = {
       lazy val source_line = doc.position(range.start).line1
       lazy val source = range.substring(snapshot.node.source).stripLineEnd
-      val entries: List[Option[JSON.Object.Entry]] =
-        List(
-          proper_list(status.map(_.name)).map("status" -> _),
-          Option.when(timing_ms > 0)("timing_ms" -> timing_ms),
-          Some(
-            if (details(State.Detail.src))
-              "src" -> PIDE_MCP_Util.numbered_lines(source, source_line)
-            else "lines" -> PIDE_MCP_Util.line_range(source_line,
-              doc.position(range.start + source.length).line1)),
-          proper_list(bad_json(doc)).map(PIDE_MCP_Command.bad -> _)) :::
-        messages_json(messages_by_kind,
-          Message_Kind.all.filter(kind => details(State.Detail.of(kind)))) :::
+      val entries: List[Option[JSON.Object.Entry]] = List(
+        proper_list(status.map(_.name)).map("status" -> _),
+        Option.when(timing_ms > 0)("timing_ms" -> timing_ms),
+        Some(
+          if (details(State.Detail.src))
+            "src" -> PIDE_MCP_Util.numbered_lines(source, source_line)
+          else "lines" -> PIDE_MCP_Util.line_range(source_line,
+            doc.position(range.start + source.length).line1)),
+        proper_list(bad_json(doc)).map(PIDE_MCP_Command.bad -> _)) :::
+        PIDE_MCP_Message.messages_json(messages_by_kind,
+          PIDE_MCP_Message.Message_Kind.values.toList.filter(kind =>
+            details(State.Detail.of(kind)))) :::
         List(
           Option.when(details(State.Detail.types))(
-            proper_list(types_json(snapshot, range)).map("types" -> _)).flatten,
+            proper_list(PIDE_MCP_Markup.types_json(snapshot, range)).map("types" -> _)).flatten,
           Option.when(details(State.Detail.facts))(
-            proper_list(facts_json(snapshot, range)).map("facts" -> _)).flatten,
+            proper_list(PIDE_MCP_Markup.facts_json(snapshot, range)).map("facts" -> _)).flatten,
           Option.when(details(State.Detail.markup))(
-            "markup" -> markup_json(snapshot, range, Markup.Elements.full)))
+            "markup" -> PIDE_MCP_Markup.markup_json(snapshot, range, Markup.Elements.full)))
       JSON_Object.flatten(entries)
     }
   }
 
   object States {
-    def commands(snapshot: Document.Snapshot, range: Option[Text.Range]): Iterator[State] =
-      iterator(snapshot, range).map { case (cmd, command_start) =>
-        val restricted = PIDE_MCP_Util.intersect_range(cmd.range + command_start, range)
-        State(snapshot, cmd, restricted, messages(snapshot, cmd, command_start, restricted).toList)
-      }
-
     def command_spans(
       snapshot: Document.Snapshot,
       theory_cmd: Command,
@@ -344,38 +252,48 @@ object PIDE_MCP_Command {
           val restricted = PIDE_MCP_Util.intersect_range(span.range, range)
           State(snapshot, theory_cmd, restricted,
             Rendering.text_messages(snapshot, restricted).flatMap(info =>
-              Message_Kind.of(info.info).map(
-                Message(_, output_positions(snapshot, theory_cmd, info.info), List(info.range)))))
+              PIDE_MCP_Message.Message_Kind.of(info.info).map(kind =>
+                PIDE_MCP_Message.Message(kind, info.info, List(info.range), snapshot,
+                  Some(theory_cmd)))))
         }
 
-    def blob(snapshot: Document.Snapshot, range: Option[Text.Range]): Option[State] =
-      snapshot.commands_loading.headOption.map { cmd =>
-        val restricted = PIDE_MCP_Util.restrict_text_range(snapshot.node.source, range)
-        State(snapshot, cmd, restricted, messages(snapshot, cmd, 0, restricted).toList)
+    def apply(
+      snapshot: Document.Snapshot,
+      selection: List[(Command, Text.Range)]
+    ): Iterator[State] =
+      single_command(snapshot) match {
+        case Some(single) =>
+          selection.iterator.filter(_._1 == single).flatMap { case (cmd, range) =>
+            if (snapshot.node_name.is_theory) command_spans(snapshot, cmd, Some(range))
+            else {
+              val messages = PIDE_MCP_Message.messages(snapshot, cmd, 0, range).toList
+              Iterator(State(snapshot, cmd, range, messages))
+            }
+          }
+        case None =>
+          val starts = snapshot.node.command_iterator().toMap
+          for ((cmd, part) <- selection.iterator; start <- starts.get(cmd)) yield {
+            val range = part + start
+            State(snapshot, cmd, range,
+              PIDE_MCP_Message.messages(snapshot, cmd, start, range).toList)
+          }
       }
 
     def apply(snapshot: Document.Snapshot, range: Option[Text.Range]): Iterator[State] =
-      if (!snapshot.node_name.is_theory) blob(snapshot, range).iterator
-      else {
-        snapshot.node.get_theory match {
-          case Some(theory_cmd) => command_spans(snapshot, theory_cmd, range)
-          case None => commands(snapshot, range)
-        }
-      }
+      apply(snapshot, select(snapshot, range))
 
-    val default_snippet_lines = 1
-    sealed case class Options(
-      summary_message_kinds: List[Message_Kind],
-      problematic_limit: Option[Int] = None,
-      unproblematic_limit: Option[Int] = None,
-      occurrences_limit: Option[Int] = None,
-      snippet_lines: Int = default_snippet_lines)
+    sealed case class Args(
+      summary_message_kinds: List[PIDE_MCP_Message.Message_Kind],
+      problematic_limit: Option[Int],
+      unproblematic_limit: Option[Int],
+      occurrences_limit: Option[Int],
+      snippet_lines: Int)
 
     def json(
       states: Iterator[State],
       doc: Line.Document,
       details: Set[State.Detail],
-      opts: Options
+      args: Args
     ): JSON.Object.T = {
       def redundant_problem(state: State, problem: Problem): Boolean =
         problem.text.isEmpty && problem.message_kind.exists(state.messages_of(_).nonEmpty)
@@ -388,29 +306,29 @@ object PIDE_MCP_Command {
       var count_unproblematic = 0
       var count_listed_occurrences = 0
       val include_details = details.nonEmpty
-      for (state <- states if !state.is_ignorable) {
+      for (state <- states if !state.is_ignorable_now) {
         count += 1
         total_timing_ms += state.timing_ms
         for (status <- state.status if Status.unproblematic(status)) counts(status.name) += 1
-        val problems =
-          state.problems.filter(_.message_kind.forall(opts.summary_message_kinds.contains))
+        val problems = state.problems.filter(
+          _.message_kind.forall(args.summary_message_kinds.contains))
         for (problem <- problems) {
           counts(problem.key) += 1
-          if (opts.occurrences_limit.forall(count_listed_occurrences < _) &&
+          if (args.occurrences_limit.forall(count_listed_occurrences < _) &&
               !redundant_problem(state, problem)) {
             occurrences.getOrElseUpdate(problem.key, new mutable.ListBuffer[JSON.Object.T]) +=
-              problem.json(doc, opts.snippet_lines)
+              problem.json(doc, args.snippet_lines)
             count_listed_occurrences += 1
           }
         }
         if (include_details) {
           if (problems.nonEmpty) {
-            if (opts.problematic_limit.forall(count_problematic < _))
+            if (args.problematic_limit.forall(count_problematic < _))
               returned_commands += state.json(doc, details)
             count_problematic += 1
           }
           else {
-            if (opts.unproblematic_limit.forall(count_unproblematic < _))
+            if (args.unproblematic_limit.forall(count_unproblematic < _))
               returned_commands += state.json(doc, details)
             count_unproblematic += 1
           }
@@ -418,7 +336,7 @@ object PIDE_MCP_Command {
       }
       def occurrences_entry(
         key: String,
-        message_kind: Option[Message_Kind]
+        message_kind: Option[PIDE_MCP_Message.Message_Kind]
       ): Option[JSON.Object.Entry] =
         Option.when(counts(key) > 0) {
           val name = message_kind.fold("occurrences")("without_" + _)
@@ -432,12 +350,54 @@ object PIDE_MCP_Command {
         Some("total_timing_ms" -> total_timing_ms) ::
         List(Status.running, Status.failed, Status.warned, Status.canceled)
           .map(status => occurrences_entry(status.name, status.message_kind)) :::
-        List(bad, Message_Kind.errors.toString, Message_Kind.warnings.toString)
+        List(bad, PIDE_MCP_Message.Message_Kind.errors.toString,
+          PIDE_MCP_Message.Message_Kind.warnings.toString)
           .map(occurrences_entry(_, None)) :::
         List(Status.unprocessed, Status.finished).map(status => count_entry(status.name)))) +
       ("cmds" -> (JSON_Object("count" -> count) ++
         JSON_Object.if_proper(include_details, JSON_Object(
           "count_returned" -> returned_commands.length, "cmds" -> returned_commands.toList))))
     }
+  }
+
+  def await(
+    session: PIDE_MCP_Session,
+    commands: List[Command],
+    stop: List[Document_Status.Command_Status] => Boolean,
+    timeout: Option[Time],
+    delay: Time,
+    progress: Progress
+  ): (Document.Snapshot, List[Command], Boolean) = {
+    val start = Time.now()
+    var terminated = 0
+    session.await_while_ready(progress, s"commands ($terminated/${commands.length} terminated)",
+      delay) {
+      val snapshot = session.snapshot()
+      val survivors = commands.filter(cmd =>
+        snapshot.version.nodes(cmd.node_name).commands.contains(cmd))
+      val statuses = survivors.map(snapshot.state.command_status(snapshot.version, _))
+      terminated = statuses.count(_.is_terminated)
+      val stopped = stop(statuses)
+      Option.when(stopped || timeout.exists(Time.now() - start >= _))(
+        (snapshot, survivors, !stopped))
+    }
+  }
+
+  def await_states(
+    session: PIDE_MCP_Session,
+    snapshot: Document.Snapshot,
+    range: Option[Text.Range],
+    stop: List[Document_Status.Command_Status] => Boolean,
+    timeout: Option[Time],
+    delay: Time,
+    progress: Progress
+  ): (Document.Snapshot, Iterator[State], Int, Boolean) = {
+    val selection = select(snapshot, range)
+    val commands = selection.filterNot { case sel @ (cmd, _) =>
+      cmd.is_ignored && States(snapshot, List(sel)).forall(_.is_ignorable_for_good) }.map(_._1)
+    val (snapshot1, survivors, timed_out) = await(session, commands, stop, timeout, delay, progress)
+    val node_snapshot = session.switch(snapshot1, snapshot.node_name)
+    (node_snapshot, States(node_snapshot, selection),
+      commands.count(cmd => !cmd.is_ignored && !survivors.contains(cmd)), timed_out)
   }
 }

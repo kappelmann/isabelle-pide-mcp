@@ -8,8 +8,9 @@ import isabelle._
 
 class Tool_List_Extensions extends PIDE_MCP_Tool("list_extensions") {
   def description: String = "List services and tools."
-  private val include_details_arg = PIDE_MCP_Tool_Arg.bool_default("include_details", "", false)
-  def input_schema: JSON.Object.T = PIDE_MCP_Tool_Schema.input_schema(List(include_details_arg))
+  private val include_details_arg = JSON_Schema.Arg.default(
+    "include_details", "", JSON_Schema.Format.bool, false)
+  def input_schema: JSON.Object.T = JSON_Schema.object_schema(List(include_details_arg))
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
   def handle(

@@ -1,28 +1,21 @@
 (* :mode=isabelle-options: *)
 
+section "Startup"
+
 option pide_mcp_exit_on_failed_option_sessions : bool = true for pide_mcp
   -- "exit when a session specified in options fails to start"
 
 option pide_mcp_await_option_sessions : bool = true for pide_mcp
   -- "await sessions specified in options before starting the MCP server"
 
-option pide_mcp_range_context : int = 50 for pide_mcp
-  -- "lines around a read or edited range that are added to the PIDE perspective"
 
-option pide_mcp_unicode_symbols_disk : bool = false for pide_mcp
-  -- "store Isabelle symbols in source files via Unicode"
-
-option pide_mcp_file_watcher_delay : real = 0.5 for pide_mcp
-  -- "delay for polling loaded files for external changes (seconds)"
-
-option pide_mcp_session_progress_delay : real = 5.0 for pide_mcp
-  -- "delay for progress messages of potentially blocking PIDE session operations (seconds)"
-
-option pide_mcp_progress_threshold : real = 20 for pide_mcp
-  -- "threshold for long-running commands (seconds)"
+section "Sessions"
 
 option pide_mcp_session_statistics_limit : int = 200 for pide_mcp
   -- "maximum number of buffered runtime statistics samples per session"
+
+
+section "Extensions"
 
 option pide_mcp_services_include : string = "*" for pide_mcp
   -- "comma-separated names of services to run or \"*\" to run all"
@@ -35,3 +28,30 @@ option pide_mcp_tools_include : string = "*" for pide_mcp
 
 option pide_mcp_tools_exclude : string = "" for pide_mcp
   -- "comma-separated names of tools not to serve or \"*\" to serve none"
+
+option pide_mcp_file_watcher_delay : real = 0.5 for pide_mcp
+  -- "delay for polling loaded files for external changes (seconds)"
+
+option pide_mcp_get_state_delay : real = 0.1 for pide_mcp
+  -- "delay for checking command status while awaiting commands (seconds)"
+
+
+section "Documents"
+
+option pide_mcp_range_context : int = 50 for pide_mcp
+  -- "lines around a read or edited range that are added to the PIDE perspective"
+
+option pide_mcp_unicode_symbols_disk : bool = false for pide_mcp
+  -- "store Isabelle symbols in source files via Unicode"
+
+
+section "Timing"
+
+option pide_mcp_poll_delay : real = 0.02 for pide_mcp
+  -- "delay for polling during potentially blocking PIDE session operations (seconds)"
+
+option pide_mcp_session_progress_delay : real = 5.0 for pide_mcp
+  -- "delay for progress messages of potentially blocking PIDE session operations (seconds)"
+
+option pide_mcp_progress_threshold : real = 20 for pide_mcp
+  -- "threshold for long-running commands (seconds)"

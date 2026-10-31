@@ -42,7 +42,7 @@ To interactively explore the agent's changes, you may also run an Isabelle/jEdit
     and Isabelle options passed to the editor session (e.g. base session and included session directories) also have to be passed to the MCP server.
 - **If you edit the same files as the MCP server, it will only see your changes once they are written to disk.**
     The `file_watcher` service synchronises disk changes of loaded files to the PIDE session.
-    The MCP's read and edit tools further synchronize with disk immediately.
+    Many tools further synchronise their used files with disk immediately.
     Vice versa, **if a file is edited via the MCP server, you may need to manually reload the file in your editor** in case the editor does not auto-reload on disk changes.
     In Isabelle/jEdit, it is sometimes necessary to reload manually (e.g. by using the F5 key). Isabelle/VSCode supports auto-reload. 
     Avoid editing a file while the agent works on it. You might have to merge conflicts by hand otherwise.

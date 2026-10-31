@@ -14,20 +14,18 @@ object PIDE_MCP_Query {
     output: Editor.Output,
     command: Option[Command]
   ) {
-    def messages: List[PIDE_MCP_Command.Message] = {
-      val ranges =
-        command.flatMap(cmd => output.snapshot.command_start(cmd).map(cmd.range + _)).toList
+    def messages: List[PIDE_MCP_Message.Message] = {
+      val ranges = command.flatMap(cmd =>
+        output.snapshot.command_start(cmd).map(cmd.range + _)).toList
       output.messages.flatMap(elem =>
-        PIDE_MCP_Command.Message_Kind.of(elem).map(kind =>
-          PIDE_MCP_Command.Message(kind,
-            command.fold(elem)(PIDE_MCP_Command.output_positions(output.snapshot, _, elem)),
-            ranges)))
+        PIDE_MCP_Message.Message_Kind.of(elem).map(kind =>
+          PIDE_MCP_Message.Message(kind, elem, ranges, output.snapshot, command)))
     }
 
-    def json(kinds: List[PIDE_MCP_Command.Message_Kind]): JSON.Object.T =
+    def json(kinds: List[PIDE_MCP_Message.Message_Kind]): JSON.Object.T =
       JSON_Object.flatten(
         List(Some("status" -> outcome.toString), Some("elapsed_ms" -> elapsed.ms)) :::
-        PIDE_MCP_Command.messages_json(messages.groupBy(_.kind), kinds))
+        PIDE_MCP_Message.messages_json(messages.groupBy(_.kind), kinds))
   }
 }
 
@@ -54,12 +52,10 @@ class PIDE_MCP_Query(
 
   def finished: Boolean = status.value == Query_Operation.Status.finished
 
-  private def require_alive(): Unit = {
-    session.require_ready()
+  private def require_command(): Unit =
     for (command <- query.get_location)
       if (!session.node_snapshot(command.node_name).node.commands.contains(command))
         error(s"The command of the $operation query in $origin is gone")
-  }
 
   def run(
     args: List[String],
@@ -77,17 +73,14 @@ class PIDE_MCP_Query(
     query.activate()
     try {
       editor.send_wait_dispatcher { query.apply_query(args) }
-      val outcome =
-        PIDE_MCP_Progress.await(progress, s"Awaiting $operation",
-          session.session.output_delay, session.progress_delay) {
-          if (finished) Some(PIDE_MCP_Query.Outcome.finished)
-          else if (stop(output.value)) Some(PIDE_MCP_Query.Outcome.stopped)
-          else {
-            require_alive()
-            if (timeout.exists(Time.now() - start > _)) Some(PIDE_MCP_Query.Outcome.timeout)
-            else None
-          }
+      val outcome = session.await_while_ready(progress, operation) {
+        if (finished) Some(PIDE_MCP_Query.Outcome.finished)
+        else if (stop(output.value)) Some(PIDE_MCP_Query.Outcome.stopped)
+        else {
+          require_command()
+          Option.when(timeout.exists(Time.now() - start > _))(PIDE_MCP_Query.Outcome.timeout)
         }
+      }
       PIDE_MCP_Query.Result(outcome, Time.now() - start, output.value, query.get_location)
     }
     finally {

@@ -13,12 +13,13 @@ class Tool_Create_Scratch extends PIDE_MCP_Tool("create_scratch") {
     "Create a temporary file for experimentation. " +
     "Files are cleaned up on session stop."
 
-  private val name_suffix_arg = PIDE_MCP_Tool_Arg.opt_string(
-    "name_suffix", "Label to identify the file. Default: auto-generated.")
-  private val extension_arg = PIDE_MCP_Tool_Arg.string_default(
-    "ext", "File extension.", ".thy")
+  private val name_suffix_arg = JSON_Schema.Arg.optional(
+    "name_suffix", "Label to identify the file. Default: auto-generated.",
+    JSON_Schema.Format.string)
+  private val extension_arg = JSON_Schema.Arg.default(
+    "ext", "File extension.", JSON_Schema.Format.string, ".thy")
 
-  def input_schema: JSON.Object.T = PIDE_MCP_Tool_Schema.input_schema(
+  def input_schema: JSON.Object.T = JSON_Schema.object_schema(
     List(PIDE_MCP_Tool_Schema.running_session_arg, name_suffix_arg, extension_arg))
 
   private val scratch_prefix: String = "Scratch_"
@@ -52,8 +53,7 @@ class Tool_Create_Scratch extends PIDE_MCP_Tool("create_scratch") {
     val suffix = name_suffix.getOrElse(Date.now().format(Date.Format("yyyy_MM_dd_HH_mm_ss_SSS")))
     val base_name = scratch_prefix + suffix
     val file_name = base_name + extension
-    val file_path =
-      (File.path(get_scratch_dir(session_id)) + Path.basic(file_name)).canonical
+    val file_path = (File.path(get_scratch_dir(session_id)) + Path.basic(file_name)).canonical
     (file_path, file_path.file.createNewFile())
   }
 

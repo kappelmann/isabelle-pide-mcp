@@ -8,7 +8,7 @@ import isabelle._
 
 class Tool_List_Sessions extends PIDE_MCP_Tool("list_sessions") {
   def description: String = "List all sessions."
-  def input_schema: JSON.Object.T = PIDE_MCP_Tool_Schema.input_schema(Nil)
+  def input_schema: JSON.Object.T = JSON_Schema.object_schema(Nil)
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("readOnlyHint" -> true))
 
   def handle(

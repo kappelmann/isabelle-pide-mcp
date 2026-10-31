@@ -7,7 +7,6 @@ JSON-RPC server loop for the Model Context Protocol.
 package isabelle.pide.mcp
 
 import isabelle._
-import PIDE_MCP_Protocol._
 
 import java.io.{BufferedReader, BufferedWriter, InputStreamReader, OutputStreamWriter}
 
@@ -45,7 +44,7 @@ class PIDE_MCP_Server(
     case Input_Failure(exn: Throwable) extends Event
     case Interrupt extends Event
     case Tool_Progress(id: JSON_RPC.Id,
-      token: Progress_Token,
+      token: PIDE_MCP_Protocol.Progress_Token,
       serial: Long,
       message: String
     ) extends Event
@@ -55,7 +54,7 @@ class PIDE_MCP_Server(
   private class Tool_Task(
     id: JSON_RPC.Id,
     tool: PIDE_MCP_Tool,
-    val call: Tool_Call,
+    val call: PIDE_MCP_Protocol.Tool_Call,
     events: Mailbox[Event]
   ) extends Progress_Task(
     name = "pide_mcp_tool_call_" + id,
@@ -77,7 +76,7 @@ class PIDE_MCP_Server(
     val events = Mailbox[Event]()
     val out = new BufferedWriter(new OutputStreamWriter(System.out, UTF8.charset))
     var tool_tasks = Map.empty[JSON_RPC.Id, Tool_Task]
-    def progress_token_owner(token: Progress_Token): Option[JSON_RPC.Id] =
+    def progress_token_owner(token: PIDE_MCP_Protocol.Progress_Token): Option[JSON_RPC.Id] =
       tool_tasks.collectFirst {
         case (id, task) if task.call.progress_token.contains(token) => id
       }
@@ -117,36 +116,36 @@ class PIDE_MCP_Server(
     }
     startup_task.start()
 
-    val result =
-      Exn.capture {
-        Exn.Interrupt.signal_handler(run_state.events.send(Event.Interrupt)) {
-          var running = true
-          while (running) {
-            for (event <- run_state.events.receive() if running) event match {
-              case Event.Startup_Failure(exn) =>
-                Exn.capture { log.error_message(s"Startup failure: ${Exn.print(exn)}") }
-                throw exn
-              case Event.Input(line) => handle_input(line, run_state)
-              case Event.Input_Closed => running = false
-              case Event.Interrupt =>
-                log("Interrupt: shutting down...")
-                running = false
-              case Event.Input_Failure(exn) =>
-                Exn.capture { log.error_message(s"Input failure: ${Exn.print(exn)}") }
-                throw exn
-              case Event.Tool_Progress(id, token, serial, message) =>
-                if (run_state.tool_tasks.contains(id))
-                  respond(run_state.out, progress_notification(token, serial, message))
-              case Event.Tool_Result(id, tool_result) =>
-                val opt_task = run_state.tool_tasks.get(id)
-                require(opt_task.isDefined,
-                  s"Active tool task expected: ${JSON.Format(id)}")
-                run_state.tool_tasks -= id
-                handle_tool_result(id, opt_task.get, tool_result, run_state.out)
-            }
+    val result = Exn.capture {
+      Exn.Interrupt.signal_handler(run_state.events.send(Event.Interrupt)) {
+        var running = true
+        while (running) {
+          for (event <- run_state.events.receive() if running) event match {
+            case Event.Startup_Failure(exn) =>
+              Exn.capture { log.error_message(s"Startup failure: ${Exn.print(exn)}") }
+              throw exn
+            case Event.Input(line) => handle_input(line, run_state)
+            case Event.Input_Closed => running = false
+            case Event.Interrupt =>
+              log("Interrupt: shutting down...")
+              running = false
+            case Event.Input_Failure(exn) =>
+              Exn.capture { log.error_message(s"Input failure: ${Exn.print(exn)}") }
+              throw exn
+            case Event.Tool_Progress(id, token, serial, message) =>
+              if (run_state.tool_tasks.contains(id))
+                respond(run_state.out,
+                  PIDE_MCP_Protocol.progress_notification(token, serial, message))
+            case Event.Tool_Result(id, tool_result) =>
+              val opt_task = run_state.tool_tasks.get(id)
+              require(opt_task.isDefined,
+                s"Active tool task expected: ${JSON.Format(id)}")
+              run_state.tool_tasks -= id
+              handle_tool_result(id, opt_task.get, tool_result, run_state.out)
           }
         }
       }
+    }
     val log_result = Exn.capture { log("Stopping tasks...") }
     val tasks = startup_task :: run_state.tool_tasks.valuesIterator.toList
     val stop_result = Exn.capture {
@@ -175,10 +174,10 @@ class PIDE_MCP_Server(
     Exn.result {
       val method = JSON.string(request, "method")
       val opt_id = JSON_RPC.id(request)
-      if (JSON.string(request, "jsonrpc") != Some(Config.jsonrpc_version)) {
+      if (JSON.string(request, "jsonrpc") != Some(JSON_RPC.version)) {
         respond(run.out, JSON_RPC.error(opt_id.getOrElse(null),
           JSON_RPC.Error_Code.INVALID_REQUEST,
-          s"Bad request: expected jsonrpc version ${Config.jsonrpc_version}"))
+          s"Bad request: expected jsonrpc version ${JSON_RPC.version}"))
       }
       // messages without id are notifications, requiring a method but no response
       else if (!request.contains("id")) {
@@ -221,7 +220,7 @@ class PIDE_MCP_Server(
     request: JSON.Object.T,
     tool_tasks: Map[JSON_RPC.Id, Tool_Task]
   ): Unit =
-    Exn.result { parse_cancellation_notification(request) } match {
+    Exn.result { PIDE_MCP_Protocol.read_cancellation(request) } match {
       case Exn.Res(cancellation) =>
         for (task <- tool_tasks.get(cancellation.id) if !task.stopped) {
           log("Cancelling tool call " + JSON.Format(cancellation.id) +
@@ -238,14 +237,15 @@ class PIDE_MCP_Server(
     request: JSON.Object.T,
     out: BufferedWriter
   ): Unit = {
-    Exn.result { parse_initialize_request(request) } match {
+    Exn.result { PIDE_MCP_Protocol.read_initialize(request) } match {
       case Exn.Exn(exn) => respond(out, JSON_RPC.error(id,
         JSON_RPC.Error_Code.INVALID_PARAMS, Exn.message(exn)))
       case Exn.Res(client_version) => respond(out, JSON_RPC.result(id, JSON_Object(
-        "protocolVersion" -> decide_protocol_version(client_version),
+        "protocolVersion" -> PIDE_MCP_Protocol.decide_protocol_version(client_version),
         "capabilities" -> JSON_Object("tools" -> JSON_Object()),
-        "serverInfo" -> JSON_Object("name" -> Config.name, "version" -> Config.version),
-        "instructions" -> Config.instructions)))
+        "serverInfo" -> JSON_Object("name" -> PIDE_MCP_Protocol.Config.name,
+          "version" -> PIDE_MCP_Protocol.Config.version),
+        "instructions" -> PIDE_MCP_Protocol.Config.instructions)))
     }
   }
 
@@ -259,7 +259,7 @@ class PIDE_MCP_Server(
     request: JSON.Object.T,
     run: Run
   ): Unit = {
-    Exn.result { parse_tool_call(request) } match {
+    Exn.result { PIDE_MCP_Protocol.read_tool_call(request) } match {
       case Exn.Exn(exn) => respond(run.out, JSON_RPC.error(id,
         JSON_RPC.Error_Code.INVALID_PARAMS, Exn.message(exn)))
       case Exn.Res(call) => call.progress_token.flatMap(token =>
@@ -289,14 +289,14 @@ class PIDE_MCP_Server(
     result match {
       case Exn.Res(_) if task.stopped =>
       case Exn.Res(PIDE_MCP_Tool_Result.Res(result)) =>
-        respond(out, JSON_RPC.result(id, tool_result(result)))
+        respond(out, JSON_RPC.result(id, PIDE_MCP_Protocol.tool_result(result)))
       case Exn.Res(PIDE_MCP_Tool_Result.Error(result)) =>
-        respond(out, JSON_RPC.result(id, tool_result(result, is_error = true)))
+        respond(out, JSON_RPC.result(id, PIDE_MCP_Protocol.tool_result(result, is_error = true)))
       // thread interrupt ends the task, not the server
       case Exn.Exn(Exn.Interrupt()) =>
         if (!task.stopped)
-          respond(out, JSON_RPC.result(id, tool_result("Tool call was interrupted",
-            is_error = true)))
+          respond(out, JSON_RPC.result(id,
+            PIDE_MCP_Protocol.tool_result("Tool call was interrupted", is_error = true)))
       case Exn.Exn(exn) =>
         Exn.capture { respond_internal_error(id, out, exn) }
         throw exn

@@ -10,7 +10,6 @@ import isabelle._
 
 object PIDE_MCP_Tool_Util {
   val retry_soon_message: String = "Please retry soon."
-  val default_start_line: Int = 1
 
   def running_session_param(
     sessions: PIDE_MCP_Sessions,
@@ -60,40 +59,4 @@ object PIDE_MCP_Tool_Util {
     snapshot
   }
 
-  def require_ordered_lines(
-    start_line: Int,
-    end_line: Option[Int]
-  ): Unit = {
-    for (stop <- end_line if stop < start_line)
-      error(s"end_line $stop < start_line $start_line")
-  }
-
-  def require_lines_in_bounds(
-    start_line: Int,
-    end_line: Option[Int],
-    total_lines: Int
-  ): Unit = {
-    if (start_line < 1 || start_line > (total_lines max default_start_line))
-      error(s"start_line $start_line out of bounds (file has $total_lines lines)")
-    for (stop <- end_line if stop < 1 || stop > total_lines)
-      error(s"end_line $stop out of bounds (file has $total_lines lines)")
-  }
-
-  def require_valid_lines(
-    start_line: Int,
-    end_line: Option[Int],
-    total_lines: Int
-  ): Unit = {
-    require_ordered_lines(start_line, end_line)
-    require_lines_in_bounds(start_line, end_line, total_lines)
-  }
-
-  def resolve_lines(
-    start_line: Int,
-    end_line: Option[Int],
-    total_lines: Int
-  ): (Int, Int) = {
-    require_valid_lines(start_line, end_line, total_lines)
-    (start_line, end_line.getOrElse(total_lines))
-  }
 }

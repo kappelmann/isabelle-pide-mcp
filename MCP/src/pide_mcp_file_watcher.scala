@@ -6,11 +6,18 @@ package isabelle.pide.mcp
 
 import isabelle._
 
+import java.io.{File => JFile}
+import java.nio.file.Files
+import java.nio.file.attribute.BasicFileAttributes
+
 object PIDE_MCP_File_Watcher {
   type Stamp = Option[(Long, Long)]
 
-  def stamp(path: Path): Stamp =
-    try { if (path.is_file) Some((path.file.lastModified, File.size(path))) else None }
+  def stamp(file: JFile): Stamp =
+    try {
+      val attrs = Files.readAttributes(file.toPath, classOf[BasicFileAttributes]).nn
+      if (attrs.isRegularFile) Some((attrs.lastModifiedTime.nn.toMillis, attrs.size)) else None
+    }
     catch { case ERROR(_) => None }
 }
 
@@ -22,12 +29,15 @@ class PIDE_MCP_File_Watcher[A](
   delay: Time,
   log: Logger
 ) {
-  private var stamps = Map.empty[A, PIDE_MCP_File_Watcher.Stamp]
+  private var stamps = Map.empty[A, (JFile, PIDE_MCP_File_Watcher.Stamp)]
 
   private def check(): Unit = {
-    val current = files().iterator.map(a => a -> PIDE_MCP_File_Watcher.stamp(path(a))).toMap
+    val current = files().iterator.map { a =>
+      val file = stamps.get(a).fold(path(a).file)(_._1)
+      a -> (file, PIDE_MCP_File_Watcher.stamp(file))
+    }.toMap
     val changes = current.iterator.collect {
-      case (a, stamp @ Some(_)) if stamps.get(a).forall(_ != stamp) => a
+      case (a, (_, stamp @ Some(_))) if stamps.get(a).forall(_._2 != stamp) => a
     }.toList
     if (changes.nonEmpty) changed(changes)
     stamps = current

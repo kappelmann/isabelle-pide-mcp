@@ -9,28 +9,26 @@ package isabelle.pide.mcp
 import isabelle._
 
 object PIDE_MCP_Tool_Schema {
-  val implicit_load_file: String = "Implicitly loads file if required."
-  val implicit_reload_file: String = "Implicitly (re)loads file."
-  val range_perspective: String = "Moves PIDE perspective to the range."
-  val no_processing_wait: String = "Does not wait for commands to finish."
-  val session_restart: String =
-    "Use only when required: unresponsiveness or ROOT or base session updates."
+  val implicit_load_file: String = "Loads file if needed."
+  val implicit_reload_file: String = "(Re)loads file."
+  val range_perspective: String = "Moves PIDE perspective to range."
+  val no_processing_wait: String = "Does not wait for commands to terminate."
+  val session_restart: String = "Use only when required: " +
+    "unresponsiveness or ROOT or base session updates."
 
-  val running_session_arg = PIDE_MCP_Tool_Arg.opt_string(
-    "session", "Running session id. Default: unique running session.")
-  val running_sessions_arg = PIDE_MCP_Tool_Arg.opt_strings(
-    "sessions", "Running session ids. Default: all running sessions.")
-  val origin_arg = PIDE_MCP_Tool_Arg.string(
-    "origin",
-    s"Session-qualified theory name (e.g. ${quote("HOL.Nat")}) or file path.")
-  val start_line_arg = PIDE_MCP_Tool_Arg.int(
-    "start_line", "", minimum = Some(1))
-  val start_line_default_arg = PIDE_MCP_Tool_Arg.int_default(
-    "start_line", "", PIDE_MCP_Tool_Util.default_start_line, minimum = Some(1))
-  val opt_end_line_arg = PIDE_MCP_Tool_Arg.opt_int(
-    "end_line", "Default: end of file.", minimum = Some(1))
-
-  def input_schema(args: List[PIDE_MCP_Tool_Arg[?]]): JSON.Object.T =
-    JSON_Object("type" -> "object", "properties" -> JSON_Object(args.map(_.entry))) ++
-    JSON.optional("required" -> proper_list(args.filter(_.required).map(_.name)))
+  val running_session_arg = JSON_Schema.Arg.optional(
+    "session", "Running session id. Default: unique running one.",
+    JSON_Schema.Format.string)
+  val running_sessions_arg = JSON_Schema.Arg.optional(
+    "sessions", "Running session ids. Default: all running ones.",
+    JSON_Schema.Format.list(JSON_Schema.Format.string))
+  val origin_arg = JSON_Schema.Arg.required("origin",
+    s"Session-qualified theory (e.g. ${quote("HOL.Nat")}) or file path.",
+    JSON_Schema.Format.string)
+  val start_line_arg = JSON_Schema.Arg.required(
+    "start_line", "", JSON_Schema.Format.int(minimum = Some(1)))
+  val start_line_default_arg = JSON_Schema.Arg.default(
+    "start_line", "", JSON_Schema.Format.int(minimum = Some(1)), 1)
+  val opt_end_line_arg = JSON_Schema.Arg.optional(
+    "end_line", "Default: end of file.", JSON_Schema.Format.int(minimum = Some(1)))
 }

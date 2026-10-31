@@ -10,11 +10,12 @@ class Tool_Stop_Session extends PIDE_MCP_Tool("stop_session") {
   def description: String = "Stop sessions. " +
     PIDE_MCP_Tool_Schema.session_restart
 
-  private val sessions_arg = PIDE_MCP_Tool_Arg.opt_strings(
-    "sessions", "Stoppable session ids. Default: all stoppable sessions.")
+  private val sessions_arg = JSON_Schema.Arg.optional(
+    "sessions", "Stoppable session ids. Default: all stoppable sessions.",
+    JSON_Schema.Format.list(JSON_Schema.Format.string))
 
   def input_schema: JSON.Object.T =
-    PIDE_MCP_Tool_Schema.input_schema(List(sessions_arg))
+    JSON_Schema.object_schema(List(sessions_arg))
 
   override def annotations: Option[JSON.Object.T] = Some(JSON_Object("destructiveHint" -> true))
 

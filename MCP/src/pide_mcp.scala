@@ -27,10 +27,10 @@ object PIDE_MCP {
   val isabelle_tool = Isabelle_Tool("pide_mcp", "Isabelle PIDE MCP server", Scala_Project.here,
     { args =>
       var log_path: Option[Path] = None
-      var session_specs: List[PIDE_MCP_Session.Spec] = Nil
+      var session_specs: List[PIDE_MCP_Session_Spec] = Nil
       var verbose = false
       var log_messages = false
-      val session_spec = new PIDE_MCP_Session.Spec.Builder
+      val session_spec = new PIDE_MCP_Session_Spec.Builder
 
       val getopts = Getopts("""
 Usage: isabelle pide_mcp [OPTIONS]
@@ -43,14 +43,14 @@ Usage: isabelle pide_mcp [OPTIONS]
     plus any session options, starting a PIDE session.
     Passed Isabelle system options are inherited by the sessions given via -S.
 
-  """ + PIDE_MCP_Session.Spec.usage + """
+  """ + PIDE_MCP_Session_Spec.usage + """
   Start an MCP (Model Context Protocol) server over stdin/stdout that manages
   headless PIDE sessions.
 """,
         List(
           "L:" -> (arg => log_path = Some(PIDE_MCP_Util.path(arg))),
           "S:" -> (arg =>
-            session_specs = session_specs ::: List(PIDE_MCP_Session.Spec.parse(arg))),
+            session_specs = session_specs ::: List(PIDE_MCP_Session_Spec.parse(arg))),
           "v" -> (_ => verbose = true),
           "w" -> (_ => log_messages = true))
           ::: session_spec.option_specs: _*)
@@ -59,8 +59,7 @@ Usage: isabelle pide_mcp [OPTIONS]
       if (more_args.nonEmpty) getopts.usage()
 
       val base_options: Options.Update = session_spec.spec.map(_.options).getOrElse(Nil)
-      val specs =
-        (if (session_spec.has_session_option) session_spec.spec.toList else Nil) :::
+      val specs = (if (session_spec.has_session_option) session_spec.spec.toList else Nil) :::
         session_specs.map(spec => spec.copy(options = base_options ::: spec.options))
       val options = Options.init(update = base_options)
       val threshold = progress_threshold(options)
@@ -71,8 +70,8 @@ Usage: isabelle pide_mcp [OPTIONS]
             verbose = verbose, threshold = threshold, detailed = false, stderr = true)
         }
       val log = Logger.make_progress(progress)
-      val service_table =
-        PIDE_MCP_Service.make_table(services_include(options), services_exclude(options))
+      val service_table = PIDE_MCP_Service.make_table(services_include(options),
+        services_exclude(options))
       val tool_table = PIDE_MCP_Tool.make_table(tools_include(options), tools_exclude(options))
       val sessions = new PIDE_MCP_Sessions(service_table, tool_table, log, progress, options)
       val server = new PIDE_MCP_Server(sessions, log, progress, log_messages)

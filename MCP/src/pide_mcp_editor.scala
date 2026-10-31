@@ -31,7 +31,7 @@ class PIDE_MCP_Editor(mcp_session: PIDE_MCP_Session, progress: Progress) extends
   def output_state(): Boolean = mcp_session.options.bool("editor_output_state")
 
   def node_overlays(name: Document.Node.Name): Document.Node.Overlays =
-    mcp_session.snapshot().get_node(name).perspective.overlays
+    mcp_session.tip_version(progress).nodes(name).perspective.overlays
   def insert_overlay(command: Command, fn: String, args: List[String]): Unit =
     mcp_session.insert_overlay(command, fn, args, progress)
   def remove_overlay(command: Command, fn: String, args: List[String]): Unit =

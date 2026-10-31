@@ -21,10 +21,9 @@ object Tool_Create_File {
 class Tool_Create_File extends PIDE_MCP_Tool("create_file") {
   def description: String =
     "Create an empty file (and parent directories) at the given path."
-  private val path_arg = PIDE_MCP_Tool_Arg.string(
-    "path", "")
+  private val path_arg = JSON_Schema.Arg.required("path", "", JSON_Schema.Format.string)
 
-  def input_schema: JSON.Object.T = PIDE_MCP_Tool_Schema.input_schema(List(path_arg))
+  def input_schema: JSON.Object.T = JSON_Schema.object_schema(List(path_arg))
 
   def handle(
     sessions: PIDE_MCP_Sessions,

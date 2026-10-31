@@ -45,7 +45,7 @@ object PIDE_MCP_Definition {
     snippet = Option.when(snippet_lines > 0)(
       PIDE_MCP_Util.numbered_lines_range(context.lines(node_name), line, line + snippet_lines - 1)))
 
-  def apply(
+  def resolve(
     context: Context,
     name_space_entry: Name_Space.Entry,
     name: String,
@@ -54,7 +54,7 @@ object PIDE_MCP_Definition {
     def_entry_not_loaded: String
   ): Option[PIDE_MCP_Definition] = {
     val session = context.session
-    def make(origin: String, line: Int): Option[PIDE_MCP_Definition] =
+    def resolve_at(origin: String, line: Int): Option[PIDE_MCP_Definition] =
       try {
         val node_name = session.node_name(origin)
         val node_origin = session.origin(node_name)
@@ -63,10 +63,10 @@ object PIDE_MCP_Definition {
       }
       catch { case ERROR(msg) => Some(unresolved(name_space_entry, name, origin, line, msg)) }
     name_space_entry.properties match {
-      case Position.Item_Def_File(def_file, def_line, _) => make(def_file, def_line)
+      case Position.Item_Def_File(def_file, def_line, _) => resolve_at(def_file, def_line)
       case Position.Item_Def_Id(def_id, def_range) =>
         context.snapshot.find_command_position(def_id, def_range.start) match {
-          case Some(pos) => make(pos.name, pos.line1)
+          case Some(pos) => resolve_at(pos.name, pos.line1)
           case None => Some(PIDE_MCP_Definition(name, name_space_entry.kind,
             def_label(name_space_entry), note = Some(def_entry_not_loaded)))
         }
@@ -90,7 +90,7 @@ object PIDE_MCP_Definition {
       case (definitions, Text.Info(r, XML.Elem(Markup.Entity(name_space_entry), _)))
       if kinds.contains(name_space_entry.kind) =>
         val name = PIDE_MCP_Util.display_name(Some(name_space_entry), r, snapshot.node.source)
-        PIDE_MCP_Definition(context, name_space_entry, name, snippet_lines,
+        resolve(context, name_space_entry, name, snippet_lines,
           filter_origins, def_entry_not_loaded).map(_ :: definitions)
       case _ => None
     }).flatMap(_.info)

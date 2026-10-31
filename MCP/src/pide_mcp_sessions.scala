@@ -62,13 +62,12 @@ class PIDE_MCP_Sessions(
     if (!entries.contains(base)) base
     else Iterator.from(2).map(base + "#" + _).find(!entries.contains(_)).get
 
-  private class Entry(val id: String, spec: PIDE_MCP_Session.Spec, caller_progress: Progress) {
+  private class Entry(val id: String, spec: PIDE_MCP_Session_Spec, caller_progress: Progress) {
     private val session_future = Future.promise[PIDE_MCP_Session]
     private val start_thread = Synchronized[Option[Thread]](None)
     private val start_progress = new Sub_Progress(caller_progress)
     private val built = Synchronized(false)
-    private val phase_consumer =
-      Synchronized[Option[Session.Consumer[Session.Phase]]](None)
+    private val phase_consumer = Synchronized[Option[Session.Consumer[Session.Phase]]](None)
 
     private val stop_request = Synchronized[Option[Promise[List[Throwable]]]](None)
 
@@ -127,32 +126,30 @@ class PIDE_MCP_Sessions(
     }
 
     def start(): PIDE_MCP_Session = {
-      val started_before =
-        start_thread.change_result {
-          case None => (false, Some(Thread.currentThread().nn))
-          case starter => (true, starter)
-        }
+      val started_before = start_thread.change_result {
+        case None => (false, Some(Thread.currentThread().nn))
+        case starter => (true, starter)
+      }
       if (started_before) error(s"PIDE session ${quote(id)} was already started")
       var started: Option[PIDE_MCP_Session] = None
       try {
         log(s"Starting PIDE session ${quote(id)} " +
           s"with base session ${quote(spec.logic)}...")
         start_progress.expose_interrupt()
-        val (options, session_background) =
-          build_lock.with_lock(start_progress, s"Awaiting build queue for session ${quote(id)}",
-            build_delay, build_progress_delay) { PIDE_MCP_Session.build(spec, start_progress) }
+        val (options, session_background) = build_lock.with_lock(start_progress,
+          s"Awaiting build queue for session ${quote(id)}", build_delay, build_progress_delay) {
+          PIDE_MCP_Session.build(spec, start_progress)
+        }
         built.change(_ => true)
         start_progress.expose_interrupt()
-        val session =
-          Result.release(PIDE_MCP_Session(spec, options, session_background, log, start_progress))
+        val session = Result.release(
+          PIDE_MCP_Session(spec, options, session_background, log, start_progress))
         started = Some(session)
         val consumer = Session.Consumer[Session.Phase](this.class_name) {
           case Session.Terminated(result) if stop_request.value.isEmpty =>
             Exn.capture {
-              val syslog = session.session.syslog.content()
               log.error_message(s"PIDE session ${quote(id)} terminated unexpectedly: " +
-                PIDE_MCP_Util.print_process_result(result) +
-                if_proper(syslog, "\n" + syslog))
+                PIDE_MCP_Util.print_process_result(result))
             }
             Isabelle_Thread.fork(name = "pide_mcp_stop_" + id) {
               for (exn <- stop(base_progress))
@@ -178,8 +175,7 @@ class PIDE_MCP_Sessions(
       catch {
         case exn: Throwable =>
           val (is_owner, result) = claim_stop()
-          val failures =
-            try { started.toList.flatMap(shutdown(_, start_progress)) }
+          val failures = try { started.toList.flatMap(shutdown(_, start_progress)) }
             finally { remove_session(id) }
           if (is_owner) result.fulfill_result(Exn.Res(failures))
           val failure = PIDE_MCP_Util.failure(exn, failures)
@@ -207,7 +203,7 @@ class PIDE_MCP_Sessions(
   }
 
   def start_session(
-    spec: PIDE_MCP_Session.Spec,
+    spec: PIDE_MCP_Session_Spec,
     progress: Progress
   ): Result[PIDE_MCP_Session, Throwable] =
     Result.result {

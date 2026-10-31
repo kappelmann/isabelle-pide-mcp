@@ -9,6 +9,10 @@ New in this PIDE MCP version
 New in PIDE MCP 2026
 ----------------------------
 
+* New tool `edit_get_state`, combining `edit` and `get_state` to simplify a common request pairing.
+* `get_state` now takes `timeout` to await termination or failure of commands. Commands edited during the request are omitted.
+  New option `pide_mcp_get_state_delay` to set delay.
+* `get_state`, `find_entities`, and `sledgehammer` synchronise with disk.
 * New tool `list_extensions` to list enabled services and tools.
 * New service `file_watcher`: changes of loaded files on disk are synced with their PIDE state.
   Use option `pide_mcp_file_watcher_delay` to configure the polling delay.
@@ -23,7 +27,7 @@ New in PIDE MCP 2026
   New `details_problematic_limit`, `summary_problematic_limit`, and `include_summary_warnings`.
   `commands_limit` and `snippet_lines` are renamed to `details_unproblematic_limit` and `summary_snippet_lines`. INCOMPATIBILITY.
 * Running commands are now reported as `processing`. Shorter output keys (e.g. `cmds_*`, `thys_*`, `src`). INCOMPATIBILITY.
-* `get_session_state`: `include_commands_running` is renamed to `include_cmds_processing`; `include_loaded_theories`, `include_session_dirs`, and `include_options` to `list_*`.
+* `get_session_state`: `include_commands_running` is renamed to `include_cmds_processing`; `include_theory_status` to `include_thy_status`; `include_loaded_theories` to `list_loaded_thys`; `include_session_dirs` and `include_options` to `list_*`.
   Processing commands are grouped by origin. INCOMPATIBILITY.
 * `find_entities`: new `kinds` to select entity kinds. Results are grouped by definition site.
 * `create_scratch`: `extension` is renamed to `ext` with default `.thy`. Files are named `Scratch_<timestamp>`. INCOMPATIBILITY.

@@ -84,14 +84,12 @@ object PIDE_MCP_Theory {
     names: List[Document.Node.Name]
   ): JSON.Object.T =
     JSON_Object(names.flatMap { name =>
-      val node_snapshot = snapshot.switch(name)
+      val node_snapshot = session.switch(snapshot, name)
       lazy val doc = Line.Document(node_snapshot.node.source)
-      val entries =
-        (for {
-          state <- PIDE_MCP_Command.States.commands(node_snapshot, None)
-          if state.status.contains(PIDE_MCP_Command.Status.running)
-        } yield state.problem(PIDE_MCP_Command.Status.running)
-          .json(doc, PIDE_MCP_Command.States.default_snippet_lines)).toList
+      val entries = (for {
+        state <- PIDE_MCP_Command.States(node_snapshot, None)
+        if state.status.contains(PIDE_MCP_Command.Status.running)
+      } yield state.problem(PIDE_MCP_Command.Status.running).json(doc, 1)).toList
       proper_list(entries).map(session.origin(name) -> _)
     })
 }

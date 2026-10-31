@@ -31,7 +31,24 @@ object PIDE_MCP_Util {
     if (start_line - 1 > end_line) None
     else doc.text_range(Line.Range(Line.Position(start_line - 1), Line.Position(end_line)))
 
-  def text_perspective(
+  def check_ordered_lines(start_line: Int, end_line: Option[Int]): Unit =
+    for (stop <- end_line if stop < start_line) error(s"end_line $stop < start_line $start_line")
+
+  def check_lines(start_line: Int, end_line: Option[Int], total_lines: Int): (Int, Int) = {
+    check_ordered_lines(start_line, end_line)
+    if (start_line < 1 || start_line > (total_lines max 1))
+      error(s"start_line $start_line out of bounds (file has $total_lines lines)")
+    for (stop <- end_line if stop < 1 || stop > total_lines)
+      error(s"end_line $stop out of bounds (file has $total_lines lines)")
+    (start_line, end_line.getOrElse(total_lines))
+  }
+
+  def check_text_range(doc: Line.Document, start_line: Int, end_line: Option[Int]): Text.Range = {
+    val (first_line, last_line) = check_lines(start_line, end_line, doc.lines.length)
+    text_range(doc, first_line, last_line).get
+  }
+
+  def check_text_perspective(
     doc: Line.Document,
     line_ranges: List[(Int, Int)],
     context: Int
@@ -62,8 +79,8 @@ object PIDE_MCP_Util {
 
   def snippet(doc: Line.Document, range: Text.Range, snippet_lines: Int): String = {
     val start = doc.position(range.start).line1
-    val (shown, rest) =
-      Line.logical_lines(range.substring(doc.text).stripLineEnd).splitAt(snippet_lines)
+    val (shown, rest) = Line.logical_lines(range.substring(doc.text).stripLineEnd)
+      .splitAt(snippet_lines)
     val omitted = Option.when(rest.nonEmpty)(
       line_range(start + shown.length, start + shown.length + rest.length - 1) + ": ...")
     cat_lines(proper_string(numbered_lines(shown, start)).toList ::: omitted.toList)
@@ -90,6 +107,18 @@ object PIDE_MCP_Util {
   def restrict_text_range(text: String, range: Option[Text.Range]): Text.Range =
     intersect_range(Text.Range.length(text), range)
 
+  def restrict_ranges(ranges: Iterable[Text.Range], range: Text.Range): List[Text.Range] =
+    ranges.iterator.filter(_.overlaps(range)).map(_.restrict(range)).toList
+
   def elem_body_plain_text(elem: XML.Elem): String =
     Pretty.string_of(elem.body, pure = true)
+
+  def xml_json(tree: XML.Tree): JSON.Object.T =
+    tree match {
+      case XML.Elem(Markup(name, props), body) =>
+        val props_obj = JSON_Object(props)
+        val base = JSON_Object("name" -> name, "body" -> body.map(xml_json))
+        if (props_obj.isEmpty) base else base + ("props" -> props_obj)
+      case XML.Text(text) => JSON_Object("text" -> text)
+    }
 }
